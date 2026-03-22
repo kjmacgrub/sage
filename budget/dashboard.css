@@ -1,0 +1,746 @@
+/* ============================================================
+   Dashboard — dashboard.css
+   Extends styles.css (shared CSS variables and base styles)
+   ============================================================ */
+
+/* ── Multi-select category dropdown ──────────────────────── */
+
+.multi-select {
+    position: relative;
+}
+
+.multi-select-trigger {
+    font-family: var(--font);
+    font-size: 0.95rem;
+    padding: 0.55rem 2rem 0.55rem 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236e6e73' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1rem;
+    user-select: none;
+}
+
+.multi-select-trigger:hover,
+.multi-select-trigger.open {
+    border-color: var(--primary);
+}
+
+.multi-select-trigger.open {
+    box-shadow: 0 0 0 3px rgba(90, 122, 82, 0.1);
+}
+
+.multi-select-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 100%;
+    max-width: 320px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    z-index: 200;
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
+}
+
+.multi-select-panel.open {
+    display: block;
+}
+
+.multi-select-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+}
+
+.ms-action-btn {
+    font-family: var(--font);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--primary);
+    background: var(--primary-light);
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem 0.65rem;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.ms-action-btn:hover {
+    background: rgba(90, 122, 82, 0.2);
+}
+
+.ms-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    transition: background 0.1s;
+}
+
+.ms-checkbox-item:hover {
+    background: var(--primary-light);
+}
+
+.ms-checkbox-item input[type=checkbox] {
+    accent-color: var(--primary);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* Group header row */
+.ms-group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: var(--background);
+    border-top: 1px solid var(--border);
+    transition: background 0.1s;
+    user-select: none;
+    position: sticky;
+    top: 41px;
+}
+
+.ms-group-header:first-child {
+    border-top: none;
+}
+
+.ms-group-header:hover {
+    background: rgba(90, 122, 82, 0.08);
+}
+
+.ms-group-header input[type=checkbox] {
+    accent-color: var(--primary);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* Indented category rows */
+.ms-cat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.75rem 0.4rem 2rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    transition: background 0.1s;
+}
+
+.ms-cat-item:hover {
+    background: var(--primary-light);
+}
+
+.ms-cat-item input[type=checkbox] {
+    accent-color: var(--primary);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.ms-badge {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-radius: 10px;
+    padding: 0.1rem 0.5rem;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+}
+
+/* ── Dashboard container — tighter than Budget Planner ──────── */
+
+body .container {
+    padding: 1rem 1.5rem;
+}
+
+/* ── Controls card ────────────────────────────────────────── */
+
+.controls-card {
+    margin-bottom: 0.6rem;
+    padding: 0.75rem 1rem;
+}
+
+.tax-criteria-list {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    flex-wrap: nowrap !important;
+}
+
+.tax-criteria-list .control-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.tax-criteria-list .control-label {
+    display: block;
+    width: 155px;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+
+.controls-row {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    flex: 1;
+    min-width: 160px;
+}
+
+.control-group-sm {
+    flex: 0 0 80px;
+    min-width: 70px;
+}
+
+.control-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.control-select,
+.control-input {
+    font-family: var(--font);
+    font-size: 0.88rem;
+    padding: 0.38rem 0.65rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+    transition: border-color 0.15s ease;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.control-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236e6e73' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1rem;
+    padding-right: 2rem;
+    cursor: pointer;
+}
+
+.control-select:focus,
+.control-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(90, 122, 82, 0.1);
+}
+
+.control-input[type=number] {
+    -moz-appearance: textfield;
+    text-align: center;
+}
+
+.control-input::-webkit-outer-spin-button,
+.control-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+}
+
+/* ── Stat cards ───────────────────────────────────────────── */
+
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+}
+
+.stat-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 0.65rem 1rem;
+    box-shadow: var(--shadow);
+    text-align: center;
+    transition: box-shadow 0.15s ease;
+}
+
+.stat-card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+.stat-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.2rem;
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.expense-color { color: #c84b00; }
+.income-color  { color: #248a3d; }
+
+/* ── Chart ────────────────────────────────────────────────── */
+
+.chart-card {
+    margin-bottom: 0.6rem;
+    padding: 0.6rem 1rem 0.4rem;
+}
+
+.chart-wrap {
+    position: relative;
+    height: 180px;
+    width: 100%;
+}
+#yearChart {
+    cursor: pointer;
+}
+
+/* ── Tile grid layout ──────────────────────────────────────── */
+
+.tile-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+}
+
+.tile-card {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.tile-card .data-table {
+    font-size: 0.8rem;
+}
+
+.tile-card .card-body {
+    max-height: calc(100vh - 320px);
+    overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+    .tile-row { grid-template-columns: 1fr; }
+}
+
+/* ── Data tables ──────────────────────────────────────────── */
+
+.section-card {
+    margin-bottom: 0.6rem;
+}
+
+/* Override the shared section-card padding for dashboard */
+.container .section-card {
+    padding: 0;
+}
+
+.card-body {
+    padding: 0.75rem 1.25rem;
+}
+
+.section-heading {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.data-table th {
+    text-align: left;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+}
+
+.data-table th:not(:first-child),
+.data-table td:not(:first-child) {
+    text-align: right;
+}
+
+.data-table td {
+    padding: 0.35rem 0.6rem;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.data-table tr:last-child td {
+    border-bottom: none;
+}
+
+.data-table tbody tr:hover td {
+    background: var(--primary-light);
+}
+
+.total-row td {
+    font-weight: 700;
+    border-top: 2px solid var(--border) !important;
+    border-bottom: none !important;
+}
+
+.td-expense { color: #c84b00; }
+.td-income  { color: #248a3d; }
+.td-net-neg { color: var(--danger); }
+.td-net-pos { color: #248a3d; }
+.td-muted   { color: var(--text-secondary); }
+
+/* ── Responsive ───────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .controls-row {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .control-group,
+    .control-group-sm {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    .stats-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .stat-value {
+        font-size: 1.35rem;
+    }
+}
+
+/* ── View toggle (C1) ──────────────────────────────────────── */
+
+.view-toggle {
+    display: flex;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.view-btn {
+    font-family: var(--font);
+    font-size: 0.8rem;
+    padding: 0.35rem 0.65rem;
+    background: var(--surface);
+    color: var(--text-secondary);
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+.view-btn + .view-btn {
+    border-left: 1.5px solid var(--border);
+}
+.view-btn.active {
+    background: var(--primary);
+    color: #fff;
+}
+
+/* ── Section heading row ───────────────────────────────────── */
+
+.section-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+}
+
+/* ── Alias management (C6) ─────────────────────────────────── */
+
+.alias-add-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.alias-input {
+    font-family: var(--font);
+    font-size: 0.9rem;
+    padding: 0.45rem 0.65rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+    flex: 1;
+    min-width: 160px;
+}
+.alias-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+.alias-btn {
+    font-family: var(--font);
+    font-size: 11px;
+    padding: 2px 7px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+.alias-btn:hover { background: var(--background); }
+.alias-btn.danger { color: var(--danger); }
+.alias-btn.danger:hover { background: #ffeaea; }
+
+/* ── Category drill-down ────────────────────────────────────── */
+
+.cat-drilldown-table th { text-align: left; }
+.td-right { text-align: right !important; }
+
+.cat-row {
+    cursor: pointer;
+    user-select: none;
+}
+.cat-row:hover { background: var(--bg-hover, #f5f5f7); }
+
+.cat-expand-icon {
+    display: inline-block;
+    font-size: 9px;
+    color: var(--text-secondary);
+    width: 14px;
+    transition: transform 0.15s;
+}
+
+.cat-group-tag {
+    font-size: 11px;
+    color: #aaa;
+    margin-left: 5px;
+}
+
+.cat-drill-row td {
+    padding: 0 !important;
+    background: #fafafa;
+    border-bottom: 1px solid var(--border);
+}
+
+.cat-drill-inner {
+    padding: 0.5rem 1rem 0.75rem 2rem;
+}
+
+.cat-drill-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.cat-drill-table th {
+    padding: 4px 8px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+}
+
+.cat-drill-table td { padding: 4px 8px; border-bottom: 1px solid #f0f0f0; }
+.cat-drill-table tr:last-child td { border-bottom: none; }
+
+.drill-date   { color: var(--text-secondary); white-space: nowrap; width: 90px; }
+.drill-payee  { color: var(--text-primary); }
+.drill-amount { font-variant-numeric: tabular-nums; font-weight: 500; }
+
+/* ── Category selector type headers ─────────────────────────── */
+
+.ms-type-header {
+    padding: 6px 12px 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    background: var(--background);
+    margin-top: 4px;
+    border-top: 1px solid var(--border);
+}
+
+.ms-type-header:first-child { margin-top: 0; border-top: none; }
+
+/* ── Date shortcuts ────────────────────────────────────────── */
+
+.shortcut-row {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-top: 0.4rem;
+}
+
+.shortcut-btn {
+    font-family: var(--font);
+    font-size: 0.75rem;
+    padding: 0.22rem 0.6rem;
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.shortcut-btn:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.shortcut-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+.shortcut-clear {
+    color: var(--danger);
+    border-color: var(--danger);
+}
+.shortcut-clear:hover {
+    background: #ffeaea;
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+/* ── Transaction Modal ──────────────────────────────────────── */
+
+.stat-card-clickable {
+    cursor: pointer;
+}
+.stat-card-clickable:hover {
+    background: var(--surface-hover, #f0f0f0);
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-box {
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    width: min(90vw, 780px);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    line-height: 1;
+    padding: 0 0.25rem;
+}
+
+.modal-body {
+    overflow-y: auto;
+    flex: 1;
+}
+
+.txn-modal-table {
+    width: 100%;
+    font-size: 0.8rem;
+}
+
+.txn-modal-table td, .txn-modal-table th {
+    padding: 0.3rem 0.75rem;
+    white-space: nowrap;
+}
+
+.txn-modal-table td:nth-child(3) {
+    white-space: normal;
+    max-width: 220px;
+}
+
+/* ── Toast ─────────────────────────────────────────────────── */
+
+.toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1c1c1e;
+    color: #fff;
+    font-size: 0.9rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+    z-index: 9999;
+}
+.toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+.toast.toast-error { background: #c0392b; }

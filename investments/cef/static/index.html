@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sage — Investments</title>
+    <link rel="icon" type="image/svg+xml" href="/static/sage-favicon.svg">
+    <script>(function(){var p=new URLSearchParams(location.search),t=p.get('theme')||localStorage.getItem('sage-theme')||'dark';if(p.get('theme'))localStorage.setItem('sage-theme',t);document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <nav class="global-tab-nav">
+        <img src="/static/sage-logo.svg" class="nav-logo" alt="Sage">
+        <a href="http://localhost:5050/" class="global-tab-link">Budget Planner</a>
+        <a href="http://localhost:5050/dashboard.html" class="global-tab-link">Cash Flow</a>
+        <a href="http://localhost:5050/tax.html" class="global-tab-link">Tax</a>
+        <a href="http://localhost:8000/" class="global-tab-link active">Investments</a>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme"></button>
+    </nav>
+    <div id="app"></div>
+    <script src="/static/app.js"></script>
+    <script>
+        (function() {
+            var btn = document.getElementById('themeToggle');
+            function sync() { btn.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '☾'; }
+            btn.addEventListener('click', function() {
+                var t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', t);
+                localStorage.setItem('sage-theme', t);
+                sync();
+            });
+            document.querySelectorAll('.global-tab-link').forEach(function(a) {
+                a.addEventListener('click', function() {
+                    var t = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var u = new URL(a.href); u.searchParams.set('theme', t); a.href = u.toString();
+                });
+            });
+            sync();
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sage — Tax</title>
+    <link rel="icon" type="image/svg+xml" href="/sage-favicon.svg">
+    <script>(function(){var p=new URLSearchParams(location.search),t=p.get('theme')||localStorage.getItem('sage-theme')||'dark';if(p.get('theme'))localStorage.setItem('sage-theme',t);document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="tax.css">
+</head>
+<body>
+    <nav class="tab-nav">
+        <img src="/sage-logo.svg" class="nav-logo" alt="Sage">
+        <a href="http://localhost:5050/" class="tab-link">Budget Planner</a>
+        <a href="http://localhost:5050/dashboard.html" class="tab-link">Cash Flow</a>
+        <a href="http://localhost:5050/tax.html" class="tab-link active">Tax</a>
+        <a href="http://localhost:8000/" class="tab-link">Investments</a>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme"></button>
+    </nav>
+
+    <div class="container">
+
+        <div class="error-banner" id="errorBanner">
+            Could not connect to the API. Make sure it's running:<br>
+            <code>python3 budget/api.py</code>
+        </div>
+
+        <!-- Controls -->
+        <div class="section-card controls-card">
+            <div class="controls-row tax-criteria-list">
+                <div class="control-group control-group-sm">
+                    <label class="control-label">Tax Year</label>
+                    <select id="taxYear" class="control-select" onchange="loadTaxData()"></select>
+                </div>
+                <div class="control-group control-group-sm">
+                    <label class="control-label">Filing Status</label>
+                    <select id="filingStatus" class="control-select" onchange="saveConfig()">
+                        <option value="mfj">Married Filing Jointly</option>
+                        <option value="single">Single</option>
+                        <option value="hoh">Head of Household</option>
+                    </select>
+                </div>
+                <div class="control-group control-group-sm">
+                    <label class="control-label">State</label>
+                    <select id="stateSelect" class="control-select" onchange="saveConfig()">
+                        <option value="">— none —</option>
+                    </select>
+                </div>
+                <div class="control-group control-group-sm">
+                    <label class="control-label">Additional Deductions</label>
+                    <input type="number" id="extraDeductions" class="control-select" value="0" min="0" step="500"
+                           onchange="saveConfig()" style="width:120px">
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary cards -->
+        <div class="tax-summary-row" id="summaryRow" style="display:none">
+            <div class="tax-card">
+                <div class="tax-card-label">YTD Taxable Income</div>
+                <div class="tax-card-value" id="cardYtdTaxable">—</div>
+            </div>
+            <div class="tax-card">
+                <div class="tax-card-label" id="cardProjTaxLabel">Projected Annual Tax</div>
+                <div class="tax-card-value warning" id="cardProjTax">—</div>
+            </div>
+            <div class="tax-card">
+                <div class="tax-card-label">Effective Rate</div>
+                <div class="tax-card-value" id="cardEffRate">—</div>
+            </div>
+            <div class="tax-card">
+                <div class="tax-card-label">Marginal Rate</div>
+                <div class="tax-card-value" id="cardMarginalRate">—</div>
+            </div>
+            <div class="tax-card">
+                <div class="tax-card-label">Tax Set Aside</div>
+                <div class="tax-card-value success" id="cardReserve">—</div>
+            </div>
+        </div>
+
+        <!-- Income breakdown -->
+        <div class="section-card" id="incomeCard" style="display:none">
+            <div class="tax-section-header">
+                <h3 class="section-heading" style="margin:0">Income by Category</h3>
+                <span class="tax-section-note">YTD · <span id="ytdMonths">?</span> months of <span id="taxYearLabel">?</span></span>
+            </div>
+            <table class="data-table" id="incomeTable">
+                <thead>
+                    <tr>
+                        <th style="text-align:left">Category</th>
+                        <th style="text-align:right">YTD Amount</th>
+                        <th style="text-align:right">Projected Annual</th>
+                        <th>Tax Character</th>
+                        <th style="text-align:right">Taxable Amount</th>
+                    </tr>
+                </thead>
+                <tbody id="incomeTableBody"></tbody>
+                <tfoot id="incomeTableFoot"></tfoot>
+            </table>
+        </div>
+
+        <!-- Tax calculation -->
+        <div class="section-card" id="calcCard" style="display:none">
+            <div class="tax-section-header">
+                <h3 class="section-heading" style="margin:0">Federal + State Tax Estimate (<span id="calcYear">?</span>)</h3>
+                <div style="display:flex;align-items:center;gap:0.5rem">
+                    <label style="font-size:0.82rem;color:#6e6e73;white-space:nowrap">Tax withheld YTD</label>
+                    <input type="number" id="taxWithheld" class="reserve-input" min="0" step="100"
+                           style="width:120px;font-size:0.95rem"
+                           onchange="saveConfig();render()" placeholder="0">
+                </div>
+            </div>
+            <table class="data-table tax-calc-table">
+                <tbody id="calcTableBody"></tbody>
+            </table>
+            <div id="underpaymentAlert" class="underpayment-alert" style="display:none"></div>
+        </div>
+
+        <!-- Tax reserve tracker -->
+        <div class="section-card" id="reserveCard" style="display:none">
+            <h3 class="section-heading">Tax Reserve</h3>
+            <div class="reserve-row">
+                <div class="reserve-labels">
+                    <span>Amount set aside</span>
+                    <span id="reserveStatus" class="reserve-status"></span>
+                </div>
+                <div class="reserve-input-row">
+                    <span class="reserve-dollar">$</span>
+                    <input type="number" id="reserveAmount" class="reserve-input" min="0" step="100"
+                           onchange="saveReserve()" placeholder="0">
+                    <button class="btn export-btn" onclick="saveReserve()">Save</button>
+                </div>
+            </div>
+            <div class="reserve-bar-wrap">
+                <div class="reserve-bar-track">
+                    <div class="reserve-bar-fill" id="reserveBarFill"></div>
+                </div>
+                <div class="reserve-bar-labels">
+                    <span id="reserveBarLeft">$0</span>
+                    <span id="reserveBarRight">$0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category classifications -->
+        <div class="section-card" id="classifyCard" style="display:none">
+            <h3 class="section-heading">Income Category Classifications</h3>
+            <p class="tax-hint">Set the tax character for each income category in your Quicken data. CEF Roth distributions should be set to Non-Taxable.</p>
+            <div id="classifyList"></div>
+        </div>
+
+    </div>
+
+    <div id="toast"></div>
+    <script src="tax.js"></script>
+    <script>
+        (function() {
+            var btn = document.getElementById('themeToggle');
+            function sync() { btn.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '☾'; }
+            btn.addEventListener('click', function() {
+                var t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', t);
+                localStorage.setItem('sage-theme', t);
+                sync();
+            });
+            document.querySelectorAll('.tab-link').forEach(function(a) {
+                a.addEventListener('click', function() {
+                    var t = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var u = new URL(a.href); u.searchParams.set('theme', t); a.href = u.toString();
+                });
+            });
+            sync();
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,283 @@
+/* ============================================================
+   Tax Estimator — tax.css
+   Extends styles.css
+   ============================================================ */
+
+/* ── Summary cards ─────────────────────────────────────────── */
+
+.tax-summary-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.tax-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    box-shadow: var(--shadow);
+}
+
+.tax-card-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    margin-bottom: 0.4rem;
+}
+
+.tax-card-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.tax-card-value.warning { color: var(--warning); }
+.tax-card-value.success { color: var(--income-accent); }
+
+/* ── Section header ────────────────────────────────────────── */
+
+.tax-section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 1.5rem 2rem 0.75rem;
+}
+
+.tax-section-note {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.tax-hint {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0 2rem 1rem;
+}
+
+/* ── Character select in table ─────────────────────────────── */
+
+.char-select {
+    font-family: var(--font);
+    font-size: 0.82rem;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text-primary);
+    cursor: pointer;
+    max-width: 220px;
+}
+
+.char-select.char-exempt {
+    color: var(--text-secondary);
+    background: rgba(0,0,0,0.02);
+}
+
+.char-select.char-ss {
+    color: #5a7a52;
+}
+
+/* ── Tax calculation table ─────────────────────────────────── */
+
+.tax-calc-table td {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+.tax-calc-table .calc-val {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+
+.tax-calc-table .negative-val { color: var(--text-secondary); }
+.tax-calc-table .warning-val  { color: var(--warning); font-weight: 700; }
+
+.tax-calc-table .calc-divider td {
+    border-top: 1px solid var(--border);
+    font-weight: 600;
+    padding-top: 0.75rem;
+}
+
+.approx-note {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+/* ── Underpayment alert ─────────────────────────────────────── */
+
+.underpayment-alert {
+    margin: 1rem 1.5rem;
+    padding: 0.7rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.underpayment-alert.danger {
+    background: rgba(255, 59, 48, 0.08);
+    border: 1px solid rgba(255, 59, 48, 0.25);
+    color: var(--danger);
+}
+
+.underpayment-alert.success {
+    background: rgba(52, 199, 89, 0.08);
+    border: 1px solid rgba(52, 199, 89, 0.25);
+    color: var(--income-accent);
+}
+
+/* ── Reserve tracker ───────────────────────────────────────── */
+
+.reserve-row {
+    padding: 0.5rem 1.5rem 1rem;
+}
+
+.reserve-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.reserve-status {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.reserve-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.reserve-dollar {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+}
+
+.reserve-input {
+    font-family: var(--font);
+    font-size: 1.25rem;
+    font-weight: 600;
+    padding: 0.4rem 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+    width: 160px;
+}
+
+.reserve-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.reserve-bar-wrap {
+    padding: 0 1.5rem 1.5rem;
+}
+
+.reserve-bar-track {
+    height: 10px;
+    background: var(--border);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 0.4rem;
+}
+
+.reserve-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.4s ease;
+    background: var(--danger);
+}
+
+.reserve-bar-fill.low  { background: var(--warning); }
+.reserve-bar-fill.good { background: #5a7a52; }
+.reserve-bar-fill.full { background: var(--income-accent); }
+
+.reserve-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+/* ── Category classify section ─────────────────────────────── */
+
+.classify-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 2rem;
+    border-bottom: 1px solid var(--border-light);
+    gap: 1rem;
+}
+
+.classify-row:last-child { border-bottom: none; }
+
+.classify-cat {
+    font-size: 0.88rem;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+
+@media (max-width: 700px) {
+    .tax-summary-row {
+        grid-template-columns: 1fr 1fr;
+    }
+    .tax-section-header {
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 1rem 1rem 0.5rem;
+    }
+    .classify-row {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 0.75rem 1rem;
+    }
+    .char-select {
+        max-width: 100%;
+        width: 100%;
+    }
+}
+
+.tax-criteria-list {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    flex-wrap: nowrap !important;
+}
+
+.tax-criteria-list .control-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.tax-criteria-list .control-label {
+    display: block;
+    width: 155px;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.tax-criteria-list .control-select,
+.tax-criteria-list input.control-select {
+    background: var(--surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.88rem;
+    font-family: inherit;
+}

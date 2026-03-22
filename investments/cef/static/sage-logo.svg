@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 122 36" width="122" height="36">
+  <!-- leaf: outline with more pronounced curves and veins -->
+  <g transform="translate(5, 3) rotate(-10, 11, 14)">
+    <!-- leaf outline -->
+    <path d="M 11 1
+             C 22 4, 23 13, 14 21
+             Q 12 24, 11 27
+             Q 10 24, 8 21
+             C -1 13, 0 4, 11 1 Z"
+          fill="none" stroke="#5a7a52" stroke-width="1.5" stroke-linejoin="round"/>
+    <!-- center vein -->
+    <line x1="11" y1="1" x2="11" y2="27"
+          stroke="#5a7a52" stroke-width="0.9"/>
+    <!-- upper veins -->
+    <line x1="11" y1="8"  x2="18" y2="5"  stroke="#5a7a52" stroke-width="0.6"/>
+    <line x1="11" y1="8"  x2="4"  y2="5"  stroke="#5a7a52" stroke-width="0.6"/>
+    <!-- middle veins -->
+    <line x1="11" y1="14" x2="20" y2="11" stroke="#5a7a52" stroke-width="0.6"/>
+    <line x1="11" y1="14" x2="2"  y2="11" stroke="#5a7a52" stroke-width="0.6"/>
+    <!-- lower veins -->
+    <line x1="11" y1="19" x2="17" y2="17" stroke="#5a7a52" stroke-width="0.6"/>
+    <line x1="11" y1="19" x2="5"  y2="17" stroke="#5a7a52" stroke-width="0.6"/>
+  </g>
+  <!-- wordmark -->
+  <text x="36" y="25"
+        font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif"
+        font-size="22"
+        font-weight="300"
+        fill="#5a7a52"
+        letter-spacing="4">sage</text>
+</svg>

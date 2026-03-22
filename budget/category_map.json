@@ -1,0 +1,28 @@
+{
+  "Monthly Income":   ["Wages:Ken", "Wages:Hilary"],
+  "Additional Income":["Fidelity:Annuity 9550", "Fidelity:SEPP", "Other Inc", "Rent Income"],
+  "RC":               ["Wages:RC"],
+
+  "Cash":             ["Cash - ATM"],
+  "Coffee":           ["Entertainment:Coffee"],
+  "Copayments":       ["Health/Medical"],
+  "Doctors":          ["Health/Medical:Doctor/Therapy/Dentist", "Health/Medical:Doctor/Therapy/Dentis", "Health/Medical:Dentist"],
+  "Food":             ["Food:Groceries"],
+  "HOA":              ["Housing:HOA"],
+  "Meals Out":        ["Food:Meals Out"],
+  "MTA":              ["Auto/Transportation:MTA"],
+  "Personal":         ["Personal"],
+  "Therapy":          ["Health/Medical:Doctor/Therapy/Dentist", "Health/Medical:Doctor/Therapy/Dentis"],
+
+  "ConEd":            ["Utilities:Electric/Con Ed"],
+  "Fios":             ["Utilities:Internet/Fios"],
+  "Nat Grid":         ["Utilities:Gas/National Grid"],
+
+  "Auto":             ["Auto/Transportation:Fuel", "Auto/Transportation:Maintenance/Repairs", "Auto/Transportation:EZpass", "auto/Parking"],
+  "Insurance":        ["Insurance:Auto Insurance", "Insurance:Insurance house", "Insurance:Long Term Care"],
+  "Charity":          ["Charity", "Charity:Cash Contrib."],
+  "Entertainment":    ["Entertainment", "Entertainment:Books", "Entertainment:Movies, Netflix etc", "Entertainment:Other"],
+  "Travel":           ["Entertainment:Travel"],
+  "Gym":              ["Gym", "Health/Medical:Fitness (Gym, Pilates...)"],
+  "Rx":               ["Health/Medical:Medicine/Rx"]
+}
