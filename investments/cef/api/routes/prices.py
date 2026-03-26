@@ -1,3 +1,4 @@
+import math
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import date, timedelta
@@ -100,9 +101,20 @@ def quick_refresh():
             "SELECT ticker FROM funds WHERE active=1"
         ).fetchall()]
 
+        # Snapshot last known price for each holding to detect reverse splits
+        prev_prices = {}
+        for r in conn.execute("""
+            SELECT h.ticker, h.shares, p.price
+            FROM holdings h
+            JOIN prices p ON p.ticker = h.ticker
+              AND p.date = (SELECT MAX(px.date) FROM prices px WHERE px.ticker = h.ticker)
+            WHERE h.shares > 0
+        """).fetchall():
+            prev_prices[r["ticker"]] = {"price": r["price"], "shares": r["shares"]}
+
     all_rows = fetch_quick_prices(tickers)
 
-    updated, errors = [], []
+    updated, errors, split_alerts = [], [], []
     with get_db() as conn:
         for ticker, rows in all_rows.items():
             if not rows:
@@ -124,10 +136,41 @@ def quick_refresh():
                             ON CONFLICT(ticker, date) DO NOTHING
                         """, (h["ticker"], h["date"], h["nav"]))
                 updated.append(ticker)
+
+                # Detect potential reverse split for holdings
+                if ticker in prev_prices and rows:
+                    latest_new = max(rows, key=lambda r: r["date"])
+                    old_price = prev_prices[ticker]["price"]
+                    new_price = latest_new.get("price")
+                    if old_price and new_price and old_price > 0:
+                        ratio = new_price / old_price
+                        # Check if ratio is close to a whole number >= 2
+                        nearest_int = round(ratio)
+                        if nearest_int >= 2 and abs(ratio - nearest_int) / nearest_int < 0.15:
+                            current = prev_prices[ticker]["shares"]
+                            exact = current / nearest_int
+                            floored = math.floor(exact)
+                            fractional = round(exact - floored, 6)
+                            # Fetch cost basis to compute reduction
+                            cb_row = conn.execute(
+                                "SELECT cost_basis FROM holdings WHERE ticker=?", (ticker,)
+                            ).fetchone()
+                            cost_basis = cb_row["cost_basis"] if cb_row else 0
+                            cost_reduction = round(fractional * nearest_int * (cost_basis / current), 2) if current else 0
+                            split_alerts.append({
+                                "ticker": ticker,
+                                "ratio": nearest_int,
+                                "old_price": round(old_price, 4),
+                                "new_price": round(new_price, 4),
+                                "current_shares": current,
+                                "suggested_shares": floored,
+                                "fractional_shares": fractional,
+                                "cost_basis_reduction": cost_reduction,
+                            })
             except Exception as e:
                 errors.append({"ticker": ticker, "error": str(e)})
 
-    return {"updated": updated, "errors": errors}
+    return {"updated": updated, "errors": errors, "split_alerts": split_alerts}
 
 
 @router.post("/refresh")

@@ -55,13 +55,16 @@ async function init() {
   renderApp();
   // Auto-refresh prices from Yahoo Finance, then re-render with live data
   try {
-    await POST('/api/prices/quick-refresh', {});
+    const qr = await POST('/api/prices/quick-refresh', {});
     [_prices, _holdings] = await Promise.all([
       GET('/api/prices/latest'),
       GET('/api/holdings'),
     ]);
     _lastUpdated = new Date().toISOString();
     renderApp();
+    if (qr.split_alerts?.length) {
+      for (const sa of qr.split_alerts) showSplitAlert(sa);
+    }
   } catch(e) {
     console.error('Quick refresh failed:', e);
   }
@@ -1438,7 +1441,7 @@ function gainClass(n) {
 
 function formatTime(isoStr) {
   if (!isoStr) return '';
-  const d = new Date(isoStr);
+  const d = new Date(isoStr.endsWith('Z') ? isoStr : isoStr + 'Z');
   return d.toLocaleTimeString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
@@ -1492,6 +1495,67 @@ function toast(msg) {
   el.classList.add('show');
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// === REVERSE SPLIT DETECTION ===
+function showSplitAlert(sa) {
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop">
+      <div class="modal" onclick="event.stopPropagation()" style="max-width:440px">
+        <div class="modal-header">
+          <h2>Reverse Split Detected — ${sa.ticker}</h2>
+          <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="margin-bottom:12px">
+            <strong>${sa.ticker}</strong> price jumped from <strong>$${sa.old_price.toFixed(2)}</strong>
+            to <strong>$${sa.new_price.toFixed(2)}</strong> — this looks like a
+            <strong>1-for-${sa.ratio}</strong> reverse stock split.
+          </p>
+          <table style="width:100%;font-size:13px;margin-bottom:12px">
+            <tr><td style="color:var(--text-muted)">Current shares</td><td style="text-align:right">${sa.current_shares.toLocaleString()}</td></tr>
+            <tr><td style="color:var(--text-muted)">Adjusted shares (÷${sa.ratio}, rounded down)</td><td style="text-align:right"><strong>${sa.suggested_shares.toLocaleString()}</strong></td></tr>
+            ${sa.fractional_shares > 0 ? `<tr><td style="color:var(--text-muted)">Fractional shares cashed out</td><td style="text-align:right">${sa.fractional_shares.toFixed(4)}</td></tr>
+            <tr><td style="color:var(--text-muted)">Cost basis reduction</td><td style="text-align:right">−$${sa.cost_basis_reduction.toFixed(2)}</td></tr>` : ''}
+          </table>
+          <p style="font-size:12px;color:var(--text-muted)">
+            Shares rounded down to whole number. Cost basis reduced proportionally for the cashed-out fractional portion.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeModal()">Dismiss</button>
+          <button class="btn btn-primary" onclick="applySplit('${sa.ticker}', ${sa.ratio})">Adjust Shares</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function applySplit(ticker, ratio) {
+  const holding = _holdings.find(h => h.ticker === ticker);
+  if (!holding) { closeModal(); return; }
+  const exact = holding.shares / ratio;
+  const newShares = Math.floor(exact);
+  const fractionLost = exact - newShares;
+  const costPerShare = holding.cost_basis / holding.shares;
+  const costReduction = fractionLost * ratio * costPerShare;  // cost basis of fractional pre-split shares
+  const newCostBasis = +(holding.cost_basis - costReduction).toFixed(2);
+  try {
+    await PUT(`/api/holdings/${ticker}`, {
+      ticker,
+      shares: newShares,
+      cost_basis: newCostBasis,
+      dividends_received: holding.dividends_received,
+      manual_nav: holding.manual_nav || null,
+      manual_nav_date: holding.manual_nav_date || null,
+      notes: holding.notes || '',
+    });
+    closeModal();
+    await loadAll();
+    renderApp();
+    toast(`${ticker} shares adjusted: ${holding.shares} → ${newShares} (1:${ratio} reverse split)`);
+  } catch(e) {
+    toast('Error adjusting shares: ' + e.message);
+  }
 }
 
 // === START ===
