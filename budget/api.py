@@ -376,33 +376,43 @@ def all_transactions():
 
 @app.route("/api/transactions")
 def transactions():
-    cat       = request.args.get("cat", "")
-    payee     = request.args.get("payee", "")
-    year_from = int(request.args.get("year_from", 2000))
-    year_to   = int(request.args.get("year_to",   2100))
-    date_from = request.args.get("date_from", "")
-    date_to   = request.args.get("date_to",   "")
+    cat        = request.args.get("cat", "")
+    payee      = request.args.get("payee", "")
+    cats_param = request.args.get("cats", "")
+    accts_param = request.args.get("accts", "")
+    year_from  = int(request.args.get("year_from", 2000))
+    year_to    = int(request.args.get("year_to",   2100))
+    date_from  = request.args.get("date_from", "")
+    date_to    = request.args.get("date_to",   "")
     if not cat and not payee:
         return jsonify([])
     conn = db.get_conn()
     if date_from and date_to:
-        date_clause = "date BETWEEN ? AND ?"
-        date_params = [date_from, date_to]
+        where  = "WHERE date BETWEEN ? AND ?"
+        params = [date_from, date_to]
     else:
-        date_clause = "year BETWEEN ? AND ?"
-        date_params = [year_from, year_to]
+        where  = "WHERE year BETWEEN ? AND ?"
+        params = [year_from, year_to]
     if cat:
-        rows = conn.execute(
-            f"SELECT date, payee, category, amount FROM transactions "
-            f"WHERE category=? AND {date_clause} ORDER BY date DESC",
-            [cat] + date_params
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            f"SELECT date, payee, category, amount FROM transactions "
-            f"WHERE payee=? AND {date_clause} ORDER BY date DESC",
-            [payee] + date_params
-        ).fetchall()
+        where += " AND category=?"
+        params.append(cat)
+    if payee:
+        where += " AND payee=?"
+        params.append(payee)
+    cat_list = [c.strip() for c in cats_param.split(",") if c.strip()]
+    if cat_list:
+        placeholders = ",".join("?" * len(cat_list))
+        where += f" AND category IN ({placeholders})"
+        params += cat_list
+    acct_list = [a.strip() for a in accts_param.split(",") if a.strip()]
+    if acct_list:
+        placeholders = ",".join("?" * len(acct_list))
+        where += f" AND account IN ({placeholders})"
+        params += acct_list
+    rows = conn.execute(
+        f"SELECT date, payee, category, amount FROM transactions {where} ORDER BY date DESC",
+        params
+    ).fetchall()
     conn.close()
     return jsonify([
         {"date": r["date"], "payee": r["payee"], "category": r["category"], "amount": r["amount"]}

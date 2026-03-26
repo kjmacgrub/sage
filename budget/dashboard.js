@@ -765,7 +765,9 @@ async function togglePayeeDrill(row) {
     const payee    = row.dataset.payee;
     const yearFrom = parseInt(document.getElementById('yearFrom').value) || 2000;
     const yearTo   = parseInt(document.getElementById('yearTo').value)   || 2100;
-    const cacheKey = `payee|${payee}|${yearFrom}|${yearTo}`;
+    const cats     = getSelectedCategories().join(',');
+    const accts    = getSelectedAccounts().join(',');
+    const cacheKey = `payee|${payee}|${yearFrom}|${yearTo}|${cats}|${accts}`;
 
     const existing = row.nextElementSibling;
     if (existing && existing.classList.contains('cat-drill-row')) {
@@ -786,7 +788,7 @@ async function togglePayeeDrill(row) {
                 ? `&date_from=${_dateFrom}&date_to=${_dateTo}`
                 : `&year_from=${yearFrom}&year_to=${yearTo}`;
             _txCache[cacheKey] = await fetch(
-                `${API}/api/transactions?payee=${encodeURIComponent(payee)}${dateParams}`
+                `${API}/api/transactions?payee=${encodeURIComponent(payee)}&cats=${encodeURIComponent(cats)}&accts=${encodeURIComponent(accts)}${dateParams}`
             ).then(r => r.json());
         } catch(e) {
             drillRow.querySelector('.cat-drill-inner').innerHTML = '<em style="color:red;font-size:12px">Failed to load</em>';
@@ -800,11 +802,27 @@ async function togglePayeeDrill(row) {
         return;
     }
 
-    drillRow.querySelector('.cat-drill-inner').outerHTML = `
-        <div class="cat-drill-inner">
+    let sortCol = 'date';
+    let sortAsc = false;
+
+    function renderDrillTable() {
+        const sorted = [...txns].sort((a, b) => {
+            let cmp;
+            if (sortCol === 'amount') cmp = (a.amount || 0) - (b.amount || 0);
+            else if (sortCol === 'category') cmp = ((a.category || '').split(':').pop()).localeCompare((b.category || '').split(':').pop());
+            else cmp = (a.date || '').localeCompare(b.date || '');
+            return sortAsc ? cmp : -cmp;
+        });
+        const arrow = col => sortCol === col ? (sortAsc ? ' ▲' : ' ▼') : '';
+        const inner = drillRow.querySelector('.cat-drill-inner');
+        inner.innerHTML = `
             <table class="cat-drill-table">
-                <thead><tr><th>Date</th><th>Category</th><th class="td-right">Amount</th></tr></thead>
-                <tbody>${txns.map(t => {
+                <thead><tr>
+                    <th class="sortable-header" data-col="date">Date${arrow('date')}</th>
+                    <th class="sortable-header" data-col="category">Category${arrow('category')}</th>
+                    <th class="sortable-header td-right" data-col="amount">Amount${arrow('amount')}</th>
+                </tr></thead>
+                <tbody>${sorted.map(t => {
                     const cls = (t.amount || 0) < 0 ? 'td-expense' : 'td-income';
                     const cat = t.category ? t.category.split(':').pop() : '';
                     return `<tr>
@@ -814,8 +832,20 @@ async function togglePayeeDrill(row) {
                     </tr>`;
                 }).join('')}
                 </tbody>
-            </table>
-        </div>`;
+            </table>`;
+        inner.querySelectorAll('.sortable-header').forEach(th => {
+            th.style.cursor = 'pointer';
+            th.addEventListener('click', () => {
+                const col = th.dataset.col;
+                if (sortCol === col) sortAsc = !sortAsc;
+                else { sortCol = col; sortAsc = col === 'amount' ? true : false; }
+                renderDrillTable();
+            });
+        });
+    }
+
+    drillRow.querySelector('.cat-drill-inner').outerHTML = '<div class="cat-drill-inner"></div>';
+    renderDrillTable();
 }
 
 

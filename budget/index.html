@@ -19,18 +19,14 @@
     </nav>
     <div class="container">
 
-        <div class="current-month-display">
-            <div class="month-selector-wrapper">
-                <div class="month-display-dropdown" onclick="toggleMonthDropdown()">
-                    <span id="selectedMonthDisplay">Loading…</span>
-                </div>
-                <div class="month-dropdown-menu" id="monthDropdownMenu"></div>
-            </div>
-        </div>
-
         <div class="balance-summary">
             <div class="balance-column">
-                <span class="balance-summary-label">Starting Balance</span>
+                <div class="month-selector-wrapper">
+                    <div class="month-display-dropdown" onclick="toggleMonthDropdown()">
+                        <span id="selectedMonthDisplay">Loading…</span>
+                    </div>
+                    <div class="month-dropdown-menu" id="monthDropdownMenu"></div>
+                </div>
                 <input type="text" class="balance-summary-input" id="startingBalanceInput"
                        value="$0"
                        onfocus="selectStartingBalance()"
