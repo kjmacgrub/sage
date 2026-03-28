@@ -14,6 +14,7 @@ let _lastSummary = null;
 let _lastMonthly = null;
 let _chartYears  = [];  // year labels for year-chart click handler
 let _chartMonths = [];  // "YYYY-MM" labels for monthly-chart click handler
+let _showTransfers = false;
 
 // ── Init ─────────────────────────────────────────────────────
 
@@ -142,7 +143,15 @@ function clearCategories() {
 }
 
 function getSelectedCategories() {
-    return Array.from(document.querySelectorAll('.cat-cb:checked')).map(cb => cb.value);
+    let cats = Array.from(document.querySelectorAll('.cat-cb:checked')).map(cb => cb.value);
+    if (!_showTransfers) cats = cats.filter(c => c !== 'Transfer');
+    return cats;
+}
+
+function toggleTransfers() {
+    _showTransfers = !_showTransfers;
+    document.getElementById('sc_transfers').classList.toggle('active', _showTransfers);
+    analyze();
 }
 
 function updateCategoryDisplay() {
@@ -658,7 +667,10 @@ async function toggleCatDrill(row) {
     const cat      = row.dataset.cat;
     const yearFrom = parseInt(document.getElementById('yearFrom').value);
     const yearTo   = parseInt(document.getElementById('yearTo').value);
-    const cacheKey = `${cat}|${yearFrom}|${yearTo}`;
+    const dateParams = _dateFrom && _dateTo
+        ? `&date_from=${_dateFrom}&date_to=${_dateTo}`
+        : `&year_from=${yearFrom}&year_to=${yearTo}`;
+    const cacheKey = `${cat}|${_dateFrom || yearFrom}|${_dateTo || yearTo}`;
 
     // If already expanded, collapse
     const existing = row.nextElementSibling;
@@ -680,7 +692,7 @@ async function toggleCatDrill(row) {
     if (!_txCache[cacheKey]) {
         try {
             _txCache[cacheKey] = await fetch(
-                `${API}/api/transactions?cat=${encodeURIComponent(cat)}&year_from=${yearFrom}&year_to=${yearTo}`
+                `${API}/api/transactions?cat=${encodeURIComponent(cat)}${dateParams}`
             ).then(r => r.json());
         } catch(e) {
             drillRow.querySelector('.cat-drill-inner').innerHTML = '<em style="color:red;font-size:12px">Failed to load</em>';
@@ -767,7 +779,7 @@ async function togglePayeeDrill(row) {
     const yearTo   = parseInt(document.getElementById('yearTo').value)   || 2100;
     const cats     = getSelectedCategories().join(',');
     const accts    = getSelectedAccounts().join(',');
-    const cacheKey = `payee|${payee}|${yearFrom}|${yearTo}|${cats}|${accts}`;
+    const cacheKey = `payee|${payee}|${_dateFrom || yearFrom}|${_dateTo || yearTo}|${cats}|${accts}`;
 
     const existing = row.nextElementSibling;
     if (existing && existing.classList.contains('cat-drill-row')) {

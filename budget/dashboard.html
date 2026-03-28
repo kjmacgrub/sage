@@ -13,7 +13,7 @@
 <body>
     <nav class="tab-nav">
         <img src="/sage-logo.svg" class="nav-logo" alt="Sage">
-        <a href="http://localhost:5050/" class="tab-link">Budget Planner</a>
+        <a href="http://localhost:5050/" class="tab-link">Planner</a>
         <a href="http://localhost:5050/dashboard.html" class="tab-link active">Cash Flow</a>
         <a href="http://localhost:5050/tax.html" class="tab-link">Tax</a>
         <a href="http://localhost:8000/" class="tab-link">Investments</a>
@@ -26,7 +26,8 @@
             <code>python3 budget/api.py</code>
         </div>
 
-        <!-- Controls -->
+        <!-- Controls + Stats sticky wrapper -->
+        <div class="sticky-header">
         <div class="section-card controls-card">
             <div class="controls-row">
                 <div class="control-group" style="position:relative; flex:2; min-width:220px">
@@ -73,7 +74,7 @@
                     <button id="btnMonth" class="view-btn"        onclick="setView('month')">By Month</button>
                 </div>
                 <button class="btn import-btn" onclick="const u=document.getElementById('csvUpload');u.value='';u.click()" title="Upload Quicken CSV">&#8593; CSV</button>
-                <input type="file" id="csvUpload" class="hidden-input" accept=".csv" onchange="uploadCSV(event)">
+                <input type="file" id="csvUpload" class="hidden-input" accept=".csv,text/csv,text/plain,application/csv,application/vnd.ms-excel" onchange="uploadCSV(event)">
             </div>
             <div class="shortcut-row">
                 <button id="sc_week"     class="shortcut-btn" onclick="setShortcut('week')">This Week</button>
@@ -83,6 +84,7 @@
                 <button id="sc_year"      class="shortcut-btn" onclick="setShortcut('year')">This Year</button>
                 <button id="sc_lastyear" class="shortcut-btn" onclick="setShortcut('lastyear')">Last Year</button>
                 <button id="sc_clear"    class="shortcut-btn shortcut-clear" onclick="clearShortcut()" style="display:none">&#10005; Clear</button>
+                <button id="sc_transfers" class="shortcut-btn shortcut-transfers" onclick="toggleTransfers()">Transfers</button>
             </div>
         </div>
 
@@ -109,6 +111,7 @@
                 <div class="stat-value income-color" id="statIncome">—</div>
             </div>
         </div>
+        </div><!-- /sticky-header -->
 
         <!-- Chart -->
         <div class="section-card chart-card" id="chartCard" style="display:none">

@@ -186,6 +186,13 @@ body .container {
 
 /* ── Controls card ────────────────────────────────────────── */
 
+.sticky-header {
+    position: sticky;
+    top: 44px;          /* sits just below the sticky tab-nav */
+    z-index: 90;
+    background: var(--background);
+}
+
 .controls-card {
     margin-bottom: 0.6rem;
     padding: 0.75rem 1rem;
@@ -564,7 +571,7 @@ body .container {
 
 .cat-drill-row td {
     padding: 0 !important;
-    background: #fafafa;
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
 }
 
@@ -588,7 +595,7 @@ body .container {
     font-weight: 600;
 }
 
-.cat-drill-table td { padding: 4px 8px; border-bottom: 1px solid #f0f0f0; }
+.cat-drill-table td { padding: 4px 8px; border-bottom: 1px solid var(--border-light); }
 .cat-drill-table tr:last-child td { border-bottom: none; }
 
 .drill-date   { color: var(--text-secondary); white-space: nowrap; width: 90px; }
@@ -650,6 +657,10 @@ body .container {
     background: #ffeaea;
     color: var(--danger);
     border-color: var(--danger);
+}
+
+.shortcut-transfers {
+    margin-left: auto;
 }
 
 /* ── Transaction Modal ──────────────────────────────────────── */
