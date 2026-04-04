@@ -183,7 +183,8 @@ function renderPortfolio() {
 
   const posWithDelta = positions.map(h => ({
     ...h,
-    disc_vs_avg: h.premium_discount != null && h.avg_discount_1y != null ? h.premium_discount - h.avg_discount_1y : null
+    disc_vs_avg: h.premium_discount != null && h.avg_discount_1y != null ? h.premium_discount - h.avg_discount_1y : null,
+    weight: totalMkt && h.market_value ? h.market_value / totalMkt * 100 : null
   }));
   const sorted = sortData(posWithDelta, _sortCol || 'ticker', _sortCol ? _sortAsc : true);
 
@@ -271,7 +272,7 @@ function portfolioRow(h, totalMkt) {
       <td class="${gainClass(h.total_return)}">${fmtGain$(h.total_return)}</td>
       <td class="${gainClass(h.total_return_pct)}">${h.total_return_pct != null ? fmtPct(h.total_return_pct) : '—'}</td>
       <td>${fmt$(h.market_value)}</td>
-      <td>${totalMkt && h.market_value ? (h.market_value / totalMkt * 100).toFixed(1) + '%' : '—'}</td>
+      <td>${h.weight != null ? h.weight.toFixed(1) + '%' : '—'}</td>
     </tr>`;
 }
 

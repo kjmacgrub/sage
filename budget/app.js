@@ -401,6 +401,18 @@ function calculateTotals() {
         end.innerHTML = formatCurrencyWithSuperscriptCents(ending);
         end.classList.toggle('negative', ending < 0);
     }
+
+    const wcEl = document.getElementById('worstCaseLow');
+    if (wcEl) {
+        const worstCase = bal - totalExpenses;
+        if (worstCase < 0) {
+            wcEl.innerHTML = `Worst-case low: <span class="negative">${formatCurrencyWithSuperscriptCents(worstCase)}</span>`;
+            wcEl.style.display = '';
+        } else {
+            wcEl.innerHTML = `Worst-case low: ${formatCurrencyWithSuperscriptCents(worstCase)}`;
+            wcEl.style.display = '';
+        }
+    }
 }
 
 function onAmountInput(input) {

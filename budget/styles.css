@@ -425,6 +425,17 @@ h1 {
     color: var(--danger);
 }
 
+.worst-case-low {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.worst-case-low .negative {
+    color: var(--danger);
+    font-weight: 600;
+}
+
 /* ============================================================
    Controls bar
    ============================================================ */
