@@ -662,6 +662,10 @@ h1 {
     border-bottom: 1px solid var(--border-light);
 }
 
+.budget-item-row td.item-name {
+    padding-left: 1.75rem;
+}
+
 .budget-item-row:last-child td {
     border-bottom: none;
 }
@@ -672,6 +676,7 @@ h1 {
 .item-name {
     color: var(--text-primary);
     font-weight: 500;
+    text-align: left;
     max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -781,6 +786,62 @@ h1 {
     transform: scale(0.95);
 }
 
+.view-toggle-btn {
+    background: transparent;
+    color: var(--text-muted);
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.25rem 0.4rem;
+    margin-left: auto;
+    flex-shrink: 0;
+    opacity: 0.5;
+    border-radius: var(--radius-sm);
+    transition: all 0.15s ease;
+    line-height: 1;
+}
+
+.view-toggle-btn:hover {
+    opacity: 1;
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.expense-subpanel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.expense-subpanel:first-child {
+    margin-top: 0;
+}
+
+.expense-subpanel .bh-cat {
+    width: 100%;
+}
+
+.subpanel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.25rem 0.5rem 0.5rem;
+}
+
+.subpanel-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.subpanel-total {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+}
 
 .delete-item-btn {
     background: var(--danger);

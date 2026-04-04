@@ -12,6 +12,7 @@ let currentActuals = {};     // {category: amount}
 let panelsExpanded = false;
 let showZeroIncome = false;
 let showZeroExpense= false;
+let expenseViewMode = 'grouped';  // 'grouped' or 'subpanels'
 
 // ── Init ───────────────────────────────────────────────────
 
@@ -138,9 +139,10 @@ function renderBudget() {
                 <div class="budget-panel-header">
                     <span class="budget-panel-title expense-title">Expenses</span>
                     <span class="budget-panel-total" id="totalExpenses">$0</span>
+                    <button class="view-toggle-btn" onclick="toggleExpenseView()" title="Toggle subpanel view">${expenseViewMode === 'grouped' ? '▦' : '▤'}</button>
                     <button class="add-category-plus" onclick="openAddItem('expense')" title="Add expense category">+</button>
                 </div>
-                ${renderTable(expenseItems, 'expense')}
+                ${expenseViewMode === 'grouped' ? renderTable(expenseItems, 'expense') : renderExpenseSubpanels(expenseItems)}
             </div>
         </div>`;
 
@@ -241,6 +243,72 @@ function renderItem(item, type, group) {
         <td class="item-diff ${diffClass}">${diffStr}</td>
         <td class="item-del"><button class="delete-item-btn" onclick="removeItem(${item.id})">×</button></td>
     </tr>`;
+}
+
+// ── Expense subpanel view ─────────────────────────────────
+
+function toggleExpenseView() {
+    expenseViewMode = expenseViewMode === 'grouped' ? 'subpanels' : 'grouped';
+    renderBudget();
+}
+
+function renderExpenseSubpanels(items) {
+    const utilities = [];
+    const custom    = [];
+    const other     = [];
+
+    items.forEach(item => {
+        if (!item.category) {
+            custom.push(item);
+        } else {
+            const group = item.category.includes(':') ? item.category.split(':')[0] : item.category;
+            if (group.toLowerCase() === 'utilities') {
+                utilities.push(item);
+            } else {
+                other.push(item);
+            }
+        }
+    });
+
+    const displayName = item => item.label || (item.category.includes(':') ? item.category.split(':').slice(1).join(':') : item.category);
+    const sortAlpha = (a, b) => displayName(a).localeCompare(displayName(b));
+    utilities.sort(sortAlpha);
+    custom.sort(sortAlpha);
+    other.sort(sortAlpha);
+
+    return renderSubpanel('Utilities', utilities, 'expense')
+         + renderSubpanel('Custom', custom, 'expense')
+         + renderSubpanel('Other', other, 'expense');
+}
+
+function renderSubpanel(title, items, type) {
+    const rows = items.map(item => {
+        const group = !item.category ? '__freeform__'
+            : item.category.includes(':') ? item.category.split(':')[0]
+            : item.category;
+        return renderItem(item, type, group);
+    }).join('');
+
+    return `
+        <div class="expense-subpanel">
+            <div class="subpanel-header">
+                <span class="subpanel-title">${title}</span>
+                <span class="subpanel-total" id="subpanel_${title.toLowerCase()}"></span>
+            </div>
+            ${!items.length ? `<p class="empty-section">No ${title.toLowerCase()} items.</p>` : `
+            <table class="budget-table">
+                <thead>
+                    <tr class="budget-col-heads">
+                        <th class="bh-cat">Category</th>
+                        <th class="bh-num">Budget</th>
+                        <th class="bh-num">Actual</th>
+                        <th class="bh-num">Diff</th>
+                        <th class="bh-del"></th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>`}
+        </div>`;
 }
 
 // ── Plan dropdown ──────────────────────────────────────────
@@ -389,6 +457,28 @@ function calculateTotals() {
     for (const [key, total] of Object.entries(groupTotals)) {
         const el = document.getElementById(`stot_${CSS.escape(key.replace('_income','').replace('_expense',''))}_${key.endsWith('income')?'income':'expense'}`);
         if (el) el.innerHTML = formatCurrencyWithSuperscriptCents(total);
+    }
+
+    // Update subpanel totals when in subpanel view
+    if (expenseViewMode === 'subpanels') {
+        const subTotals = {utilities: 0, custom: 0, other: 0};
+        (currentPlan.items || []).filter(i => i.item_type === 'expense').forEach(item => {
+            const val = parseFloat(item.budget_amount) || 0;
+            // Re-read from DOM for live values
+            const inp = document.querySelector(`.expense-input[data-item-id="${item.id}"]`);
+            const live = inp ? (parseFloat(inp.value.replace(/,/g, '')) || 0) : val;
+            if (!item.category) {
+                subTotals.custom += live;
+            } else {
+                const group = item.category.includes(':') ? item.category.split(':')[0] : item.category;
+                if (group.toLowerCase() === 'utilities') subTotals.utilities += live;
+                else subTotals.other += live;
+            }
+        });
+        for (const [key, total] of Object.entries(subTotals)) {
+            const el = document.getElementById(`subpanel_${key}`);
+            if (el) el.innerHTML = formatCurrencyWithSuperscriptCents(total);
+        }
     }
 
     const ending = bal + totalIncome - totalExpenses;
