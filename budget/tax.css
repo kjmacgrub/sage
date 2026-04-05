@@ -281,3 +281,307 @@
     font-size: 0.88rem;
     font-family: inherit;
 }
+
+/* ============================================================
+   Roth Conversion Planner
+   ============================================================ */
+
+/* ── View toggle ──────────────────────────────────────────── */
+
+.view-toggle-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.view-btn {
+    font-family: var(--font);
+    font-size: 0.88rem;
+    font-weight: 500;
+    padding: 0.5rem 1.25rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.view-btn.active {
+    background: #5a7a52;
+    color: white;
+    border-color: #5a7a52;
+}
+
+.view-btn:hover:not(.active) {
+    border-color: #5a7a52;
+    color: var(--text-primary);
+}
+
+/* ── Planner summary cards ────────────────────────────────── */
+
+.rp-summary {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+.tax-card-detail {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    margin-top: 0.2rem;
+}
+
+/* ── Conversion controls ──────────────────────────────────── */
+
+.rp-conv-controls {
+    padding: 1rem 2rem 1.5rem;
+}
+
+.rp-conv-amount {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.rp-slider {
+    width: 100%;
+    margin: 0;
+    accent-color: #5a7a52;
+    height: 6px;
+}
+
+.rp-slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    margin-top: 0.3rem;
+}
+
+/* ── Fill bracket buttons ─────────────────────────────────── */
+
+.rp-fill-btns {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.rp-fill-btn {
+    font-family: var(--font);
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.3rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.rp-fill-btn:hover {
+    border-color: #5a7a52;
+    color: #5a7a52;
+}
+
+/* ── Income profile grid ──────────────────────────────────── */
+
+.rp-income-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem 2rem;
+    padding: 0 2rem 1.5rem;
+}
+
+.rp-field {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.rp-field label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    width: 185px;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.rp-field input {
+    font-family: var(--font);
+    font-size: 0.95rem;
+    font-weight: 500;
+    padding: 0.35rem 0.5rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+    width: 120px;
+    font-variant-numeric: tabular-nums;
+}
+
+.rp-field input:focus {
+    outline: none;
+    border-color: #5a7a52;
+}
+
+.rp-field-sep {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+/* ── Bracket bar visualization ────────────────────────────── */
+
+.rp-bracket-viz {
+    padding: 0 2rem 1.5rem;
+}
+
+.rp-bar {
+    display: flex;
+    height: 38px;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.rp-seg {
+    position: relative;
+    min-width: 3%;
+    border-right: 1px solid rgba(255,255,255,0.15);
+}
+
+.rp-seg:last-child { border-right: none; }
+
+.rp-seg-bg {
+    position: absolute;
+    inset: 0;
+    background: var(--seg-color);
+    opacity: 0.15;
+}
+
+.rp-seg-base {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--seg-color);
+    opacity: 0.7;
+    transition: width 0.15s ease;
+}
+
+.rp-seg-conv {
+    position: absolute;
+    top: 0; bottom: 0;
+    background: var(--seg-color);
+    opacity: 0.35;
+    transition: left 0.15s, width 0.15s ease;
+    background-image: repeating-linear-gradient(
+        -45deg, transparent, transparent 2px,
+        rgba(255,255,255,0.15) 2px, rgba(255,255,255,0.15) 4px
+    );
+}
+
+.rp-seg-rate {
+    position: relative;
+    z-index: 1;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+[data-theme="light"] .rp-seg-rate {
+    color: #333;
+    text-shadow: 0 1px 1px rgba(255,255,255,0.6);
+}
+
+.rp-bar-labels {
+    display: flex;
+    margin-top: 0.25rem;
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+}
+
+.rp-bar-info {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.rp-bar-conv {
+    color: var(--warning);
+    font-weight: 600;
+}
+
+/* ── Detail table section headers ─────────────────────────── */
+
+.rp-section-head td {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #5a7a52;
+    padding-top: 1.25rem !important;
+    padding-bottom: 0.5rem !important;
+}
+
+.rp-conv-row td {
+    color: var(--warning) !important;
+    font-weight: 600;
+}
+
+.rp-pref-row td {
+    color: var(--text-secondary);
+}
+
+/* ── Projection controls ──────────────────────────────────── */
+
+.rp-proj-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 2rem;
+    padding: 0 2rem 1.25rem;
+}
+
+.rp-pct-label {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.rp-proj-table-wrap {
+    padding: 0 1rem 1.5rem;
+    overflow-x: auto;
+}
+
+#rpProjTable {
+    font-size: 0.88rem;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+#rpProjTable th,
+#rpProjTable td {
+    padding: 0.5rem 1rem;
+    white-space: nowrap;
+}
+
+#rpProjTable th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+
+@media (max-width: 700px) {
+    .rp-summary { grid-template-columns: 1fr 1fr; }
+    .rp-income-grid { grid-template-columns: 1fr; }
+    .rp-fill-btns { flex-wrap: wrap; }
+    .rp-field label { width: 140px; }
+    .rp-conv-controls { padding: 1rem 1rem 1.5rem; }
+    .rp-bracket-viz { padding: 0 1rem 1.5rem; }
+    .rp-proj-controls { padding: 0 1rem 1.25rem; }
+}

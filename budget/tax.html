@@ -26,6 +26,14 @@
             <code>python3 budget/api.py</code>
         </div>
 
+        <!-- View Toggle -->
+        <div class="view-toggle-row">
+            <button class="view-btn active" data-view="tracker" onclick="setView('tracker')">YTD Tracker</button>
+            <button class="view-btn" data-view="planner" onclick="setView('planner')">Roth Planner</button>
+        </div>
+
+        <div id="trackerView">
+
         <!-- Controls -->
         <div class="section-card controls-card">
             <div class="controls-row tax-criteria-list">
@@ -149,6 +157,198 @@
             <p class="tax-hint">Set the tax character for each income category in your Quicken data. CEF Roth distributions should be set to Non-Taxable.</p>
             <div id="classifyList"></div>
         </div>
+
+        </div><!-- /trackerView -->
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- ROTH CONVERSION PLANNER                                -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <div id="plannerView" style="display:none">
+
+            <!-- Summary Cards -->
+            <div class="tax-summary-row rp-summary">
+                <div class="tax-card">
+                    <div class="tax-card-label">Base Tax (no conversion)</div>
+                    <div class="tax-card-value" id="rpCardBase">—</div>
+                </div>
+                <div class="tax-card">
+                    <div class="tax-card-label">Conversion Tax Cost</div>
+                    <div class="tax-card-value warning" id="rpCardCost">—</div>
+                </div>
+                <div class="tax-card">
+                    <div class="tax-card-label">Effective Rate</div>
+                    <div class="tax-card-value" id="rpCardEffective">—</div>
+                    <div class="tax-card-detail" id="rpCardEffDetail"></div>
+                </div>
+                <div class="tax-card">
+                    <div class="tax-card-label">Combined Marginal Rate</div>
+                    <div class="tax-card-value" id="rpCardMarginal">—</div>
+                    <div class="tax-card-detail" id="rpCardMargDetail"></div>
+                </div>
+                <div class="tax-card">
+                    <div class="tax-card-label">Room to Fill 22%</div>
+                    <div class="tax-card-value success" id="rpCardRoom">—</div>
+                </div>
+            </div>
+
+            <!-- Conversion Input + Bracket Viz -->
+            <div class="section-card">
+                <div class="tax-section-header">
+                    <h3 class="section-heading" style="margin:0">Roth Conversion</h3>
+                    <div class="rp-fill-btns">
+                        <button class="rp-fill-btn" onclick="rpFillBracket(0.12)">Fill 12%</button>
+                        <button class="rp-fill-btn" onclick="rpFillBracket(0.22)">Fill 22%</button>
+                        <button class="rp-fill-btn" onclick="rpFillBracket(0.24)">Fill 24%</button>
+                    </div>
+                </div>
+                <div class="rp-conv-controls">
+                    <div class="rp-conv-amount">
+                        <span class="reserve-dollar">$</span>
+                        <input type="number" id="rp_conversion" class="reserve-input"
+                               min="0" max="800000" step="1000" value="0"
+                               oninput="rpSyncSlider(false)" style="width:140px">
+                    </div>
+                    <input type="range" id="rp_slider" class="rp-slider"
+                           min="0" max="300000" step="1000" value="0"
+                           oninput="rpSyncSlider(true)">
+                    <div class="rp-slider-labels">
+                        <span>$0</span><span>$150K</span><span>$300K</span>
+                    </div>
+                </div>
+                <div id="rpBracketViz" class="rp-bracket-viz"></div>
+            </div>
+
+            <!-- Income Profile -->
+            <div class="section-card">
+                <h3 class="section-heading">Income Profile</h3>
+                <p class="tax-hint">Pre-filled from 2025 return. Adjust for your 2026 estimates.</p>
+                <div class="rp-income-grid">
+                    <div class="rp-field">
+                        <label>Wages (W-2)</label>
+                        <input type="number" id="rp_wages" value="58500" step="500" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>Annuity — gross (NY Life)</label>
+                        <input type="number" id="rp_annuity" value="50649" step="500" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>Pension (ADP)</label>
+                        <input type="number" id="rp_pension" value="30305" step="500" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>Taxable Interest</label>
+                        <input type="number" id="rp_interest" value="600" step="100" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>Non-Qualified Dividends</label>
+                        <input type="number" id="rp_div_nonqual" value="7475" step="100" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>Qualified Dividends</label>
+                        <input type="number" id="rp_div_qual" value="5353" step="100" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>CG Distributions</label>
+                        <input type="number" id="rp_cg_dist" value="4428" step="100" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>Social Security — Ken</label>
+                        <input type="number" id="rp_ss_self" value="0" step="500" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>Social Security — Hilary</label>
+                        <input type="number" id="rp_ss_spouse" value="0" step="500" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>Capital Loss Carryover</label>
+                        <input type="number" id="rp_cap_loss_co" value="36355" step="500" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>Additional Deductions</label>
+                        <input type="number" id="rp_extra_ded" value="0" step="500" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field rp-field-sep">
+                        <label>Federal Tax Withheld</label>
+                        <input type="number" id="rp_fed_withheld" value="15000" step="100" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>State + Local Withheld</label>
+                        <input type="number" id="rp_state_withheld" value="7000" step="100" oninput="rpOnInput()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Tax Computation -->
+            <div class="section-card">
+                <h3 class="section-heading">Tax Computation Detail</h3>
+                <table class="data-table tax-calc-table">
+                    <tbody id="rpCalcBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Multi-Year Projection -->
+            <div class="section-card">
+                <div class="tax-section-header">
+                    <h3 class="section-heading" style="margin:0">10-Year Roth Conversion Projection</h3>
+                </div>
+                <p class="tax-hint">Fills to target bracket each year. Income changes: Ken retires mid-2027 ($20K partial), Park Slope pension $24K starts 2027, Social Security starts 2029 (Ken $22,800 / Hilary $10,500 at FRA). Annuity is fixed; other investment income grows with inflation.</p>
+                <div class="rp-proj-controls">
+                    <div class="rp-field">
+                        <label>Target Bracket</label>
+                        <select id="rp_target_bracket" class="char-select" onchange="rpOnInput()" style="width:auto">
+                            <option value="0.12">12%</option>
+                            <option value="0.22" selected>22%</option>
+                            <option value="0.24">24%</option>
+                        </select>
+                    </div>
+                    <div class="rp-field">
+                        <label>State</label>
+                        <select id="rp_state" class="char-select" onchange="rpOnInput()" style="width:auto">
+                            <option value="nyc" selected>NY + NYC</option>
+                            <option value="ny">NY (no NYC)</option>
+                            <option value="none">No State Tax</option>
+                            <option value="flat_3">Low (3%)</option>
+                            <option value="flat_5">Mid (5%)</option>
+                        </select>
+                    </div>
+                    <div class="rp-field">
+                        <label>IRA Balance</label>
+                        <input type="number" id="rp_ira_balance" value="742000" step="5000" oninput="rpOnInput()">
+                    </div>
+                    <div class="rp-field">
+                        <label>IRA Growth</label>
+                        <input type="number" id="rp_growth_rate" value="5" step="0.5" min="0" max="15" oninput="rpOnInput()" style="width:70px">
+                        <span class="rp-pct-label">%</span>
+                    </div>
+                    <div class="rp-field">
+                        <label>Inflation</label>
+                        <input type="number" id="rp_inflation" value="2.5" step="0.5" min="0" max="10" oninput="rpOnInput()" style="width:70px">
+                        <span class="rp-pct-label">%</span>
+                    </div>
+                </div>
+                <div class="rp-proj-table-wrap">
+                    <table class="data-table" id="rpProjTable">
+                        <thead>
+                            <tr>
+                                <th>Year</th>
+                                <th>Age</th>
+                                <th style="text-align:right">Base Taxable</th>
+                                <th style="text-align:right">Conversion</th>
+                                <th style="text-align:right">IRA Balance</th>
+                                <th style="text-align:right">Roth Balance</th>
+                                <th style="text-align:right">Total Tax</th>
+                                <th style="text-align:right">Conv. Cost</th>
+                                <th>Effective</th>
+                                <th>Marginal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rpProjBody"></tbody>
+                        <tfoot id="rpProjFoot"></tfoot>
+                    </table>
+                </div>
+            </div>
+
+        </div><!-- /plannerView -->
 
     </div>
 
