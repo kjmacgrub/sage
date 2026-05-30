@@ -111,11 +111,20 @@ async function removeItem(itemId) {
     renderBudget();
 }
 
+// Keep the in-memory plan in sync with edited inputs so any re-render
+// (view toggle, add/remove item, suggestions) repaints the real value
+// instead of the stale pre-edit one (which would show — and re-save — 0).
+function updateLocalItemAmount(itemId, amount) {
+    const item = (currentPlan.items || []).find(i => i.id === itemId);
+    if (item) item.budget_amount = amount;
+}
+
 let _saveTimers = {};
 function debounceSaveItem(itemId, amount) {
     clearTimeout(_saveTimers[itemId]);
     _saveTimers[itemId] = setTimeout(() => {
-        apiPut(`/api/items/${itemId}`, {budget_amount: amount});
+        apiPut(`/api/items/${itemId}`, {budget_amount: amount})
+            .catch(() => showToast('Could not save — check connection'));
     }, 600);
 }
 
@@ -182,7 +191,7 @@ function renderTable(items, type) {
         return `
             <tr class="budget-group-row">
                 <td class="group-name">${groupLabel}</td>
-                <td></td><td></td><td></td>
+                <td></td><td></td>
                 <td class="group-subtotal" id="stot_${CSS.escape(group)}_${type}"></td>
             </tr>
             ${itemRows}`;
@@ -195,7 +204,6 @@ function renderTable(items, type) {
                     <th class="bh-cat">Category</th>
                     <th class="bh-num">Budget</th>
                     <th class="bh-num">Actual</th>
-                    <th class="bh-num">Diff</th>
                     <th class="bh-del"></th>
                 </tr>
             </thead>
@@ -213,18 +221,6 @@ function renderItem(item, type, group) {
     const actualAbs = Math.abs(actualRaw);
     const actualStr = isFreeform ? '—' : (actualAbs > 0.01 ? formatCurrencyWhole(actualAbs) : '—');
 
-    const budget = parseFloat(item.budget_amount) || 0;
-    let diffStr = '', diffClass = '';
-    if (!isFreeform && actualAbs > 0.01 && budget > 0) {
-        const diff = type === 'income' ? (actualAbs - budget) : (budget - actualAbs);
-        if (Math.abs(diff) < 1) {
-            diffStr = '—'; diffClass = 'exact';
-        } else {
-            diffStr   = (diff > 0 ? '+' : '') + formatCurrencyWhole(diff);
-            diffClass = diff > 0 ? 'under' : 'over';
-        }
-    }
-
     return `
     <tr class="budget-item-row" data-item-id="${item.id}">
         <td class="item-name${isFreeform ? ' freeform-item' : ''}" title="${isFreeform ? item.label : item.category}">${displayName}</td>
@@ -240,7 +236,6 @@ function renderItem(item, type, group) {
                    onkeypress="if(event.key==='Enter') this.blur()">
         </td>
         <td class="item-actual">${actualStr}</td>
-        <td class="item-diff ${diffClass}">${diffStr}</td>
         <td class="item-del"><button class="delete-item-btn" onclick="removeItem(${item.id})">×</button></td>
     </tr>`;
 }
@@ -302,7 +297,6 @@ function renderSubpanel(title, items, type) {
                         <th class="bh-cat">Category</th>
                         <th class="bh-num">Budget</th>
                         <th class="bh-num">Actual</th>
-                        <th class="bh-num">Diff</th>
                         <th class="bh-del"></th>
                     </tr>
                 </thead>
@@ -508,6 +502,7 @@ function calculateTotals() {
 function onAmountInput(input) {
     const val    = parseFloat(input.value.replace(/,/g, '')) || 0;
     const itemId = parseInt(input.getAttribute('data-item-id'));
+    updateLocalItemAmount(itemId, val);
     debounceSaveItem(itemId, val);
     calculateTotals();
 }
@@ -612,7 +607,10 @@ function formatAndSaveAmount(input) {
     const val    = parseFloat(input.value.replace(/,/g, '')) || 0;
     const itemId = parseInt(input.getAttribute('data-item-id'));
     input.value  = formatNumberWithCommas(val);
-    apiPut(`/api/items/${itemId}`, {budget_amount: val});
+    updateLocalItemAmount(itemId, val);
+    clearTimeout(_saveTimers[itemId]);   // supersede any pending debounce
+    apiPut(`/api/items/${itemId}`, {budget_amount: val})
+        .catch(() => showToast('Could not save — check connection'));
     calculateTotals();
 }
 
