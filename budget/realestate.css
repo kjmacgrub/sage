@@ -1,0 +1,274 @@
+/* Real Estate tab — self-contained styles (uses shared CSS variables from styles.css) */
+
+.re-titlebar {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    margin: 0.5rem 0 0.25rem;
+}
+.re-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+.re-version {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    background: var(--primary-light);
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    cursor: default;
+}
+.re-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    max-width: 70ch;
+    margin: 0 0 1.25rem;
+    line-height: 1.5;
+}
+
+/* Headings */
+.re-heading {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.9rem;
+}
+.re-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.re-card-head .re-heading { margin-bottom: 0; }
+.re-hint, .re-mut {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+.re-hint { margin: 0 0 0.9rem; }
+
+/* Scenario bar */
+.re-scenario-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+/* Fields */
+.re-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.re-field-grow { flex: 1; min-width: 180px; }
+.re-field > label,
+.re-assump > .re-field > label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+.re-select, .re-text, .re-num-in {
+    padding: 0.45rem 0.6rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-family: var(--font);
+}
+.re-num-in { text-align: right; }
+.re-select:focus, .re-text:focus, .re-num-in:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Buttons */
+.re-btn-ghost {
+    padding: 0.5rem 0.9rem;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    font-size: 0.88rem;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.re-btn-ghost:hover { border-color: var(--primary); color: var(--text-primary); }
+
+/* Assumption grids */
+.re-assump {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 0.75rem 1rem;
+    align-items: end;
+}
+.re-assump .re-num-in { width: 100%; }
+.re-check {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    grid-column: 1 / -1;
+    font-weight: 500;
+}
+.re-check input { width: 16px; height: 16px; accent-color: var(--primary); }
+
+/* Two-column layout for assumption / result cards */
+.re-cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 1.25rem;
+}
+
+/* Tables */
+.re-table-wrap { overflow-x: auto; }
+.re-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+.re-table th, .re-table td {
+    padding: 0.5rem 0.6rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+}
+.re-table thead th {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-secondary);
+    font-weight: 600;
+    border-bottom: 1.5px solid var(--border);
+    white-space: nowrap;
+}
+.re-table .re-num { text-align: right; white-space: nowrap; }
+.re-table tbody tr:last-child td { border-bottom: none; }
+
+/* Inline inputs inside the units table */
+.re-cell-in {
+    width: 100%;
+    min-width: 64px;
+    padding: 0.35rem 0.45rem;
+    border: 1.5px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.86rem;
+    font-family: var(--font);
+}
+.re-cell-in:hover { border-color: var(--border); }
+.re-cell-in:focus { outline: none; border-color: var(--primary); background: var(--surface); }
+td.re-num .re-cell-in { text-align: right; }
+.re-role-select {
+    padding: 0.3rem 0.4rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    font-family: var(--font);
+}
+.re-row-skip { opacity: 0.5; }
+.re-row-residence td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
+.re-row-rental td:first-child { box-shadow: inset 3px 0 0 var(--warning); }
+.re-del {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0.2rem 0.4rem;
+    border-radius: var(--radius-sm);
+}
+.re-del:hover { color: var(--danger); background: var(--primary-light); }
+.re-computed { color: var(--text-secondary); }
+
+/* Sources & Uses */
+.re-su {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+@media (max-width: 640px) { .re-su { grid-template-columns: 1fr; } }
+.re-su-title {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+}
+.re-su-table td:last-child, .re-kv td:last-child { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.re-su-table .re-total td, .re-kv .re-total td {
+    border-top: 1.5px solid var(--border);
+    border-bottom: none;
+    font-weight: 700;
+    padding-top: 0.6rem;
+}
+.re-kv .re-sub td { color: var(--text-secondary); font-size: 0.82rem; }
+.re-balance {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+.re-balance.ok { background: rgba(52, 199, 89, 0.12); color: #248a3d; }
+.re-balance.gap { background: rgba(255, 149, 0, 0.14); color: #c84b00; }
+[data-theme="dark"] .re-balance.ok { color: #4ad06a; }
+[data-theme="dark"] .re-balance.gap { color: #ffae52; }
+
+.re-pos { color: #248a3d; }
+.re-neg { color: #c84b00; }
+[data-theme="dark"] .re-pos { color: #4ad06a; }
+[data-theme="dark"] .re-neg { color: #ffae52; }
+
+/* Notes */
+.re-notes { margin: 0; padding-left: 1.1rem; }
+.re-notes li {
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    line-height: 1.55;
+    margin-bottom: 0.6rem;
+}
+.re-notes li.warn::marker { content: "⚠ "; }
+.re-results-card { border: 1.5px solid var(--primary-light); }
+
+/* Persistent bottom-line bar (reuses global .sticky-footer positioning) */
+.re-bottombar {
+    gap: 1.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    z-index: 50;
+}
+.re-bb-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.15;
+}
+.re-bb-item.emph { padding: 0 0.5rem; }
+.re-bb-sep { width: 1px; align-self: stretch; background: var(--border); }
+.re-bb-label {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+.re-bb-val {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+.re-bb-item.emph .re-bb-val { font-size: 1.22rem; }
+@media (max-width: 560px) {
+    .re-bottombar { gap: 0.9rem; }
+    .re-bb-sep { display: none; }
+    .re-bb-val { font-size: 0.92rem; }
+    .re-bb-item.emph .re-bb-val { font-size: 1.05rem; }
+}
