@@ -460,8 +460,11 @@ def fetch_screener_data(ticker: str):
         )
         if r.status_code == 200:
             rows = r.json().get("Data", {}).get("PriceHistory", [])
+            # The 1Y endpoint returns oldest-first (unlike the 5D endpoint), so newest is at the end.
             if rows:
-                latest = rows[0]
+                rows_sorted = sorted(rows, key=lambda x: x.get("DataDate") or "")
+                latest = rows_sorted[-1]
+                oldest = rows_sorted[0]
                 price = latest.get("Data")
                 nav = latest.get("NAVData")
                 disc = latest.get("DiscountData")
@@ -469,12 +472,13 @@ def fetch_screener_data(ticker: str):
                     premium_discount = round(disc, 2)
                 elif price and nav:
                     premium_discount = round((price / nav - 1) * 100, 2)
-                discounts = [r["DiscountData"] for r in rows if r.get("DiscountData") is not None]
+                discounts = [r["DiscountData"] for r in rows_sorted if r.get("DiscountData") is not None]
                 if discounts:
                     avg_discount_1y = round(sum(discounts) / len(discounts), 2)
-                nav_vals = [r["NAVData"] for r in rows if r.get("NAVData") is not None]
-                if len(nav_vals) >= 2:
-                    nav_change_1y = round((nav_vals[0] - nav_vals[-1]) / nav_vals[-1] * 100, 2)
+                nav_first = oldest.get("NAVData")
+                nav_last = latest.get("NAVData")
+                if nav_first and nav_last:
+                    nav_change_1y = round((nav_last - nav_first) / nav_first * 100, 2)
     except Exception:
         pass
 
