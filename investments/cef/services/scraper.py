@@ -9,6 +9,73 @@ from bs4 import BeautifulSoup
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
 
+SPECIAL_THRESHOLD = 1.75  # payment ≥ this × median ⇒ flagged special
+
+
+def _analyze_distributions(ticker: str, price: float) -> dict:
+    """
+    Detect special distributions and compute a regular-only yield.
+
+    Returns {has_special_dist, regular_yield_pct, last_special_date, last_special_amount}.
+    All keys present (values may be None) so callers can pass straight to SQL.
+    """
+    out = {
+        "has_special_dist": 0,
+        "regular_yield_pct": None,
+        "last_special_date": None,
+        "last_special_amount": None,
+    }
+    if not price:
+        return out
+    try:
+        url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range=2y&interval=1mo&events=dividends"
+        r = httpx.get(url, headers=HEADERS, timeout=10)
+        if r.status_code != 200:
+            return out
+        divs = r.json()["chart"]["result"][0].get("events", {}).get("dividends", {})
+        if not divs:
+            return out
+        events = []
+        for d in divs.values():
+            ex = datetime.fromtimestamp(d["date"], tz=timezone.utc).date()
+            events.append((ex, float(d["amount"])))
+        events.sort()
+        if len(events) < 2:
+            return out
+
+        amounts_sorted = sorted(a for _, a in events)
+        median = amounts_sorted[len(amounts_sorted) // 2]
+        if median <= 0:
+            return out
+
+        today = date.today()
+        # 12-month window
+        cutoff = today.replace(year=today.year - 1)
+
+        recent_specials = [
+            (ex, a) for ex, a in events
+            if ex >= cutoff and a >= median * SPECIAL_THRESHOLD
+        ]
+        regulars_12m = [
+            (ex, a) for ex, a in events
+            if ex >= cutoff and a < median * SPECIAL_THRESHOLD
+        ]
+
+        out["has_special_dist"] = 1 if recent_specials else 0
+        if recent_specials:
+            last = recent_specials[-1]
+            out["last_special_date"] = last[0].isoformat()
+            out["last_special_amount"] = round(last[1], 4)
+
+        if regulars_12m:
+            n_reg = len(regulars_12m)
+            freq_map = {1: 1, 2: 2, 3: 4, 4: 4, 6: 6, 11: 12, 12: 12, 13: 12}
+            periods = freq_map.get(n_reg, 12 if n_reg > 12 else n_reg)
+            out["regular_yield_pct"] = round(median * periods / price * 100, 2)
+    except Exception:
+        pass
+    return out
+
 
 def _compute_nav_cagr(ticker: str) -> float:
     """Fetch 5Y weekly NAV history and return annualized NAV CAGR, or None."""
@@ -173,6 +240,14 @@ def _fetch_cefconnect(ticker: str) -> dict:
     except Exception:
         pass
 
+    special = _analyze_distributions(ticker, price)
+    if special["has_special_dist"] and special["regular_yield_pct"] is not None:
+        # Only override when the recalc actually excludes specials (lower than source).
+        # If it comes out higher, the median was contaminated by a policy change
+        # (old larger regulars vs. new smaller ones) — keep the source value.
+        if yield_pct is None or special["regular_yield_pct"] < yield_pct:
+            yield_pct = special["regular_yield_pct"]
+
     return {
         "ticker": ticker,
         "name": None,
@@ -185,6 +260,10 @@ def _fetch_cefconnect(ticker: str) -> dict:
         "yield_pct": yield_pct,
         "distribution": distribution,
         "dist_freq": dist_freq,
+        "has_special_dist": special["has_special_dist"],
+        "regular_yield_pct": special["regular_yield_pct"],
+        "last_special_date": special["last_special_date"],
+        "last_special_amount": special["last_special_amount"],
         "history": price_history,
     }
 
@@ -225,6 +304,11 @@ def _fetch_yahoo(ticker: str) -> dict:
                         6: "Bi-Monthly", 11: "Monthly", 12: "Monthly", 13: "Monthly"}
             dist_freq = freq_map.get(count)
 
+        special = _analyze_distributions(ticker, price)
+        if special["has_special_dist"] and special["regular_yield_pct"] is not None:
+            if yield_pct is None or special["regular_yield_pct"] < yield_pct:
+                yield_pct = special["regular_yield_pct"]
+
         return {
             "ticker": ticker,
             "name": long_name,
@@ -237,6 +321,10 @@ def _fetch_yahoo(ticker: str) -> dict:
             "yield_pct": yield_pct,
             "distribution": distribution,
             "dist_freq": dist_freq,
+            "has_special_dist": special["has_special_dist"],
+            "regular_yield_pct": special["regular_yield_pct"],
+            "last_special_date": special["last_special_date"],
+            "last_special_amount": special["last_special_amount"],
         }
     except Exception as e:
         raise RuntimeError(f"Yahoo Finance fetch failed for {ticker}: {e}")
@@ -438,6 +526,11 @@ def fetch_screener_data(ticker: str):
     except Exception:
         pass
 
+    special = _analyze_distributions(ticker, price)
+    if special["has_special_dist"] and special["regular_yield_pct"] is not None:
+        if yield_pct is None or special["regular_yield_pct"] < yield_pct:
+            yield_pct = special["regular_yield_pct"]
+
     return {
         "ticker": ticker,
         "price": round(price, 4),
@@ -451,6 +544,10 @@ def fetch_screener_data(ticker: str):
         "inception_date": inception_date,
         "category": category,
         "dist_cagr": dist_cagr,
+        "has_special_dist": special["has_special_dist"],
+        "regular_yield_pct": special["regular_yield_pct"],
+        "last_special_date": special["last_special_date"],
+        "last_special_amount": special["last_special_amount"],
     }
 
 
@@ -467,4 +564,8 @@ def _empty(ticker: str) -> dict:
         "yield_pct": None,
         "distribution": None,
         "dist_freq": None,
+        "has_special_dist": 0,
+        "regular_yield_pct": None,
+        "last_special_date": None,
+        "last_special_amount": None,
     }

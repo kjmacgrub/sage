@@ -24,6 +24,7 @@ class HoldingIn(BaseModel):
     dividends_received: float = 0.0
     manual_nav: Optional[float] = None
     manual_nav_date: Optional[str] = None
+    acquired_date: Optional[str] = None
     notes: str = ""
 
 
@@ -33,6 +34,7 @@ def list_holdings():
         rows = conn.execute("""
             SELECT h.*, f.name, f.type,
                    p.price, p.nav, p.premium_discount, p.avg_discount_1y, p.nav_cagr, p.yield_pct,
+                   p.has_special_dist, p.regular_yield_pct, p.last_special_date, p.last_special_amount,
                    p2.price AS prev_price
             FROM holdings h
             JOIN funds f ON f.ticker = h.ticker
@@ -76,19 +78,21 @@ def list_holdings():
 def upsert_holding(ticker: str, holding: HoldingIn):
     with get_db() as conn:
         conn.execute("""
-            INSERT INTO holdings (ticker, shares, cost_basis, dividends_received, manual_nav, manual_nav_date, div_tracking_since, notes, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, date('now'), ?, datetime('now'))
+            INSERT INTO holdings (ticker, shares, cost_basis, dividends_received, manual_nav, manual_nav_date, acquired_date, div_tracking_since, notes, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, date('now'), ?, datetime('now'))
             ON CONFLICT(ticker) DO UPDATE SET
                 shares=excluded.shares,
                 cost_basis=excluded.cost_basis,
                 dividends_received=excluded.dividends_received,
                 manual_nav=excluded.manual_nav,
                 manual_nav_date=excluded.manual_nav_date,
+                acquired_date=excluded.acquired_date,
                 div_tracking_since=COALESCE(holdings.div_tracking_since, excluded.div_tracking_since),
                 notes=excluded.notes,
                 updated_at=datetime('now')
         """, (ticker.upper(), holding.shares, holding.cost_basis,
-              holding.dividends_received, holding.manual_nav, holding.manual_nav_date, holding.notes)
+              holding.dividends_received, holding.manual_nav, holding.manual_nav_date,
+              holding.acquired_date, holding.notes)
         )
         if holding.manual_nav and holding.manual_nav_date:
             conn.execute("""

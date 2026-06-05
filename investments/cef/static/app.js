@@ -181,11 +181,41 @@ function renderPortfolio() {
     ...divTooltipLines,
   ].join('&#10;');
 
-  const posWithDelta = positions.map(h => ({
-    ...h,
-    disc_vs_avg: h.premium_discount != null && h.avg_discount_1y != null ? h.premium_discount - h.avg_discount_1y : null,
-    weight: totalMkt && h.market_value ? h.market_value / totalMkt * 100 : null
-  }));
+  // Earliest recorded distribution per ticker — fallback "owned since" date when acquired_date isn't set
+  const earliestDistByTicker = {};
+  for (const d of _distributions) {
+    if (!earliestDistByTicker[d.ticker] || d.ex_date < earliestDistByTicker[d.ticker]) {
+      earliestDistByTicker[d.ticker] = d.ex_date;
+    }
+  }
+
+  const posWithDelta = positions.map(h => {
+    // Pre-compute derived columns so header sort works (sortData reads row fields, not the inline <td>)
+    const p = _prices.find(p => p.ticker === h.ticker);
+    const distPerShare = p?.distribution;
+    const distFreq = (p?.dist_freq || '').toLowerCase();
+    const periodsPerYear = distFreq.includes('month') ? 12 : distFreq.includes('quarter') ? 4 : distFreq.includes('annual') ? 1 : 12;
+    // Annualized total return (CAGR) from acquired_date, falling back to first recorded distribution
+    const startDate = h.acquired_date || earliestDistByTicker[h.ticker] || null;
+    let annualized_return = null, hold_years = null;
+    if (startDate && h.total_return_pct != null) {
+      hold_years = (now - new Date(startDate)) / (365.25 * 24 * 3600 * 1000);
+      if (hold_years >= 0.5) {
+        annualized_return = +(((1 + h.total_return_pct / 100) ** (1 / hold_years) - 1) * 100).toFixed(2);
+      }
+    }
+    return {
+      ...h,
+      disc_vs_avg: h.premium_discount != null && h.avg_discount_1y != null ? h.premium_discount - h.avg_discount_1y : null,
+      cost_per_share: h.shares ? h.cost_basis / h.shares : null,
+      yoc: (distPerShare && h.shares && h.cost_basis) ? distPerShare * h.shares * periodsPerYear / h.cost_basis * 100 : null,
+      annualized_return,
+      hold_years,
+      hold_start: startDate,
+      hold_start_estimated: !h.acquired_date && !!startDate,
+      weight: totalMkt && h.market_value ? h.market_value / totalMkt * 100 : null
+    };
+  });
   const sorted = sortData(posWithDelta, _sortCol || 'ticker', _sortCol ? _sortAsc : true);
 
   return `
@@ -212,6 +242,7 @@ function renderPortfolio() {
       <table>
         <thead>
           <tr>
+            <th class="col-num">#</th>
             ${th('ticker', 'Ticker', true, 1)}
             ${th('name', 'Name', true, 2)}
             ${th('type', 'Type', true, 3)}
@@ -220,7 +251,6 @@ function renderPortfolio() {
             ${th('price_change_pct', 'Day %')}
             ${th('cost_per_share', 'Cost/Sh')}
             ${th('yield_pct', 'Yield', false, false, 'Current market yield')}
-            ${th('yoc', 'YoC', false, false, 'Yield on cost basis (annualized distributions / total cost)')}
             ${th('nav_cagr', 'NAV/yr', false, false, '5-year annualized NAV growth rate (from CEFConnect history)')}
             ${th('disc_vs_avg', 'δ vs Avg', false, false, 'Current disc/premium relative to its 1-year average. Negative = trading cheaper than usual.')}
             <th title="12-month NAV trend">NAV Trend</th>
@@ -228,19 +258,22 @@ function renderPortfolio() {
             ${th('dividends_received', 'Divs')}
             ${th('total_return', 'Total Ret')}
             ${th('total_return_pct', 'Ret %')}
+            ${th('hold_years', 'Held', false, false, 'Time owned — since acquired date, or estimated (~) from the first recorded distribution. This is the period the annualized return is computed over.')}
+            ${th('annualized_return', 'Ann Ret', false, false, 'Annualized total return (CAGR) since acquired date — falls back to first recorded distribution if no acquired date is set. Needs ≥6 months held.')}
+            ${th('yoc', 'YoC', false, false, 'Yield on cost basis (annualized distributions / total cost)')}
             ${th('market_value', 'Mkt Val')}
             ${th('weight', '% Port')}
           </tr>
         </thead>
         <tbody>
-          ${sorted.map(h => portfolioRow(h, totalMkt)).join('')}
+          ${sorted.map((h, i) => portfolioRow(h, totalMkt, i + 1)).join('')}
         </tbody>
       </table>
     </div>
     ${renderIncomeProjection(positions)}`;
 }
 
-function portfolioRow(h, totalMkt) {
+function portfolioRow(h, totalMkt, idx) {
   const costPerShare = h.shares ? (h.cost_basis / h.shares) : null;
   // Yield on cost: annualized distributions / cost basis
   const p = _prices.find(p => p.ticker === h.ticker);
@@ -251,8 +284,21 @@ function portfolioRow(h, totalMkt) {
     ? (distPerShare * h.shares * periodsPerYear / h.cost_basis * 100)
     : null;
 
+  const heldStr = h.hold_years != null
+    ? (h.hold_start_estimated ? '~' : '') + (h.hold_years >= 1 ? h.hold_years.toFixed(1) + 'y' : Math.round(h.hold_years * 12) + 'mo')
+    : '—';
+  const heldTitle = h.hold_start
+    ? `Owned since ${h.hold_start}${h.hold_start_estimated ? ' (estimated from first distribution — set an acquired date for accuracy)' : ''}`
+    : 'No acquired date or recorded distributions yet';
+  const annRetTitle = h.annualized_return != null
+    ? `Annualized total return (CAGR) over ${h.hold_years.toFixed(1)} yrs since ${h.hold_start}${h.hold_start_estimated ? ' (estimated from first distribution — set an acquired date for accuracy)' : ''}`
+    : h.hold_start
+      ? `Held ${h.hold_years != null && h.hold_years >= 1 ? h.hold_years.toFixed(1) + ' yrs' : 'under 1 yr'} — needs ≥6 months to annualize`
+      : 'Set an acquired date (or record a distribution) to compute annualized return';
+
   return `
     <tr onclick="openHoldingModal('${h.ticker}')">
+      <td class="col-num">${idx}</td>
       <td class="left col-sticky">
         <a class="ticker-link" href="${tickerUrl(h.ticker, h.type)}" target="_blank" onclick="event.stopPropagation()">${h.ticker}</a>
       </td>
@@ -262,8 +308,7 @@ function portfolioRow(h, totalMkt) {
       <td>${fmt$(h.price)}</td>
       <td class="${gainClass(h.price_change_pct)}">${h.price_change_pct != null ? (h.price_change_pct >= 0 ? '+' : '') + h.price_change_pct.toFixed(2) + '%' : '—'}</td>
       <td>${costPerShare != null ? fmt$(costPerShare) : '—'}</td>
-      <td title="Current market yield">${h.yield_pct != null ? h.yield_pct.toFixed(2) + '%' : '—'}</td>
-      <td class="positive" title="Yield on cost basis">${yoc != null ? yoc.toFixed(2) + '%' : '—'}</td>
+      ${yieldCell(h)}
       <td class="${gainClass(h.nav_cagr)}" title="5Y annualized NAV change">${h.nav_cagr != null ? (h.nav_cagr >= 0 ? '+' : '') + h.nav_cagr.toFixed(2) + '%' : '—'}</td>
       <td>${fmtDiscCell(h.premium_discount, h.avg_discount_1y)}</td>
       <td>${renderSparkline(_navSparklines[h.ticker])}</td>
@@ -271,6 +316,9 @@ function portfolioRow(h, totalMkt) {
       <td class="positive" onclick="event.stopPropagation(); openDivModal('${h.ticker}')" style="cursor:pointer;text-decoration:underline dotted" title="Click to view distribution history">${fmt$(h.dividends_received)}</td>
       <td class="${gainClass(h.total_return)}">${fmtGain$(h.total_return)}</td>
       <td class="${gainClass(h.total_return_pct)}">${h.total_return_pct != null ? fmtPct(h.total_return_pct) : '—'}</td>
+      <td style="color:var(--text-2)" title="${heldTitle}">${heldStr}</td>
+      <td class="${gainClass(h.annualized_return)}" title="${annRetTitle}">${h.annualized_return != null ? fmtPct(h.annualized_return) : '—'}</td>
+      <td class="positive" title="Yield on cost basis">${yoc != null ? yoc.toFixed(2) + '%' : '—'}</td>
       <td>${fmt$(h.market_value)}</td>
       <td>${h.weight != null ? h.weight.toFixed(1) + '%' : '—'}</td>
     </tr>`;
@@ -342,7 +390,7 @@ function watchlistRow(p, isHeld = false) {
       <td>${fmtDiscCell(p.premium_discount, p.avg_discount_1y)}</td>
       <td>${fmt$(p.price)}</td>
       <td>${fmt$(p.nav)}</td>
-      <td>${p.yield_pct != null ? p.yield_pct.toFixed(2) + '%' : '—'}</td>
+      ${yieldCell(p)}
       <td class="${gainClass(p.nav_cagr)}" title="5Y annualized NAV change">${p.nav_cagr != null ? (p.nav_cagr >= 0 ? '+' : '') + p.nav_cagr.toFixed(2) + '%' : '—'}</td>
       <td style="color:var(--text-2)">${p.dist_freq || '—'}</td>
       <td style="color:var(--text-muted)">${p.date || ''}</td>
@@ -796,9 +844,15 @@ async function openHoldingModal(ticker) {
               <input type="number" id="h-cost" min="0" step="0.01" value="${merged.cost_basis || ''}">
             </div>
           </div>
-          <div class="form-group">
-            <label>Dividends Received ($)</label>
-            <input type="number" id="h-divs" min="0" step="0.01" value="${merged.dividends_received || ''}">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Dividends Received ($)</label>
+              <input type="number" id="h-divs" min="0" step="0.01" value="${merged.dividends_received || ''}">
+            </div>
+            <div class="form-group">
+              <label>Acquired Date</label>
+              <input type="date" id="h-acquired" value="${merged.acquired_date || ''}" title="When you bought this position — drives annualized return. If blank, the first recorded distribution is used as an estimate." style="width:160px">
+            </div>
           </div>
           ${merged.type === 'BDC' ? `
           <div class="form-group">
@@ -967,9 +1021,10 @@ async function saveHolding(ticker) {
   const dividends_received = parseFloat(document.getElementById('h-divs')?.value) || 0;
   const manual_nav = parseFloat(document.getElementById('h-nav')?.value) || null;
   const manual_nav_date = document.getElementById('h-nav-date')?.value || null;
+  const acquired_date = document.getElementById('h-acquired')?.value || null;
   const notes = document.getElementById('h-notes')?.value || '';
   try {
-    await PUT(`/api/holdings/${ticker}`, { ticker, shares, cost_basis, dividends_received, manual_nav, manual_nav_date, notes });
+    await PUT(`/api/holdings/${ticker}`, { ticker, shares, cost_basis, dividends_received, manual_nav, manual_nav_date, acquired_date, notes });
     closeModal();
     await loadAll();
     renderApp();
@@ -1314,7 +1369,7 @@ function screenRow(f, wlTickers, heldTickers) {
       </td>
       <td class="left col-sticky-2" style="color:var(--text-2)">${f.name || ''}</td>
       <td class="left col-sticky-3" style="color:var(--text-muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;max-width:120px">${f.category || '—'}</td>
-      <td>${f.yield_pct != null ? f.yield_pct.toFixed(2) + '%' : '—'}</td>
+      ${yieldCell(f)}
       <td style="color:var(--text-2)">${f.dist_freq || '—'}</td>
       <td class="${discClass(f.premium_discount)}" title="${f.avg_discount_1y != null ? '1Y avg: ' + fmtDisc(f.avg_discount_1y) : ''}">${fmtDisc(f.premium_discount)}</td>
       <td>${navChg}</td>
@@ -1410,6 +1465,16 @@ function tickerUrl(ticker, type) {
 function fmt$(n) { return n != null ? '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'; }
 function fmtGain$(n) { return n != null ? (n >= 0 ? '+' : '') + fmt$(n) : '—'; }
 function fmtPct(n) { return n != null ? (n >= 0 ? '+' : '') + n.toFixed(2) + '%' : '—'; }
+
+// Yield cell — marks funds whose displayed yield excludes special distributions (regular-only)
+function yieldCell(o) {
+  if (o.yield_pct == null) return '<td title="Current market yield">—</td>';
+  if (o.has_special_dist) {
+    const last = o.last_special_date ? ` Last special ${o.last_special_date}: ${fmt$(o.last_special_amount)}.` : '';
+    return `<td title="Regular-only yield — special distributions excluded so the figure isn't skewed by year-end/ROC payouts.${last}">${o.yield_pct.toFixed(2)}%<sup style="color:var(--accent,#5a7a52)">*</sup></td>`;
+  }
+  return `<td title="Current market yield">${o.yield_pct.toFixed(2)}%</td>`;
+}
 
 function fmtDisc(n) {
   if (n == null) return '—';
@@ -1548,6 +1613,7 @@ async function applySplit(ticker, ratio) {
       dividends_received: holding.dividends_received,
       manual_nav: holding.manual_nav || null,
       manual_nav_date: holding.manual_nav_date || null,
+      acquired_date: holding.acquired_date || null,
       notes: holding.notes || '',
     });
     closeModal();

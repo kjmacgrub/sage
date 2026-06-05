@@ -1,14 +1,19 @@
-# CEF — Closed-End Fund Tracker
+# CEF — Closed-End Fund Tracker (Sage › Investments)
+
+> ⚠️ **This is the LIVE code**, served on :8000 as the Investments personality of Sage.
+> It lives in the **`sage` repo** at `/Users/km/python3/source/sage/investments/`.
+> The top-level `/Users/km/python3/source/cef/` repo is **ARCHIVED** and serves nothing — do not edit it.
 
 ## Dev Server
-- `cd /Users/km/python3/source/cef && python3 -m uvicorn cef.api.app:create_app --factory --host 0.0.0.0 --port 8000 --reload`
-- Port **8000** — do not use this port for other apps
+- `cd /Users/km/python3/source/sage/investments && /Users/km/python3/source/sage/.venv/bin/python -m uvicorn cef.api.app:create_app --factory --host 0.0.0.0 --port 8000 --reload`
+- Port **8000** — do not use this port for other apps (Sage's main Budget/Cash Flow/Tax app is :5050)
 - App served at `http://localhost:8000`
+- The Python package is still named `cef` (import path `cef.api.app`), even though the product is "Investments."
 
 ## Git / Remote
-- Repo root: `/Users/km/python3/source/cef/`
-- GitHub: `https://github.com/kjmacgrub/cef.git`, branch: `master`
-- This is a **nested repo** inside `/Users/km/python3/source/` — always use `git -C /Users/km/python3/source/cef` or cd into it
+- Part of the **`sage`** monorepo — repo root is `/Users/km/python3/source/sage/`, this app is the `investments/` subtree.
+- Use `git -C /Users/km/python3/source/sage` for all git ops. GitHub: `kjmacgrub/sage`.
+- Live DB: `/Users/km/python3/source/sage/investments/cef.db`.
 
 ## Key Files
 - `cef/static/` — frontend (HTML/JS/CSS), dark theme

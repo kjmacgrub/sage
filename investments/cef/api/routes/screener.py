@@ -64,10 +64,12 @@ def _do_refresh():
                             conn.execute("""
                                 INSERT INTO screener_cache
                                   (ticker, name, price, nav, premium_discount, avg_discount_1y,
-                                   nav_change_1y, nav_cagr, yield_pct, dist_freq, inception_date, category, dist_cagr, fetched_at)
+                                   nav_change_1y, nav_cagr, yield_pct, dist_freq, inception_date, category, dist_cagr,
+                                   has_special_dist, regular_yield_pct, last_special_date, last_special_amount, fetched_at)
                                 VALUES
                                   (:ticker, :name, :price, :nav, :premium_discount, :avg_discount_1y,
-                                   :nav_change_1y, :nav_cagr, :yield_pct, :dist_freq, :inception_date, :category, :dist_cagr, datetime('now'))
+                                   :nav_change_1y, :nav_cagr, :yield_pct, :dist_freq, :inception_date, :category, :dist_cagr,
+                                   :has_special_dist, :regular_yield_pct, :last_special_date, :last_special_amount, datetime('now'))
                                 ON CONFLICT(ticker) DO UPDATE SET
                                     name=excluded.name, price=excluded.price, nav=excluded.nav,
                                     premium_discount=excluded.premium_discount,
@@ -79,6 +81,10 @@ def _do_refresh():
                                     inception_date=excluded.inception_date,
                                     category=excluded.category,
                                     dist_cagr=excluded.dist_cagr,
+                                    has_special_dist=excluded.has_special_dist,
+                                    regular_yield_pct=excluded.regular_yield_pct,
+                                    last_special_date=excluded.last_special_date,
+                                    last_special_amount=excluded.last_special_amount,
                                     fetched_at=excluded.fetched_at
                             """, {**data, "name": name})
             except Exception as e:

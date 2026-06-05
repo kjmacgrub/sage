@@ -20,6 +20,15 @@ def init_db():
             "ALTER TABLE distributions ADD COLUMN source TEXT DEFAULT 'yahoo'",
             "ALTER TABLE holdings ADD COLUMN realized_gain REAL",
             "ALTER TABLE prices ADD COLUMN prev_close REAL",
+            "ALTER TABLE holdings ADD COLUMN acquired_date TEXT",
+            "ALTER TABLE prices ADD COLUMN has_special_dist INTEGER DEFAULT 0",
+            "ALTER TABLE prices ADD COLUMN regular_yield_pct REAL",
+            "ALTER TABLE prices ADD COLUMN last_special_date TEXT",
+            "ALTER TABLE prices ADD COLUMN last_special_amount REAL",
+            "ALTER TABLE screener_cache ADD COLUMN has_special_dist INTEGER DEFAULT 0",
+            "ALTER TABLE screener_cache ADD COLUMN regular_yield_pct REAL",
+            "ALTER TABLE screener_cache ADD COLUMN last_special_date TEXT",
+            "ALTER TABLE screener_cache ADD COLUMN last_special_amount REAL",
         ]:
             try:
                 conn.execute(sql)
