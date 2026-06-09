@@ -35,6 +35,7 @@ def list_holdings():
             SELECT h.*, f.name, f.type,
                    p.price, p.nav, p.premium_discount, p.avg_discount_1y, p.nav_cagr, p.yield_pct,
                    p.has_special_dist, p.regular_yield_pct, p.last_special_date, p.last_special_amount,
+                   p.earned_yield_1y, p.dist_yield_1y, p.earned_yield_life, p.dist_yield_life, p.yield_life_years,
                    p2.price AS prev_price
             FROM holdings h
             JOIN funds f ON f.ticker = h.ticker

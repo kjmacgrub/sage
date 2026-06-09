@@ -207,6 +207,9 @@ function renderPortfolio() {
     return {
       ...h,
       disc_vs_avg: h.premium_discount != null && h.avg_discount_1y != null ? h.premium_discount - h.avg_discount_1y : null,
+      // Earned − distributed gap (the NAV-erosion signal) — drives the E/D column sort
+      coverage_1y: h.earned_yield_1y != null && h.dist_yield_1y != null ? h.earned_yield_1y - h.dist_yield_1y : null,
+      coverage_life: h.earned_yield_life != null && h.dist_yield_life != null ? h.earned_yield_life - h.dist_yield_life : null,
       cost_per_share: h.shares ? h.cost_basis / h.shares : null,
       yoc: (distPerShare && h.shares && h.cost_basis) ? distPerShare * h.shares * periodsPerYear / h.cost_basis * 100 : null,
       annualized_return,
@@ -251,9 +254,9 @@ function renderPortfolio() {
             ${th('price_change_pct', 'Day %')}
             ${th('cost_per_share', 'Cost/Sh')}
             ${th('yield_pct', 'Yield', false, false, 'Current market yield')}
-            ${th('nav_cagr', 'NAV/yr', false, false, '5-year annualized NAV growth rate (from CEFConnect history)')}
+            ${th('coverage_1y', '1Y E/D', false, false, 'Earned yield (total return on NAV) vs Distributed yield (distributions ÷ NAV), trailing 1 year. Green = distribution out-earned, NAV growing; red = NAV eroding (ROC-funded). Sorted by the earned−distributed gap.')}
+            ${th('coverage_life', 'Life E/D', false, false, 'Earned vs Distributed yield, annualized over up to 5 years (or since inception). Green = sustainable; red = NAV-eroding. CEFs only.')}
             ${th('disc_vs_avg', 'δ vs Avg', false, false, 'Current disc/premium relative to its 1-year average. Negative = trading cheaper than usual.')}
-            <th title="12-month NAV trend">NAV Trend</th>
             ${th('unrealized_gain', 'Unr. Gain')}
             ${th('dividends_received', 'Divs')}
             ${th('total_return', 'Total Ret')}
@@ -309,9 +312,9 @@ function portfolioRow(h, totalMkt, idx) {
       <td class="${gainClass(h.price_change_pct)}">${h.price_change_pct != null ? (h.price_change_pct >= 0 ? '+' : '') + h.price_change_pct.toFixed(2) + '%' : '—'}</td>
       <td>${costPerShare != null ? fmt$(costPerShare) : '—'}</td>
       ${yieldCell(h)}
-      <td class="${gainClass(h.nav_cagr)}" title="5Y annualized NAV change">${h.nav_cagr != null ? (h.nav_cagr >= 0 ? '+' : '') + h.nav_cagr.toFixed(2) + '%' : '—'}</td>
+      ${yieldPairCell(h.earned_yield_1y, h.dist_yield_1y, '1-Year')}
+      ${yieldPairCell(h.earned_yield_life, h.dist_yield_life, 'Lifetime', h.yield_life_years)}
       <td>${fmtDiscCell(h.premium_discount, h.avg_discount_1y)}</td>
-      <td>${renderSparkline(_navSparklines[h.ticker])}</td>
       <td class="${gainClass(h.unrealized_gain)}">${fmtGain$(h.unrealized_gain)}</td>
       <td class="positive" onclick="event.stopPropagation(); openDivModal('${h.ticker}')" style="cursor:pointer;text-decoration:underline dotted" title="Click to view distribution history">${fmt$(h.dividends_received)}</td>
       <td class="${gainClass(h.total_return)}">${fmtGain$(h.total_return)}</td>
@@ -338,7 +341,9 @@ function renderWatchlist() {
   const visible = _hideHeld ? _prices.filter(p => !held.has(p.ticker)) : _prices;
   const visWithDelta = [...visible].map(p => ({
     ...p,
-    disc_vs_avg: p.premium_discount != null && p.avg_discount_1y != null ? p.premium_discount - p.avg_discount_1y : null
+    disc_vs_avg: p.premium_discount != null && p.avg_discount_1y != null ? p.premium_discount - p.avg_discount_1y : null,
+    coverage_1y: p.earned_yield_1y != null && p.dist_yield_1y != null ? p.earned_yield_1y - p.dist_yield_1y : null,
+    coverage_life: p.earned_yield_life != null && p.dist_yield_life != null ? p.earned_yield_life - p.dist_yield_life : null
   }));
   const sorted = sortData(visWithDelta, _sortCol || 'name', _sortCol ? _sortAsc : true);
 
@@ -364,7 +369,8 @@ function renderWatchlist() {
             ${th('price', 'Price')}
             ${th('nav', 'NAV')}
             ${th('yield_pct', 'Yield')}
-            ${th('nav_cagr', 'NAV/yr', false, false, '5-year annualized NAV growth rate (from CEFConnect history)')}
+            ${th('coverage_1y', '1Y E/D', false, false, 'Earned yield (total return on NAV) vs Distributed yield (distributions ÷ NAV), trailing 1 year. Green = distribution out-earned, NAV growing; red = NAV eroding. CEFs only.')}
+            ${th('coverage_life', 'Life E/D', false, false, 'Earned vs Distributed yield, annualized over up to 5 years (or since inception). Green = sustainable; red = NAV-eroding. CEFs only.')}
             ${th('dist_freq', 'Freq', true)}
             ${th('date', 'As Of', true)}
             <th></th>
@@ -391,7 +397,8 @@ function watchlistRow(p, isHeld = false) {
       <td>${fmt$(p.price)}</td>
       <td>${fmt$(p.nav)}</td>
       ${yieldCell(p)}
-      <td class="${gainClass(p.nav_cagr)}" title="5Y annualized NAV change">${p.nav_cagr != null ? (p.nav_cagr >= 0 ? '+' : '') + p.nav_cagr.toFixed(2) + '%' : '—'}</td>
+      ${yieldPairCell(p.earned_yield_1y, p.dist_yield_1y, '1-Year')}
+      ${yieldPairCell(p.earned_yield_life, p.dist_yield_life, 'Lifetime', p.yield_life_years)}
       <td style="color:var(--text-2)">${p.dist_freq || '—'}</td>
       <td style="color:var(--text-muted)">${p.date || ''}</td>
       <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();confirmRemove('${p.ticker}')">Remove</button></td>
@@ -832,7 +839,8 @@ async function openHoldingModal(ticker) {
             <div><div style="font-size:11px;color:var(--text-muted)">NAV</div><div>${fmt$(merged.nav)}</div></div>
             <div><div style="font-size:11px;color:var(--text-muted)">Disc/Prem</div><div class="${discClass(merged.premium_discount)}">${fmtDisc(merged.premium_discount)}</div></div>
             <div><div style="font-size:11px;color:var(--text-muted)">Yield</div><div>${merged.yield_pct != null ? merged.yield_pct.toFixed(2) + '%' : '—'}</div></div>
-            <div><div style="font-size:11px;color:var(--text-muted)">NAV Trend (12M)</div><div>${renderSparkline(_navSparklines[ticker], 120, 32)}</div></div>
+            <div title="Earned yield (total return on NAV) vs distributed yield, trailing 1 year"><div style="font-size:11px;color:var(--text-muted)">Earned/Dist 1Y</div><div class="${merged.earned_yield_1y != null && merged.dist_yield_1y != null ? (merged.earned_yield_1y >= merged.dist_yield_1y ? 'positive' : 'negative') : ''}">${merged.earned_yield_1y != null && merged.dist_yield_1y != null ? merged.earned_yield_1y.toFixed(1) + ' / ' + merged.dist_yield_1y.toFixed(1) : '—'}</div></div>
+            <div title="Earned vs distributed yield, annualized over up to 5 years (or since inception)"><div style="font-size:11px;color:var(--text-muted)">Earned/Dist Life</div><div class="${merged.earned_yield_life != null && merged.dist_yield_life != null ? (merged.earned_yield_life >= merged.dist_yield_life ? 'positive' : 'negative') : ''}">${merged.earned_yield_life != null && merged.dist_yield_life != null ? merged.earned_yield_life.toFixed(1) + ' / ' + merged.dist_yield_life.toFixed(1) : '—'}</div></div>
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -1032,6 +1040,22 @@ async function saveHolding(ticker) {
   } catch(e) {
     toast('Error: ' + e.message);
   }
+}
+
+// Earned (total return on NAV) vs distributed (distributions/NAV) yield — paired cell.
+// Green when the distribution is being out-earned (NAV holding/growing), red when it erodes NAV.
+function yieldPairCell(earned, distributed, period, years) {
+  if (earned == null || distributed == null) {
+    return `<td style="color:var(--text-muted)" title="No NAV history available (CEFs on CEFConnect only)">—</td>`;
+  }
+  const covered = earned >= distributed;
+  const cls = covered ? 'positive' : 'negative';
+  const span = years != null ? ` (${years}y)` : '';
+  const tip = `${period}${span}: earned ${earned.toFixed(1)}% on NAV vs ${distributed.toFixed(1)}% distributed. `
+    + (covered
+        ? 'Distribution out-earned — NAV holding or growing.'
+        : 'Distribution exceeds what the fund earned — NAV eroding (effectively return of capital).');
+  return `<td class="${cls}" title="${tip}" style="white-space:nowrap">${earned.toFixed(1)} / ${distributed.toFixed(1)}</td>`;
 }
 
 // === NAV SPARKLINES (F5/I3) ===
@@ -1256,7 +1280,11 @@ function renderScreen() {
   const state = _screenData.length === 0 ? 'empty' : 'loaded';
   const isRunning = _screenPollTimer != null;
 
-  const filtered = applyScreenFilters(_screenData);
+  const filtered = applyScreenFilters(_screenData).map(f => ({
+    ...f,
+    coverage_1y: f.earned_yield_1y != null && f.dist_yield_1y != null ? f.earned_yield_1y - f.dist_yield_1y : null,
+    coverage_life: f.earned_yield_life != null && f.dist_yield_life != null ? f.earned_yield_life - f.dist_yield_life : null,
+  }));
   const defaultSort = _sortCol ? _sortCol : 'premium_discount';
   const defaultAsc  = _sortCol ? _sortAsc : true;
   const sorted = sortData(filtered, defaultSort, defaultAsc);
@@ -1333,7 +1361,8 @@ function renderScreen() {
               ${th('yield_pct', 'Yield')}
               ${th('dist_freq', 'Freq', true)}
               ${th('premium_discount', 'Disc/Prem')}
-              ${th('nav_cagr', 'NAV/yr', false, false, '5-year annualized NAV growth rate (from CEFConnect history)')}
+              ${th('coverage_1y', '1Y E/D', false, false, 'Earned yield (total return on NAV) vs Distributed yield (distributions ÷ NAV), trailing 1 year. Green = distribution out-earned, NAV growing; red = NAV eroding. Sorted by the earned−distributed gap.')}
+              ${th('coverage_life', 'Life E/D', false, false, 'Earned vs Distributed yield, annualized over up to 5 years (or since inception). Green = sustainable; red = NAV-eroding.')}
               ${th('dist_cagr', 'Dist/yr', false, false, 'Annualized distribution change rate since inception (first → last complete year)')}
               ${th('inception_date', 'Since', true)}
               <th></th>
@@ -1356,9 +1385,6 @@ function screenRow(f, wlTickers, heldTickers) {
     : inWl
     ? `<span title="In watchlist" style="color:var(--accent);margin-right:4px">●</span>`
     : '';
-  const navChg = f.nav_cagr != null
-    ? `<span class="${f.nav_cagr >= 0 ? 'positive' : 'negative'}" title="5Y annualized NAV change">${f.nav_cagr >= 0 ? '+' : ''}${f.nav_cagr.toFixed(2)}%</span>`
-    : '—';
   const distChg = f.dist_cagr != null
     ? `<span class="${f.dist_cagr >= 0 ? 'positive' : 'negative'}">${f.dist_cagr >= 0 ? '+' : ''}${f.dist_cagr.toFixed(2)}%</span>`
     : '—';
@@ -1372,7 +1398,8 @@ function screenRow(f, wlTickers, heldTickers) {
       ${yieldCell(f)}
       <td style="color:var(--text-2)">${f.dist_freq || '—'}</td>
       <td class="${discClass(f.premium_discount)}" title="${f.avg_discount_1y != null ? '1Y avg: ' + fmtDisc(f.avg_discount_1y) : ''}">${fmtDisc(f.premium_discount)}</td>
-      <td>${navChg}</td>
+      ${yieldPairCell(f.earned_yield_1y, f.dist_yield_1y, '1-Year')}
+      ${yieldPairCell(f.earned_yield_life, f.dist_yield_life, 'Lifetime', f.yield_life_years)}
       <td>${distChg}</td>
       <td style="color:var(--text-muted)">${yrs != null ? yrs + 'y' : '—'}</td>
       <td>${inWl ? '' : `<button class="btn btn-ghost btn-sm" onclick="addFromScreener('${f.ticker}','${(f.name||'').replace(/'/g,"\\'")}')">+ Watch</button>`}</td>

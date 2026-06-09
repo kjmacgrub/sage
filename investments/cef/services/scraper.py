@@ -3,7 +3,7 @@ Fetch fund data. Tries CEFConnect first; falls back to Yahoo Finance
 for BDCs and other tickers not listed on CEFConnect.
 """
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import httpx
 from bs4 import BeautifulSoup
 
@@ -140,6 +140,87 @@ def _compute_dist_cagr(ticker: str) -> float:
     return None
 
 
+def _compute_yield_metrics(ticker: str) -> dict:
+    """
+    Earned yield (total return on NAV) vs distributed yield (distributions / NAV),
+    annualized, for the trailing 1 year and for the full available history
+    (up to 5 years from CEFConnect, or since inception for younger funds).
+
+    earned − distributed ≈ the NAV growth rate: when earned ≥ distributed the
+    distribution is being out-earned (NAV holding/growing); when earned <
+    distributed the payout is eroding NAV (effectively ROC-funded).
+
+    All five keys are always present (values may be None) so callers can pass
+    the dict straight to SQL. Only meaningful for CEFs on CEFConnect.
+    """
+    out = {
+        "earned_yield_1y": None, "dist_yield_1y": None,
+        "earned_yield_life": None, "dist_yield_life": None,
+        "yield_life_years": None,
+    }
+
+    # 1. Weekly NAV series (≤5Y) from CEFConnect
+    try:
+        r = httpx.get(
+            f"https://www.cefconnect.com/api/v3/pricinghistory/{ticker}/5Y",
+            headers=HEADERS, timeout=10,
+        )
+        if r.status_code != 200:
+            return out
+        rows = r.json().get("Data", {}).get("PriceHistory", [])
+        navs = []
+        for x in rows:
+            dd = (x.get("DataDate") or "").split("T")[0]
+            nv = x.get("NAVData")
+            if dd and nv and nv > 0:
+                navs.append((datetime.fromisoformat(dd).date(), nv))
+        navs.sort()
+        if len(navs) < 2:
+            return out
+    except Exception:
+        return out
+
+    # 2. Full distribution history from Yahoo
+    divs = []
+    try:
+        url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range=max&interval=1mo&events=dividends"
+        dr = httpx.get(url, headers=HEADERS, timeout=15)
+        if dr.status_code == 200:
+            ev = dr.json()["chart"]["result"][0].get("events", {}).get("dividends", {})
+            for v in ev.values():
+                ex = datetime.fromtimestamp(v["date"], tz=timezone.utc).date()
+                divs.append((ex, float(v["amount"])))
+            divs.sort()
+    except Exception:
+        pass
+
+    end_date, nav_end = navs[-1]
+
+    def _metrics(start_date, nav_start):
+        """Annualized (earned, distributed) over (start_date, end_date]."""
+        years = (end_date - start_date).days / 365.25
+        if years < 0.5 or not nav_start:
+            return None, None
+        dist_sum = sum(a for ex, a in divs if start_date < ex <= end_date)
+        simple_tr = (nav_end - nav_start + dist_sum) / nav_start
+        earned = ((1 + simple_tr) ** (1 / years) - 1) * 100
+        distributed = (dist_sum / years) / nav_start * 100
+        return round(earned, 2), round(distributed, 2)
+
+    # Lifetime: full available series
+    start_date, nav_start = navs[0]
+    out["earned_yield_life"], out["dist_yield_life"] = _metrics(start_date, nav_start)
+    out["yield_life_years"] = round((end_date - start_date).days / 365.25, 1)
+
+    # Trailing 1 year: anchor on the NAV reading closest to 365 days before end
+    target = end_date - timedelta(days=365)
+    anchor = min(navs, key=lambda t: abs((t[0] - target).days))
+    if anchor[0] < end_date and abs((anchor[0] - target).days) <= 45:
+        out["earned_yield_1y"], out["dist_yield_1y"] = _metrics(anchor[0], anchor[1])
+
+    return out
+
+
 def fetch_fund_data(ticker: str) -> dict:
     ticker = ticker.upper()
     data = _fetch_cefconnect(ticker)
@@ -204,6 +285,7 @@ def _fetch_cefconnect(ticker: str) -> dict:
         pass
 
     nav_cagr = _compute_nav_cagr(ticker)
+    yield_metrics = _compute_yield_metrics(ticker)
 
     # Step 2: get distribution data from the fund page HTML
     yield_pct = distribution = dist_freq = None
@@ -264,6 +346,7 @@ def _fetch_cefconnect(ticker: str) -> dict:
         "regular_yield_pct": special["regular_yield_pct"],
         "last_special_date": special["last_special_date"],
         "last_special_amount": special["last_special_amount"],
+        **yield_metrics,
         "history": price_history,
     }
 
@@ -325,6 +408,9 @@ def _fetch_yahoo(ticker: str) -> dict:
             "regular_yield_pct": special["regular_yield_pct"],
             "last_special_date": special["last_special_date"],
             "last_special_amount": special["last_special_amount"],
+            # Earned-vs-distributed needs a NAV series (CEFConnect only); N/A for Yahoo tickers
+            "earned_yield_1y": None, "dist_yield_1y": None,
+            "earned_yield_life": None, "dist_yield_life": None, "yield_life_years": None,
         }
     except Exception as e:
         raise RuntimeError(f"Yahoo Finance fetch failed for {ticker}: {e}")
@@ -488,6 +574,7 @@ def fetch_screener_data(ticker: str):
     # NAV CAGR from 5Y history; distribution CAGR from full history
     nav_cagr = _compute_nav_cagr(ticker)
     dist_cagr = _compute_dist_cagr(ticker)
+    yield_metrics = _compute_yield_metrics(ticker)
 
     yield_pct = dist_freq = inception_date = category = None
     try:
@@ -552,6 +639,7 @@ def fetch_screener_data(ticker: str):
         "regular_yield_pct": special["regular_yield_pct"],
         "last_special_date": special["last_special_date"],
         "last_special_amount": special["last_special_amount"],
+        **yield_metrics,
     }
 
 
@@ -572,4 +660,6 @@ def _empty(ticker: str) -> dict:
         "regular_yield_pct": None,
         "last_special_date": None,
         "last_special_amount": None,
+        "earned_yield_1y": None, "dist_yield_1y": None,
+        "earned_yield_life": None, "dist_yield_life": None, "yield_life_years": None,
     }

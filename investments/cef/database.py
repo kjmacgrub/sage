@@ -29,6 +29,17 @@ def init_db():
             "ALTER TABLE screener_cache ADD COLUMN regular_yield_pct REAL",
             "ALTER TABLE screener_cache ADD COLUMN last_special_date TEXT",
             "ALTER TABLE screener_cache ADD COLUMN last_special_amount REAL",
+            # Earned (total return on NAV) vs distributed (distributions/NAV) yields
+            "ALTER TABLE prices ADD COLUMN earned_yield_1y REAL",
+            "ALTER TABLE prices ADD COLUMN dist_yield_1y REAL",
+            "ALTER TABLE prices ADD COLUMN earned_yield_life REAL",
+            "ALTER TABLE prices ADD COLUMN dist_yield_life REAL",
+            "ALTER TABLE prices ADD COLUMN yield_life_years REAL",
+            "ALTER TABLE screener_cache ADD COLUMN earned_yield_1y REAL",
+            "ALTER TABLE screener_cache ADD COLUMN dist_yield_1y REAL",
+            "ALTER TABLE screener_cache ADD COLUMN earned_yield_life REAL",
+            "ALTER TABLE screener_cache ADD COLUMN dist_yield_life REAL",
+            "ALTER TABLE screener_cache ADD COLUMN yield_life_years REAL",
         ]:
             try:
                 conn.execute(sql)

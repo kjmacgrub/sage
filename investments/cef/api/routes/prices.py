@@ -194,9 +194,11 @@ def refresh_prices():
             with get_db() as conn:
                 conn.execute("""
                     INSERT INTO prices (ticker, date, price, nav, premium_discount, avg_discount_1y, nav_cagr, yield_pct, distribution, dist_freq,
-                                        has_special_dist, regular_yield_pct, last_special_date, last_special_amount)
+                                        has_special_dist, regular_yield_pct, last_special_date, last_special_amount,
+                                        earned_yield_1y, dist_yield_1y, earned_yield_life, dist_yield_life, yield_life_years)
                     VALUES (:ticker, :date, :price, :nav, :premium_discount, :avg_discount_1y, :nav_cagr, :yield_pct, :distribution, :dist_freq,
-                            :has_special_dist, :regular_yield_pct, :last_special_date, :last_special_amount)
+                            :has_special_dist, :regular_yield_pct, :last_special_date, :last_special_amount,
+                            :earned_yield_1y, :dist_yield_1y, :earned_yield_life, :dist_yield_life, :yield_life_years)
                     ON CONFLICT(ticker, date) DO UPDATE SET
                         price=excluded.price, nav=excluded.nav,
                         premium_discount=excluded.premium_discount,
@@ -209,6 +211,11 @@ def refresh_prices():
                         regular_yield_pct=excluded.regular_yield_pct,
                         last_special_date=excluded.last_special_date,
                         last_special_amount=excluded.last_special_amount,
+                        earned_yield_1y=excluded.earned_yield_1y,
+                        dist_yield_1y=excluded.dist_yield_1y,
+                        earned_yield_life=excluded.earned_yield_life,
+                        dist_yield_life=excluded.dist_yield_life,
+                        yield_life_years=excluded.yield_life_years,
                         fetched_at=datetime('now')
                 """, data)
                 # Keep nav_history in sync for sparklines
