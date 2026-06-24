@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 
 DB = os.path.join(os.path.dirname(__file__), "cef_demo.db")
-BUDGET_CSV = "/Users/km/Downloads/Time Transaction All.csv"
+BUDGET_CSV = "/Users/ken/Downloads/Time Transaction All.csv"
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "python3", "source"))
 

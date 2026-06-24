@@ -27,7 +27,7 @@ python3 -m uvicorn cef.api.app:create_app --factory --host 0.0.0.0 --port 8000 -
 
 ## Git
 
-- Repo root: `/Users/km/python3/source/sage/`
+- Repo root: `/Users/ken/python3/source/sage/`
 - GitHub: `https://github.com/kjmacgrub/sage.git`, branch: `main`
 
 ## Key Files

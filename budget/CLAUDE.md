@@ -6,9 +6,9 @@
 - Cash Flow dashboard: `http://localhost:5050/dashboard.html`
 
 ## Git / Remote
-- Repo root: `/Users/km/python3/source/budget/`
+- Repo root: `/Users/ken/python3/source/budget/`
 - GitHub: `https://github.com/kjmacgrub/budget.git`, branch: `master`
-- This is a **nested repo** inside `/Users/km/python3/source/` — always use `git -C /Users/km/python3/source/budget` or cd into it
+- This is a **nested repo** inside `/Users/ken/python3/source/` — always use `git -C /Users/ken/python3/source/budget` or cd into it
 
 ## Key Files
 - `index.html` + `app.js` + `styles.css` — Budget Planner (pure client-side, localStorage)
@@ -22,7 +22,7 @@
 
 ## Data Sources
 - Budget Planner: localStorage only — no server needed
-- Cash Flow: reads `/Users/km/Downloads/Time Transaction All.csv` (Quicken export)
+- Cash Flow: reads `/Users/ken/Downloads/Time Transaction All.csv` (Quicken export)
   - Skip 7 header rows; columns: `_t`, `_blank`, Date, Account, Payee, Category, Amount
   - Category format: "Group:SubCategory" (e.g. "Food:Groceries")
 - CEF investment income → Cash Flow auto-feed is a planned feature (not yet built)
