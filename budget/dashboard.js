@@ -15,6 +15,9 @@ let _lastMonthly = null;
 let _chartYears  = [];  // year labels for year-chart click handler
 let _chartMonths = [];  // "YYYY-MM" labels for monthly-chart click handler
 let _showTransfers = false;
+// Chart starts collapsed unless the user has expanded it before
+const CHART_OPEN_KEY = 'sage-cashflow-chart-open';
+let _chartOpen = localStorage.getItem(CHART_OPEN_KEY) === '1';
 
 // ── Init ─────────────────────────────────────────────────────
 
@@ -37,6 +40,9 @@ async function init() {
         });
         yearFrom.value = Math.min(...data.years);
         yearTo.value   = Math.max(...data.years);
+
+        buildYearShortcuts(data.years);
+        applyChartCollapse();
 
         // Load accounts
         const acctRes = await fetch(`${API}/api/accounts`);
@@ -80,8 +86,10 @@ function buildCategoryTree() {
 
     function renderSection(label, groupList) {
         if (!groupList.length) return;
+        const section = groupList === incomeGroups ? 'income' : 'expense';
         const sec = document.createElement('div');
         sec.className = 'ms-type-header';
+        sec.dataset.section = section;
         sec.textContent = label;
         container.appendChild(sec);
 
@@ -89,6 +97,8 @@ function buildCategoryTree() {
             const cats = groups[group];
             const header = document.createElement('label');
             header.className = 'ms-group-header';
+            header.dataset.group   = group;
+            header.dataset.section = section;
             header.innerHTML = `<input type="checkbox" id="grp_${group}" checked onchange="onGroupToggle('${group}')"> ${group}`;
             container.appendChild(header);
 
@@ -96,8 +106,10 @@ function buildCategoryTree() {
                 const displayName = cat.includes(':') ? cat.split(':').slice(1).join(':') : cat;
                 const row = document.createElement('label');
                 row.className = 'ms-cat-item';
-                row.innerHTML = `<input type="checkbox" class="cat-cb" data-group="${group}" value="${cat}" checked onchange="onCatToggle('${group}')"> ${displayName}`;
+                row.dataset.group   = group;
+                row.dataset.section = section;
                 container.appendChild(row);
+                row.innerHTML = `<input type="checkbox" class="cat-cb" data-group="${group}" value="${cat}" checked onchange="onCatToggle('${group}')"> ${displayName}`;
             });
         });
     }
@@ -124,23 +136,46 @@ function onCatToggle(group) {
     updateCategoryDisplay();
 }
 
-function selectAllCategories() {
-    document.querySelectorAll('.cat-cb').forEach(cb => cb.checked = true);
-    document.querySelectorAll('[id^="grp_"]').forEach(cb => {
-        cb.checked = true;
-        cb.indeterminate = false;
+// Hide rows that don't match the search box. Filtering is display-only —
+// hidden checkboxes keep their state and still count toward the query.
+function filterCategories() {
+    const q         = (document.getElementById('categorySearch').value || '').trim().toLowerCase();
+    const container = document.getElementById('categoryTree');
+    const hitGroups   = new Set();
+    const hitSections = new Set();
+
+    container.querySelectorAll('.ms-cat-item').forEach(row => {
+        const cb  = row.querySelector('.cat-cb');
+        const hit = !q || cb.value.toLowerCase().includes(q) || row.dataset.group.toLowerCase().includes(q);
+        row.classList.toggle('ms-hidden', !hit);
+        if (hit) {
+            hitGroups.add(row.dataset.group);
+            hitSections.add(row.dataset.section);
+        }
+    });
+    container.querySelectorAll('.ms-group-header').forEach(h =>
+        h.classList.toggle('ms-hidden', !hitGroups.has(h.dataset.group)));
+    container.querySelectorAll('.ms-type-header').forEach(s =>
+        s.classList.toggle('ms-hidden', !hitSections.has(s.dataset.section)));
+}
+
+// All / None apply to the rows currently visible, so you can search for one
+// category and select just it.
+function setVisibleCategories(state) {
+    document.querySelectorAll('.ms-cat-item:not(.ms-hidden) .cat-cb')
+        .forEach(cb => cb.checked = state);
+    document.querySelectorAll('[id^="grp_"]').forEach(grpCb => {
+        const group   = grpCb.id.slice(4);
+        const all     = document.querySelectorAll(`.cat-cb[data-group="${group}"]`);
+        const checked = document.querySelectorAll(`.cat-cb[data-group="${group}"]:checked`);
+        grpCb.checked       = checked.length > 0;
+        grpCb.indeterminate = checked.length > 0 && checked.length < all.length;
     });
     updateCategoryDisplay();
 }
 
-function clearCategories() {
-    document.querySelectorAll('.cat-cb').forEach(cb => cb.checked = false);
-    document.querySelectorAll('[id^="grp_"]').forEach(cb => {
-        cb.checked = false;
-        cb.indeterminate = false;
-    });
-    updateCategoryDisplay();
-}
+function selectAllCategories() { setVisibleCategories(true); }
+function clearCategories()     { setVisibleCategories(false); }
 
 function getSelectedCategories() {
     let cats = Array.from(document.querySelectorAll('.cat-cb:checked')).map(cb => cb.value);
@@ -251,6 +286,25 @@ function closeAccountPanel() {
 
 // ── Date shortcuts ────────────────────────────────────────────
 
+// One pill per prior year with data, newest first, capped at 5.
+// The current year is already covered by "This Year".
+function buildYearShortcuts(years) {
+    const cur    = new Date().getFullYear();
+    const anchor = document.getElementById('sc_clear');
+    [...new Set(years)]
+        .filter(y => y < cur)
+        .sort((a, b) => b - a)
+        .slice(0, 5)
+        .forEach(y => {
+            const btn = document.createElement('button');
+            btn.id          = `sc_y${y}`;
+            btn.className   = 'shortcut-btn';
+            btn.textContent = y;
+            btn.onclick     = () => setShortcut(`y${y}`);
+            anchor.parentNode.insertBefore(btn, anchor);
+        });
+}
+
 function setShortcut(name) {
     const now   = new Date();
     const today = now.toISOString().split('T')[0];
@@ -303,11 +357,15 @@ function setShortcut(name) {
             viewMode    = 'month';
             break;
         }
-        case 'lastyear':
-            _dateFrom = `${y - 1}-01-01`;
-            _dateTo   = `${y - 1}-12-31`;
+        default: {
+            // "y2025" → that full calendar year
+            const yr = /^y(\d{4})$/.exec(name);
+            if (!yr) return;
+            _dateFrom = `${yr[1]}-01-01`;
+            _dateTo   = `${yr[1]}-12-31`;
             viewMode  = 'year';
             break;
+        }
     }
 
     // Sync year dropdowns to match the shortcut range
@@ -426,14 +484,8 @@ async function analyze() {
         if (tileRow1)  tileRow1.style.display  = 'grid';
         if (tileRow2)  tileRow2.style.display  = 'grid';
 
-        // Defer chart render one frame so the browser can finish laying out the container
-        requestAnimationFrame(() => {
-            if (viewMode === 'month' && _lastMonthly) {
-                renderMonthlyChart(_lastMonthly);
-            } else if (_lastSummary) {
-                renderChart(_lastSummary);
-            }
-        });
+        // Only draw while expanded — a collapsed canvas has no width to measure
+        if (_chartOpen) renderCurrentChart();
     } catch (e) {
         console.error('analyze() error:', e);
         showError();
@@ -443,29 +495,46 @@ async function analyze() {
 // ── Render: Stats ─────────────────────────────────────────────
 
 function renderStats(data) {
-    const yearFrom = parseInt(document.getElementById('yearFrom').value);
-    const yearTo   = parseInt(document.getElementById('yearTo').value);
-    const nMonths  = (yearTo - yearFrom + 1) * 12;
-
     document.getElementById('statTotal').textContent   = fmt(data.expenses);
     document.getElementById('statMonthly').textContent = fmt(data.monthly_avg) + '/mo';
     document.getElementById('statCount').textContent   = data.count.toLocaleString();
 
-    const monthlyIncomeCard = document.getElementById('statMonthlyIncomeCard');
-    if (data.income > 1) {
-        document.getElementById('statMonthlyIncome').textContent = '+' + fmt(data.income / nMonths) + '/mo';
-        monthlyIncomeCard.style.display = 'block';
-    } else {
-        monthlyIncomeCard.style.display = 'none';
-    }
+    // Income tiles always stay in place — a $0 tile keeps the row from reflowing
+    // between searches.
+    document.getElementById('statMonthlyIncome').textContent =
+        '+' + fmt(data.income > 1 ? data.monthly_avg_income : 0) + '/mo';
+    document.getElementById('statMonthlyIncomeCard').style.display = 'block';
 
-    const incomeCard = document.getElementById('statIncomeCard');
-    if (data.income > 1) {
-        document.getElementById('statIncome').textContent = '+' + fmt(data.income);
-        incomeCard.style.display = 'block';
-    } else {
-        incomeCard.style.display = 'none';
-    }
+    document.getElementById('statIncome').textContent =
+        '+' + fmt(data.income > 1 ? data.income : 0);
+    document.getElementById('statIncomeCard').style.display = 'block';
+}
+
+// ── Chart collapse ────────────────────────────────────────────
+
+function toggleChart() {
+    _chartOpen = !_chartOpen;
+    localStorage.setItem(CHART_OPEN_KEY, _chartOpen ? '1' : '0');
+    applyChartCollapse();
+    if (_chartOpen) renderCurrentChart();
+}
+
+function applyChartCollapse() {
+    document.getElementById('chartWrap').style.display = _chartOpen ? '' : 'none';
+    const btn = document.getElementById('chartToggle');
+    btn.classList.toggle('open', _chartOpen);
+    btn.setAttribute('aria-expanded', _chartOpen ? 'true' : 'false');
+}
+
+// Defer one frame so the browser can finish laying out the container
+function renderCurrentChart() {
+    requestAnimationFrame(() => {
+        if (viewMode === 'month' && _lastMonthly) {
+            renderMonthlyChart(_lastMonthly);
+        } else if (_lastSummary) {
+            renderChart(_lastSummary);
+        }
+    });
 }
 
 // ── Render: Chart ─────────────────────────────────────────────
@@ -665,12 +734,13 @@ function renderExpenseBreakdown(data) {
 
 async function toggleCatDrill(row) {
     const cat      = row.dataset.cat;
+    const type     = row.dataset.type;
     const yearFrom = parseInt(document.getElementById('yearFrom').value);
     const yearTo   = parseInt(document.getElementById('yearTo').value);
     const dateParams = _dateFrom && _dateTo
         ? `&date_from=${_dateFrom}&date_to=${_dateTo}`
         : `&year_from=${yearFrom}&year_to=${yearTo}`;
-    const cacheKey = `${cat}|${_dateFrom || yearFrom}|${_dateTo || yearTo}`;
+    const cacheKey = `${type}|${cat}|${_dateFrom || yearFrom}|${_dateTo || yearTo}`;
 
     // If already expanded, collapse
     const existing = row.nextElementSibling;
@@ -692,7 +762,7 @@ async function toggleCatDrill(row) {
     if (!_txCache[cacheKey]) {
         try {
             _txCache[cacheKey] = await fetch(
-                `${API}/api/transactions?cat=${encodeURIComponent(cat)}${dateParams}`
+                `${API}/api/transactions?cat=${encodeURIComponent(cat)}&type=${type}${dateParams}`
             ).then(r => r.json());
         } catch(e) {
             drillRow.querySelector('.cat-drill-inner').innerHTML = '<em style="color:red;font-size:12px">Failed to load</em>';
@@ -706,7 +776,6 @@ async function toggleCatDrill(row) {
         return;
     }
 
-    const type = row.dataset.type;
     drillRow.querySelector('.cat-drill-inner').outerHTML = `
         <div class="cat-drill-inner">
             <table class="cat-drill-table">

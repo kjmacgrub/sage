@@ -85,6 +85,30 @@
     background: rgba(90, 122, 82, 0.2);
 }
 
+/* Search box in the multi-select header */
+.ms-search {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font);
+    font-size: 0.8rem;
+    padding: 0.25rem 0.55rem;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text-primary);
+    transition: border-color 0.15s ease;
+}
+
+.ms-search:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Rows filtered out by the search box */
+.ms-hidden {
+    display: none !important;
+}
+
 .ms-checkbox-item {
     display: flex;
     align-items: center;
@@ -332,6 +356,40 @@ body .container {
 .chart-card {
     margin-bottom: 0.6rem;
     padding: 0.6rem 1rem 0.4rem;
+}
+
+.chart-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.1rem 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.chart-toggle:hover {
+    color: var(--primary);
+}
+
+.chart-caret {
+    display: inline-block;
+    transition: transform 0.15s ease;
+}
+
+.chart-toggle.open .chart-caret {
+    transform: rotate(90deg);
+}
+
+.chart-toggle.open {
+    margin-bottom: 0.4rem;
 }
 
 .chart-wrap {

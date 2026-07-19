@@ -41,6 +41,7 @@
                             <div class="multi-select-actions">
                                 <button class="ms-action-btn" onclick="selectAllCategories()">All</button>
                                 <button class="ms-action-btn" onclick="clearCategories()">None</button>
+                                <input type="search" id="categorySearch" class="ms-search" placeholder="Search categories&hellip;" oninput="filterCategories()">
                             </div>
                             <div id="categoryTree"></div>
                         </div>
@@ -69,7 +70,7 @@
                     <label class="control-label">To</label>
                     <select id="yearTo" class="control-select"></select>
                 </div>
-                <button class="btn export-btn" onclick="analyze()">Analyze</button>
+                <button class="btn export-btn" onclick="analyze()">Apply</button>
                 <div class="view-toggle">
                     <button id="btnYear"  class="view-btn active" onclick="setView('year')">By Year</button>
                     <button id="btnMonth" class="view-btn"        onclick="setView('month')">By Month</button>
@@ -83,7 +84,7 @@
                 <button id="sc_month"     class="shortcut-btn" onclick="setShortcut('month')">This Month</button>
                 <button id="sc_lastmonth" class="shortcut-btn" onclick="setShortcut('lastmonth')">Last Month</button>
                 <button id="sc_year"      class="shortcut-btn" onclick="setShortcut('year')">This Year</button>
-                <button id="sc_lastyear" class="shortcut-btn" onclick="setShortcut('lastyear')">Last Year</button>
+<!-- prior-year pills are inserted here by buildYearShortcuts() -->
                 <button id="sc_clear"    class="shortcut-btn shortcut-clear" onclick="clearShortcut()" style="display:none">&#10005; Clear</button>
                 <button id="sc_transfers" class="shortcut-btn shortcut-transfers" onclick="toggleTransfers()">Transfers</button>
             </div>
@@ -116,7 +117,10 @@
 
         <!-- Chart -->
         <div class="section-card chart-card" id="chartCard" style="display:none">
-            <div class="chart-wrap">
+            <button class="chart-toggle" id="chartToggle" onclick="toggleChart()" aria-expanded="false">
+                <span class="chart-caret">&#9656;</span> Income / Expenses Chart
+            </button>
+            <div class="chart-wrap" id="chartWrap" style="display:none">
                 <canvas id="yearChart"></canvas>
             </div>
         </div>

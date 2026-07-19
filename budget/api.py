@@ -105,13 +105,20 @@ def summary():
 
     rows = conn.execute(f"SELECT year, amount FROM transactions {where}", params).fetchall()
 
+    # Months elapsed in the range — the end is clamped to the last *completed*
+    # month so an in-progress year averages over finished months, not the full 12.
+    from datetime import date as _date, timedelta
+    today = _date.today()
     if date_from and date_to:
-        from datetime import date as _date
         d1 = _date.fromisoformat(date_from)
         d2 = _date.fromisoformat(date_to)
-        n_months = max(1, (d2.year - d1.year) * 12 + d2.month - d1.month + 1)
     else:
-        n_months = (year_to - year_from + 1) * 12
+        d1 = _date(year_from, 1, 1)
+        d2 = _date(year_to, 12, 31)
+    last_complete = _date(today.year, today.month, 1) - timedelta(days=1)
+    if d2 > last_complete:
+        d2 = last_complete
+    n_months = max(1, (d2.year - d1.year) * 12 + d2.month - d1.month + 1)
     expenses = sum((r["amount"] or 0) for r in rows if (r["amount"] or 0) < 0)
     income   = sum((r["amount"] or 0) for r in rows if (r["amount"] or 0) > 0)
 
@@ -380,6 +387,7 @@ def transactions():
     payee      = request.args.get("payee", "")
     cats_param = request.args.get("cats", "")
     accts_param = request.args.get("accts", "")
+    type_param = request.args.get("type", "")
     year_from  = int(request.args.get("year_from", 2000))
     year_to    = int(request.args.get("year_to",   2100))
     date_from  = request.args.get("date_from", "")
@@ -399,6 +407,10 @@ def transactions():
     if payee:
         where += " AND payee=?"
         params.append(payee)
+    if type_param == "income":
+        where += " AND amount > 0"
+    elif type_param == "expense":
+        where += " AND amount < 0"
     cat_list = [c.strip() for c in cats_param.split(",") if c.strip()]
     if cat_list:
         placeholders = ",".join("?" * len(cat_list))
