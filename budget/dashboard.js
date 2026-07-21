@@ -43,6 +43,7 @@ async function init() {
 
         buildYearShortcuts(data.years);
         applyChartCollapse();
+        initTableSorting();
 
         // Load accounts
         const acctRes = await fetch(`${API}/api/accounts`);
@@ -505,9 +506,13 @@ function renderStats(data) {
         '+' + fmt(data.income > 1 ? data.monthly_avg_income : 0) + '/mo';
     document.getElementById('statMonthlyIncomeCard').style.display = 'block';
 
-    document.getElementById('statIncome').textContent =
-        '+' + fmt(data.income > 1 ? data.income : 0);
-    document.getElementById('statIncomeCard').style.display = 'block';
+    const inc     = data.income > 1 ? data.income : 0;
+    const incPct  = data.expenses ? Math.abs(inc) / Math.abs(data.expenses) * 100 : 0;
+    const incCard = document.getElementById('statIncomeCard');
+    document.getElementById('statIncome').innerHTML =
+        '+' + fmt(inc) + `<span class="stat-suffix">${incPct.toFixed(1)}%</span>`;
+    incCard.title = `${incPct.toFixed(1)}% of total spent (${fmt(data.expenses)}) came back as income / reimbursement`;
+    incCard.style.display = 'block';
 }
 
 // ── Chart collapse ────────────────────────────────────────────
@@ -698,6 +703,82 @@ function renderMonthlyChart(monthly) {
     chart.resize();
 }
 
+// ── Table sorting ─────────────────────────────────────────────
+
+// dir: 1 = ascending, -1 = descending. Defaults mirror the order the API
+// returns, so the first paint looks the same as before.
+const _tableSort = {
+    year:    { col: 'year',   dir:  1 },
+    payee:   { col: 'amount', dir:  1 },   // amounts are negative → biggest spend first
+    expense: { col: 'amount', dir:  1 },
+    income:  { col: 'amount', dir: -1 },
+};
+
+const _sortAccessors = {
+    year: {
+        year:     r => r.year,
+        expenses: r => r.expenses,
+        income:   r => r.income,
+        net:      r => r.expenses + r.income,
+        count:    r => r.count,
+    },
+    payee: {
+        payee:  r => (r.payee || '').toLowerCase(),
+        amount: r => r.amount,
+    },
+    cat: {
+        category: r => (r.category.includes(':') ? r.category.split(':').slice(1).join(':') : r.category).toLowerCase(),
+        amount:   r => r.amount,
+        pct:      r => Math.abs(r.amount),
+    },
+};
+
+// Direction a column gets on its first click — put the interesting end on top
+// (largest spend, largest income, most transactions, A→Z for text).
+function defaultSortDir(panel, col) {
+    if (col === 'year' || col === 'category' || col === 'payee') return 1;
+    if (col === 'count' || col === 'pct') return -1;
+    if (col === 'income') return -1;
+    if (col === 'amount') return panel === 'income' ? -1 : 1;
+    return 1;   // expenses, net — negative values, so ascending shows the largest
+}
+
+function sortRows(rows, panel, accessorKey) {
+    const st  = _tableSort[panel];
+    const acc = _sortAccessors[accessorKey][st.col];
+    if (!acc) return rows;
+    return [...rows].sort((a, b) => {
+        const va = acc(a), vb = acc(b);
+        const cmp = typeof va === 'string' ? va.localeCompare(vb) : (va - vb);
+        return st.dir * cmp;
+    });
+}
+
+function markSortHeaders(panel) {
+    const st = _tableSort[panel];
+    document.querySelectorAll(`th.sortable-header[data-panel="${panel}"]`).forEach(th => {
+        const active = th.dataset.col === st.col;
+        th.classList.toggle('sorted', active);
+        th.dataset.dir = active ? (st.dir === 1 ? 'asc' : 'desc') : '';
+    });
+}
+
+function initTableSorting() {
+    document.addEventListener('click', e => {
+        const th = e.target.closest('th.sortable-header[data-panel]');
+        if (!th) return;
+        const { panel, col } = th.dataset;
+        const st = _tableSort[panel];
+        if (st.col === col) st.dir = -st.dir;
+        else { st.col = col; st.dir = defaultSortDir(panel, col); }
+        if (!_lastSummary) return;
+        if      (panel === 'year')  renderTable(_lastSummary);
+        else if (panel === 'payee') renderPayees(_lastSummary);
+        else if (panel === 'expense') renderExpenseBreakdown(_lastSummary);
+        else if (panel === 'income')  renderIncomeBreakdown(_lastSummary);
+    });
+}
+
 // ── Render: Category Breakdowns ──────────────────────────────
 
 function catRowHtml(r, total, type) {
@@ -719,17 +800,19 @@ function catRowHtml(r, total, type) {
 }
 
 function renderIncomeBreakdown(data) {
+    markSortHeaders('income');
     document.getElementById('incomeTableBody').innerHTML =
         (!data.income_by_cat || !data.income_by_cat.length || data.income < 1)
         ? '<tr><td colspan="3" style="color:#999;font-size:0.8rem;padding:0.5rem 0.6rem">No income data</td></tr>'
-        : data.income_by_cat.map(r => catRowHtml(r, data.income, 'income')).join('');
+        : sortRows(data.income_by_cat, 'income', 'cat').map(r => catRowHtml(r, data.income, 'income')).join('');
 }
 
 function renderExpenseBreakdown(data) {
+    markSortHeaders('expense');
     document.getElementById('expenseCatBody').innerHTML =
         (!data.expense_by_cat || !data.expense_by_cat.length)
         ? '<tr><td colspan="3" style="color:#999;font-size:0.8rem;padding:0.5rem 0.6rem">No expense data</td></tr>'
-        : data.expense_by_cat.map(r => catRowHtml(r, data.expenses, 'expense')).join('');
+        : sortRows(data.expense_by_cat, 'expense', 'cat').map(r => catRowHtml(r, data.expenses, 'expense')).join('');
 }
 
 async function toggleCatDrill(row) {
@@ -776,19 +859,48 @@ async function toggleCatDrill(row) {
         return;
     }
 
-    drillRow.querySelector('.cat-drill-inner').outerHTML = `
-        <div class="cat-drill-inner">
+    let sortCol = 'date';
+    let sortAsc = false;
+
+    function renderDrillTable() {
+        const sorted = [...txns].sort((a, b) => {
+            let cmp;
+            if (sortCol === 'amount')     cmp = Math.abs(a.amount || 0) - Math.abs(b.amount || 0);
+            else if (sortCol === 'payee') cmp = (a.payee || '').localeCompare(b.payee || '');
+            else                          cmp = (a.date || '').localeCompare(b.date || '');
+            return sortAsc ? cmp : -cmp;
+        });
+        const arrow = col => sortCol === col ? (sortAsc ? ' ▲' : ' ▼') : '';
+        const inner = drillRow.querySelector('.cat-drill-inner');
+        inner.innerHTML = `
             <table class="cat-drill-table">
-                <thead><tr><th>Date</th><th>Payee</th><th class="td-right">Amount</th></tr></thead>
-                <tbody>${txns.map(t => `
+                <thead><tr>
+                    <th class="sortable-header" data-col="date">Date${arrow('date')}</th>
+                    <th class="sortable-header" data-col="payee">Payee${arrow('payee')}</th>
+                    <th class="sortable-header td-right" data-col="amount">Amount${arrow('amount')}</th>
+                </tr></thead>
+                <tbody>${sorted.map(t => `
                     <tr>
                         <td class="drill-date">${t.date}</td>
                         <td class="drill-payee">${escHtml(t.payee)}</td>
                         <td class="td-right drill-amount ${type === 'income' ? 'td-income' : 'td-expense'}">${fmt(t.amount)}</td>
                     </tr>`).join('')}
                 </tbody>
-            </table>
-        </div>`;
+            </table>`;
+        inner.querySelectorAll('.sortable-header').forEach(th => {
+            th.style.cursor = 'pointer';
+            th.addEventListener('click', e => {
+                e.stopPropagation();   // don't collapse the parent category row
+                const col = th.dataset.col;
+                if (sortCol === col) sortAsc = !sortAsc;
+                else { sortCol = col; sortAsc = col !== 'amount'; }
+                renderDrillTable();
+            });
+        });
+    }
+
+    drillRow.querySelector('.cat-drill-inner').outerHTML = '<div class="cat-drill-inner"></div>';
+    renderDrillTable();
 }
 
 // ── Render: Table ─────────────────────────────────────────────
@@ -796,9 +908,10 @@ async function toggleCatDrill(row) {
 function renderTable(data) {
     const tbody = document.getElementById('yearTableBody');
     tbody.innerHTML = '';
+    markSortHeaders('year');
     let totExp = 0, totInc = 0, totCount = 0;
 
-    data.by_year.forEach(r => {
+    sortRows(data.by_year, 'year', 'year').forEach(r => {
         const net = r.expenses + r.income;
         totExp   += r.expenses;
         totInc   += r.income;
@@ -829,11 +942,12 @@ function renderTable(data) {
 function renderPayees(data) {
     const tbody = document.getElementById('payeeTableBody');
     tbody.innerHTML = '';
+    markSortHeaders('payee');
     if (!data.top_payees.length) {
         tbody.innerHTML = '<tr><td colspan="2" style="color:#999;font-size:0.8rem;padding:0.5rem 0.6rem">No data</td></tr>';
         return;
     }
-    data.top_payees.forEach(r => {
+    sortRows(data.top_payees, 'payee', 'payee').forEach(r => {
         tbody.innerHTML += `
             <tr class="cat-row" data-payee="${escHtml(r.payee)}" onclick="togglePayeeDrill(this)" style="cursor:pointer">
                 <td><span class="cat-expand-icon">&#9654;</span> ${escHtml(r.payee)}</td>

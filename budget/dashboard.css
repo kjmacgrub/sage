@@ -45,8 +45,14 @@
     left: 0;
     min-width: 100%;
     max-width: 320px;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    /* Tinted a step off --surface so the panel reads as floating above the page.
+       All three are opaque — the group/section bands are sticky, so rows must
+       not show through them while scrolling. */
+    --panel-bg:   #eef2ec;
+    --panel-row:  #e4eae1;
+    --panel-band: #d9e1d5;
+    background: var(--panel-bg);
+    border: 1px solid #cbd5c6;
     border-radius: var(--radius);
     box-shadow: var(--shadow-lg);
     z-index: 200;
@@ -58,6 +64,13 @@
     display: block;
 }
 
+[data-theme="dark"] .multi-select-panel {
+    --panel-bg:   #262b3a;
+    --panel-row:  #2f3648;
+    --panel-band: #363e54;
+    border-color: #3a4058;
+}
+
 .multi-select-actions {
     display: flex;
     gap: 0.5rem;
@@ -65,7 +78,7 @@
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
-    background: var(--surface);
+    background: var(--panel-bg);
 }
 
 .ms-action-btn {
@@ -142,7 +155,7 @@
     font-size: 0.85rem;
     font-weight: 700;
     color: var(--text-primary);
-    background: var(--background);
+    background: var(--panel-row);
     border-top: 1px solid var(--border);
     transition: background 0.1s;
     user-select: none;
@@ -348,6 +361,14 @@ body .container {
     font-variant-numeric: tabular-nums;
 }
 
+/* Share-of-spend hint next to the Income / Reimbursed value */
+.stat-suffix {
+    margin-left: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
 .expense-color { color: #c84b00; }
 .income-color  { color: #248a3d; }
 
@@ -470,6 +491,29 @@ body .container {
     letter-spacing: 0.5px;
     border-bottom: 1px solid var(--border);
 }
+
+/* Click-to-sort column headers */
+.sortable-header {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.sortable-header:hover {
+    color: var(--primary);
+}
+
+.sortable-header::after {
+    content: '';
+    opacity: 0.5;
+}
+
+.sortable-header.sorted {
+    color: var(--primary);
+}
+
+.sortable-header.sorted[data-dir="asc"]::after  { content: ' \25B2'; opacity: 1; }
+.sortable-header.sorted[data-dir="desc"]::after { content: ' \25BC'; opacity: 1; }
 
 .data-table th:not(:first-child),
 .data-table td:not(:first-child) {
@@ -669,7 +713,7 @@ body .container {
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-secondary);
-    background: var(--background);
+    background: var(--panel-band);
     margin-top: 4px;
     border-top: 1px solid var(--border);
 }

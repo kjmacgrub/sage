@@ -133,11 +133,11 @@
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Year</th>
-                                <th>Expenses</th>
-                                <th>Income</th>
-                                <th>Net</th>
-                                <th>Txn</th>
+                                <th class="sortable-header" data-panel="year" data-col="year">Year</th>
+                                <th class="sortable-header" data-panel="year" data-col="expenses">Expenses</th>
+                                <th class="sortable-header" data-panel="year" data-col="income">Income</th>
+                                <th class="sortable-header" data-panel="year" data-col="net">Net</th>
+                                <th class="sortable-header" data-panel="year" data-col="count">Txn</th>
                             </tr>
                         </thead>
                         <tbody id="yearTableBody"></tbody>
@@ -149,7 +149,11 @@
                     <h3 class="section-heading">Top Payees</h3>
                     <table class="data-table">
                         <thead>
-                            <tr><th>Payee</th><th>Amount</th><th></th></tr>
+                            <tr>
+                                <th class="sortable-header" data-panel="payee" data-col="payee">Payee</th>
+                                <th class="sortable-header" data-panel="payee" data-col="amount">Amount</th>
+                                <th></th>
+                            </tr>
                         </thead>
                         <tbody id="payeeTableBody"></tbody>
                     </table>
@@ -164,7 +168,11 @@
                     <h3 class="section-heading">Expenses by Category</h3>
                     <table class="data-table cat-drilldown-table">
                         <thead>
-                            <tr><th>Category</th><th class="td-right">Total</th><th class="td-right">%</th></tr>
+                            <tr>
+                                <th class="sortable-header" data-panel="expense" data-col="category">Category</th>
+                                <th class="sortable-header td-right" data-panel="expense" data-col="amount">Total</th>
+                                <th class="sortable-header td-right" data-panel="expense" data-col="pct">%</th>
+                            </tr>
                         </thead>
                         <tbody id="expenseCatBody"></tbody>
                     </table>
@@ -175,7 +183,11 @@
                     <h3 class="section-heading">Income by Category</h3>
                     <table class="data-table cat-drilldown-table">
                         <thead>
-                            <tr><th>Category</th><th class="td-right">Total</th><th class="td-right">%</th></tr>
+                            <tr>
+                                <th class="sortable-header" data-panel="income" data-col="category">Category</th>
+                                <th class="sortable-header td-right" data-panel="income" data-col="amount">Total</th>
+                                <th class="sortable-header td-right" data-panel="income" data-col="pct">%</th>
+                            </tr>
                         </thead>
                         <tbody id="incomeTableBody"></tbody>
                     </table>
