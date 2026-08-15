@@ -811,3 +811,24 @@ tr.group-header:hover td { background: var(--surface2); }
 .modal-body table { width: 100%; }
 /* Wide tables scroll inside their own container rather than clipping. */
 .modal-scroll-x { overflow-x: auto; margin-bottom: 6px; }
+
+/* Grade badges align to the right edge of the ticker column so they read as a
+   column rather than drifting with ticker length (AOD vs BBDC vs XFLT). */
+.ticker-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ticker-cell > .grade-badge { margin-left: 0; flex: 0 0 auto; }
+.ticker-name { display: inline-flex; align-items: center; min-width: 0; }
+
+/* Light theme overrides --green-dim/--red-dim (the badge grounds) but keeps the
+   bright dark-theme foregrounds, which leaves the amber C and orange D badges
+   short on contrast against near-white. Darken the text and borders only. */
+[data-theme="light"] .grade-a { color: #17703d; border-color: rgba(23,112,61,0.55); }
+[data-theme="light"] .grade-b { color: #17703d; border-color: rgba(23,112,61,0.40); }
+[data-theme="light"] .grade-c { color: #7d5c0c; background: rgba(240,192,64,0.20); border-color: rgba(125,92,12,0.45); }
+[data-theme="light"] .grade-d { color: #9c4a15; background: rgba(231,76,60,0.13); border-color: rgba(156,74,21,0.45); }
+[data-theme="light"] .grade-f { color: #b3271a; border-color: rgba(179,39,26,0.60); }
+[data-theme="light"] .grade-unknown { color: var(--text-2); border-color: var(--text-2); }

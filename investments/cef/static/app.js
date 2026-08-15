@@ -348,7 +348,7 @@ function portfolioRow(h, totalMkt, idx) {
     <tr onclick="openHoldingModal('${h.ticker}')">
       <td class="col-num">${idx}</td>
       <td class="left col-sticky">
-        <a class="ticker-link" href="${tickerUrl(h.ticker, h.type)}" target="_blank" onclick="event.stopPropagation()">${h.ticker}</a>${gradeBadge(h.ticker)}
+        <span class="ticker-cell"><a class="ticker-link" href="${tickerUrl(h.ticker, h.type)}" target="_blank" onclick="event.stopPropagation()">${h.ticker}</a>${gradeBadge(h.ticker)}</span>
       </td>
       <td class="left col-sticky-2" style="color:var(--text-2)">${h.name || ''}</td>
       <td class="left col-sticky-3"><span class="badge-type ${(h.type||'').toLowerCase()}">${h.type || ''}</span></td>
@@ -480,8 +480,7 @@ function watchlistRow(p, isHeld = false) {
   return `
     <tr onclick="openHoldingModal('${p.ticker}')">
       <td class="left col-sticky">
-        ${isHeld ? '<span title="In portfolio" style="color:var(--green);font-size:8px;margin-right:4px;vertical-align:middle">●</span>' : ''}
-        <a class="ticker-link" href="${tickerUrl(p.ticker, p.type)}" target="_blank" onclick="event.stopPropagation()">${p.ticker}</a>${gradeBadge(p.ticker)}
+        <span class="ticker-cell"><span class="ticker-name">${isHeld ? '<span title="In portfolio" style="color:var(--green);font-size:8px;margin-right:4px">●</span>' : ''}<a class="ticker-link" href="${tickerUrl(p.ticker, p.type)}" target="_blank" onclick="event.stopPropagation()">${p.ticker}</a></span>${gradeBadge(p.ticker)}</span>
       </td>
       <td class="left col-sticky-2" style="color:var(--text-2)">${p.name || ''}</td>
       <td class="left col-sticky-3"><span class="badge-type ${(p.type||'').toLowerCase()}">${p.type || ''}</span></td>
