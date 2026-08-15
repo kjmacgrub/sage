@@ -112,6 +112,8 @@ function renderApp() {
         ${_lastUpdated ? `<span class="last-updated">Updated ${formatTime(_lastUpdated)}</span>` : ''}
         ${_tab === 'portfolio' ? `<button class="btn btn-ghost btn-sm" onclick="auditAllHeld()"
           title="Run the distribution audit on every held position, one at a time">⚖ Audit all</button>` : ''}
+        ${_tab === 'watchlist' ? `<button class="btn btn-ghost btn-sm" onclick="auditAllWatchlist()"
+          title="Audit every fund currently shown on the watchlist, one at a time">⚖ Audit all</button>` : ''}
         <button class="btn btn-ghost btn-sm" onclick="refreshPrices()" id="refresh-btn">
           ↻ Refresh
         </button>
@@ -1808,6 +1810,9 @@ function showGradeTip(ev, ticker) {
 
     const warns = (a.flags || []).filter(f => f.severity === 'warn' || f.severity === 'error');
     const foot = [];
+    // Say so when the ownership component sat out, otherwise a watchlist grade
+    // and a portfolio grade look like the same measurement when they aren't.
+    if (!pos) foot.push('Fund quality only — not held');
     if (a.rubric_changed) foot.push('<span class="grade-tip-warn">Rubric changed since this ran</span>');
     else if (a.stale) foot.push(`<span class="grade-tip-warn">${a.age_days}d old — re-run</span>`);
     if (a.confidence === 'low') foot.push('<span class="grade-tip-warn">Low confidence</span>');
@@ -1883,10 +1888,23 @@ async function runAudit(ticker, reopen = false) {
   }
 }
 
-async function auditAllHeld() {
-  const held = _holdings.filter(h => h.shares > 0).map(h => h.ticker);
-  toast(`Auditing ${held.length} positions…`);
-  for (const t of held) {
+function auditAllHeld() {
+  return auditSweep(_holdings.filter(h => h.shares > 0).map(h => h.ticker), 'positions');
+}
+
+/** Watchlist sweep covers whatever the current filter shows, so "Audit all"
+ *  means what's on screen rather than a hidden superset. */
+function auditAllWatchlist() {
+  const held = new Set(_holdings.filter(h => h.shares > 0).map(h => h.ticker));
+  const visible = (_hideHeld ? _prices.filter(p => !held.has(p.ticker)) : _prices)
+    .map(p => p.ticker);
+  return auditSweep(visible, 'watchlist funds');
+}
+
+async function auditSweep(tickers, label) {
+  if (!tickers.length) return toast('Nothing to audit');
+  toast(`Auditing ${tickers.length} ${label}…`);
+  for (const t of tickers) {
     _auditRunning[t] = true;
     renderApp();
     try {
@@ -1936,6 +1954,11 @@ function openAuditModal(ticker) {
           </div>
           ${isBdc ? bdcAuditBody(d, c) : cefAuditBody(d, c)}
           ${auditComponentTable(c, d, isBdc)}
+          ${!c.your_return?.position ? `<div class="settings-hint" style="margin-top:8px">
+            Not held, so the realized-return component sits out and the remaining
+            weights scale up to fill it. Across the current portfolio that shifts a
+            grade by about 2 points either way — comparable to a held fund's grade,
+            but not identical to one.</div>` : ''}
           ${auditFlags(a.flags)}
           ${auditRubricNote(a)}
         </div>
