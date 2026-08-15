@@ -10,7 +10,8 @@
 </head>
 <body>
     <nav class="global-tab-nav">
-        <img src="/static/sage-logo.svg" class="nav-logo" alt="Sage">
+        <img src="/static/sage-logo.svg" class="nav-logo" alt="Sage"
+             title="Settings" onclick="event.stopPropagation();openSettings(event)">
         <a href="http://localhost:5050/" class="global-tab-link">Budget Planner</a>
         <a href="http://localhost:5050/dashboard.html" class="global-tab-link">Cash Flow</a>
         <a href="http://localhost:5050/tax.html" class="global-tab-link">Tax</a>

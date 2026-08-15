@@ -17,6 +17,9 @@ let _screenPollTimer = null;
 let _navSparklines = {};    // {ticker: [{date, nav}]}
 let _alertThreshold = 3;    // pp wider than avg triggers alert
 let _showIncomeProjection = false;
+let _audits = {};           // {ticker: latest audit} — drives the grade badges
+let _settings = {};         // server-side settings (see cef/settings.py)
+let _auditRunning = {};     // {ticker: true} while an audit is in flight
 
 // === API ===
 async function GET(url) {
@@ -72,15 +75,24 @@ async function init() {
 
 async function loadAll() {
   try {
-    [_prices, _holdings, _distributions] = await Promise.all([
+    let settingsResp;
+    [_prices, _holdings, _distributions, _audits, settingsResp] = await Promise.all([
       GET('/api/prices/latest'),
       GET('/api/holdings'),
       GET('/api/distributions'),
+      GET('/api/audit').catch(() => ({})),
+      GET('/api/settings').catch(() => null),
     ]);
+    _settings = settingsResp?.settings || {};
     if (_prices.length) _lastUpdated = _prices[0].fetched_at;
   } catch(e) {
     console.error(e);
   }
+}
+
+function setting(key, fallback) {
+  const v = _settings[key];
+  return v === undefined || v === null ? fallback : v;
 }
 
 async function loadSparklines() {
@@ -98,6 +110,8 @@ function renderApp() {
       <div class="header-title">CEF<span>.</span></div>
       <div class="header-right">
         ${_lastUpdated ? `<span class="last-updated">Updated ${formatTime(_lastUpdated)}</span>` : ''}
+        ${_tab === 'portfolio' ? `<button class="btn btn-ghost btn-sm" onclick="auditAllHeld()"
+          title="Run the distribution audit on every held position, one at a time">⚖ Audit all</button>` : ''}
         <button class="btn btn-ghost btn-sm" onclick="refreshPrices()" id="refresh-btn">
           ↻ Refresh
         </button>
@@ -207,9 +221,9 @@ function renderPortfolio() {
     return {
       ...h,
       disc_vs_avg: h.premium_discount != null && h.avg_discount_1y != null ? h.premium_discount - h.avg_discount_1y : null,
-      // Earned − distributed gap (the NAV-erosion signal) — drives the E/D column sort
-      coverage_1y: h.earned_yield_1y != null && h.dist_yield_1y != null ? h.earned_yield_1y - h.dist_yield_1y : null,
-      coverage_life: h.earned_yield_life != null && h.dist_yield_life != null ? h.earned_yield_life - h.dist_yield_life : null,
+      // Normalized coverage ratio — comparable across CEFs (NAV total return ÷
+      // distributed) and BDCs (NII ÷ dividend), so one column sorts both.
+      coverage_ratio: coverageRatio(h),
       cost_per_share: h.shares ? h.cost_basis / h.shares : null,
       yoc: (distPerShare && h.shares && h.cost_basis) ? distPerShare * h.shares * periodsPerYear / h.cost_basis * 100 : null,
       annualized_return,
@@ -254,8 +268,8 @@ function renderPortfolio() {
             ${th('price_change_pct', 'Day %')}
             ${th('cost_per_share', 'Cost/Sh')}
             ${th('yield_pct', 'Yield', false, false, 'Current market yield')}
-            ${th('coverage_1y', '1Y E/D', false, false, 'Earned yield (total return on NAV) vs Distributed yield (distributions ÷ NAV), trailing 1 year. Green = distribution out-earned, NAV growing; red = NAV eroding (ROC-funded). Sorted by the earned−distributed gap.')}
-            ${th('coverage_life', 'Life E/D', false, false, 'Earned vs Distributed yield, annualized over up to 5 years (or since inception). Green = sustainable; red = NAV-eroding. CEFs only.')}
+            ${th('yoc', 'YoC', false, false, 'Yield on cost basis (annualized distributions / total cost)')}
+            ${th('coverage_ratio', 'Coverage', false, false, 'Is the yield paying for itself? For CEFs: earned yield (NAV total return) ÷ distributed yield, taken over rolling 3-year windows. For BDCs: net investment income ÷ dividend, as filed. At or above 1.0× the payout is earned; below it, the shortfall comes out of principal. Run the audit (badge beside the ticker) to populate.')}
             ${th('disc_vs_avg', 'δ vs Avg', false, false, 'Current disc/premium relative to its 1-year average. Negative = trading cheaper than usual.')}
             ${th('unrealized_gain', 'Unr. Gain')}
             ${th('dividends_received', 'Divs')}
@@ -263,17 +277,48 @@ function renderPortfolio() {
             ${th('total_return_pct', 'Ret %')}
             ${th('hold_years', 'Held', false, false, 'Time owned — since acquired date, or estimated (~) from the first recorded distribution. This is the period the annualized return is computed over.')}
             ${th('annualized_return', 'Ann Ret', false, false, 'Annualized total return (CAGR) since acquired date — falls back to first recorded distribution if no acquired date is set. Needs ≥6 months held.')}
-            ${th('yoc', 'YoC', false, false, 'Yield on cost basis (annualized distributions / total cost)')}
             ${th('market_value', 'Mkt Val')}
             ${th('weight', '% Port')}
           </tr>
         </thead>
         <tbody>
-          ${sorted.map((h, i) => portfolioRow(h, totalMkt, i + 1)).join('')}
+          ${portfolioBody(sorted, totalMkt)}
         </tbody>
       </table>
     </div>
     ${renderIncomeProjection(positions)}`;
+}
+
+/** Rows, optionally grouped by security type with per-group subtotals.
+ *  Grouping rather than separate tabs: 18 of the 21 columns mean the same
+ *  thing for both types, and a split table would break the whole-portfolio
+ *  denominator that makes the % Port column and the summary bar meaningful. */
+function portfolioBody(sorted, totalMkt) {
+  if (!setting('display.group_by_type', true)) {
+    return sorted.map((h, i) => portfolioRow(h, totalMkt, i + 1)).join('');
+  }
+  const groups = {};
+  sorted.forEach(h => { (groups[h.type || '—'] ||= []).push(h); });
+  const order = ['CEF', 'BDC'].filter(k => groups[k])
+    .concat(Object.keys(groups).filter(k => k !== 'CEF' && k !== 'BDC'));
+
+  let idx = 0;
+  const out = [];
+  for (const type of order) {
+    const rows = groups[type];
+    const value = rows.reduce((s, h) => s + (h.market_value || 0), 0);
+    const pct = totalMkt ? (value / totalMkt * 100) : null;
+    out.push(`
+      <tr class="group-header">
+        <td colspan="20">
+          ${type}
+          <span class="group-meta">${rows.length} position${rows.length > 1 ? 's' : ''}
+            · ${fmt$(value)}${pct != null ? ` · ${pct.toFixed(1)}% of portfolio` : ''}</span>
+        </td>
+      </tr>`);
+    rows.forEach(h => out.push(portfolioRow(h, totalMkt, ++idx)));
+  }
+  return out.join('');
 }
 
 function portfolioRow(h, totalMkt, idx) {
@@ -303,7 +348,7 @@ function portfolioRow(h, totalMkt, idx) {
     <tr onclick="openHoldingModal('${h.ticker}')">
       <td class="col-num">${idx}</td>
       <td class="left col-sticky">
-        <a class="ticker-link" href="${tickerUrl(h.ticker, h.type)}" target="_blank" onclick="event.stopPropagation()">${h.ticker}</a>
+        <a class="ticker-link" href="${tickerUrl(h.ticker, h.type)}" target="_blank" onclick="event.stopPropagation()">${h.ticker}</a>${gradeBadge(h.ticker)}
       </td>
       <td class="left col-sticky-2" style="color:var(--text-2)">${h.name || ''}</td>
       <td class="left col-sticky-3"><span class="badge-type ${(h.type||'').toLowerCase()}">${h.type || ''}</span></td>
@@ -312,8 +357,8 @@ function portfolioRow(h, totalMkt, idx) {
       <td class="${gainClass(h.price_change_pct)}">${h.price_change_pct != null ? (h.price_change_pct >= 0 ? '+' : '') + h.price_change_pct.toFixed(2) + '%' : '—'}</td>
       <td>${costPerShare != null ? fmt$(costPerShare) : '—'}</td>
       ${yieldCell(h)}
-      ${yieldPairCell(h.earned_yield_1y, h.dist_yield_1y, '1-Year')}
-      ${yieldPairCell(h.earned_yield_life, h.dist_yield_life, 'Lifetime', h.yield_life_years)}
+      <td class="positive" title="Yield on cost basis">${yoc != null ? yoc.toFixed(2) + '%' : '—'}</td>
+      ${coverageCell(h)}
       <td>${fmtDiscCell(h.premium_discount, h.avg_discount_1y)}</td>
       <td class="${gainClass(h.unrealized_gain)}">${fmtGain$(h.unrealized_gain)}</td>
       <td class="positive" onclick="event.stopPropagation(); openDivModal('${h.ticker}')" style="cursor:pointer;text-decoration:underline dotted" title="Click to view distribution history">${fmt$(h.dividends_received)}</td>
@@ -321,10 +366,41 @@ function portfolioRow(h, totalMkt, idx) {
       <td class="${gainClass(h.total_return_pct)}">${h.total_return_pct != null ? fmtPct(h.total_return_pct) : '—'}</td>
       <td style="color:var(--text-2)" title="${heldTitle}">${heldStr}</td>
       <td class="${gainClass(h.annualized_return)}" title="${annRetTitle}">${h.annualized_return != null ? fmtPct(h.annualized_return) : '—'}</td>
-      <td class="positive" title="Yield on cost basis">${yoc != null ? yoc.toFixed(2) + '%' : '—'}</td>
       <td>${fmt$(h.market_value)}</td>
       <td>${h.weight != null ? h.weight.toFixed(1) + '%' : '—'}</td>
     </tr>`;
+}
+
+/** Coverage ratio from the audit, falling back to the legacy earned/distributed
+ *  figures stored on the prices row when a fund hasn't been audited yet. */
+function coverageRatio(h) {
+  const a = _audits[h.ticker];
+  if (a?.detail?.headline_ratio != null) return a.detail.headline_ratio;
+  if (h.earned_yield_life != null && h.dist_yield_life > 0) {
+    return h.earned_yield_life / h.dist_yield_life;
+  }
+  if (h.earned_yield_1y != null && h.dist_yield_1y > 0) {
+    return h.earned_yield_1y / h.dist_yield_1y;
+  }
+  return null;
+}
+
+function coverageCell(h) {
+  const a = _audits[h.ticker];
+  const r = coverageRatio(h);
+  if (r == null) {
+    return `<td style="color:var(--text-muted)" title="Run the audit (badge beside the ticker) to measure coverage">—</td>`;
+  }
+  const cls = r >= 1 ? 'cov-good' : r >= 0.7 ? 'cov-mid' : 'cov-bad';
+  const src = a
+    ? (a.kind === 'bdc'
+        ? 'Net investment income ÷ dividend, from filed quarterly figures.'
+        : 'Earned yield ÷ distributed yield, median of rolling 3-year windows.')
+    : 'From stored lifetime earned/distributed yields — not yet audited.';
+  const verdict = r >= 1
+    ? 'The payout is fully earned.'
+    : `About ${Math.round((1 - r) * 100)}% of the payout is coming out of principal.`;
+  return `<td class="cov-ratio ${cls}" title="${src} ${verdict}">${r.toFixed(2)}×</td>`;
 }
 
 // === WATCHLIST TAB ===
@@ -342,8 +418,7 @@ function renderWatchlist() {
   const visWithDelta = [...visible].map(p => ({
     ...p,
     disc_vs_avg: p.premium_discount != null && p.avg_discount_1y != null ? p.premium_discount - p.avg_discount_1y : null,
-    coverage_1y: p.earned_yield_1y != null && p.dist_yield_1y != null ? p.earned_yield_1y - p.dist_yield_1y : null,
-    coverage_life: p.earned_yield_life != null && p.dist_yield_life != null ? p.earned_yield_life - p.dist_yield_life : null
+    coverage_ratio: coverageRatio(p)
   }));
   const sorted = sortData(visWithDelta, _sortCol || 'name', _sortCol ? _sortAsc : true);
 
@@ -369,19 +444,36 @@ function renderWatchlist() {
             ${th('price', 'Price')}
             ${th('nav', 'NAV')}
             ${th('yield_pct', 'Yield')}
-            ${th('coverage_1y', '1Y E/D', false, false, 'Earned yield (total return on NAV) vs Distributed yield (distributions ÷ NAV), trailing 1 year. Green = distribution out-earned, NAV growing; red = NAV eroding. CEFs only.')}
-            ${th('coverage_life', 'Life E/D', false, false, 'Earned vs Distributed yield, annualized over up to 5 years (or since inception). Green = sustainable; red = NAV-eroding. CEFs only.')}
+            ${th('coverage_ratio', 'Coverage', false, false, 'Is the yield paying for itself? For CEFs: earned yield ÷ distributed yield over rolling 3-year windows. For BDCs: net investment income ÷ dividend, as filed. At or above 1.0× the payout is earned. Run the audit (badge beside the ticker) to populate.')}
             ${th('dist_freq', 'Freq', true)}
             ${th('date', 'As Of', true)}
             <th></th>
           </tr>
         </thead>
         <tbody>
-          ${sorted.map(p => watchlistRow(p, held.has(p.ticker))).join('')}
+          ${watchlistBody(sorted, held)}
         </tbody>
       </table>
     </div>
     ${renderInactiveFunds()}`;
+}
+
+function watchlistBody(sorted, held) {
+  if (!setting('display.group_by_type', true)) {
+    return sorted.map(p => watchlistRow(p, held.has(p.ticker))).join('');
+  }
+  const groups = {};
+  sorted.forEach(p => { (groups[p.type || '—'] ||= []).push(p); });
+  const order = ['CEF', 'BDC'].filter(k => groups[k])
+    .concat(Object.keys(groups).filter(k => k !== 'CEF' && k !== 'BDC'));
+
+  return order.map(type => {
+    const rows = groups[type];
+    return `
+      <tr class="group-header">
+        <td colspan="11">${type}<span class="group-meta">${rows.length} fund${rows.length > 1 ? 's' : ''}</span></td>
+      </tr>` + rows.map(p => watchlistRow(p, held.has(p.ticker))).join('');
+  }).join('');
 }
 
 function watchlistRow(p, isHeld = false) {
@@ -389,7 +481,7 @@ function watchlistRow(p, isHeld = false) {
     <tr onclick="openHoldingModal('${p.ticker}')">
       <td class="left col-sticky">
         ${isHeld ? '<span title="In portfolio" style="color:var(--green);font-size:8px;margin-right:4px;vertical-align:middle">●</span>' : ''}
-        <a class="ticker-link" href="${tickerUrl(p.ticker, p.type)}" target="_blank" onclick="event.stopPropagation()">${p.ticker}</a>
+        <a class="ticker-link" href="${tickerUrl(p.ticker, p.type)}" target="_blank" onclick="event.stopPropagation()">${p.ticker}</a>${gradeBadge(p.ticker)}
       </td>
       <td class="left col-sticky-2" style="color:var(--text-2)">${p.name || ''}</td>
       <td class="left col-sticky-3"><span class="badge-type ${(p.type||'').toLowerCase()}">${p.type || ''}</span></td>
@@ -397,8 +489,7 @@ function watchlistRow(p, isHeld = false) {
       <td>${fmt$(p.price)}</td>
       <td>${fmt$(p.nav)}</td>
       ${yieldCell(p)}
-      ${yieldPairCell(p.earned_yield_1y, p.dist_yield_1y, '1-Year')}
-      ${yieldPairCell(p.earned_yield_life, p.dist_yield_life, 'Lifetime', p.yield_life_years)}
+      ${coverageCell(p)}
       <td style="color:var(--text-2)">${p.dist_freq || '—'}</td>
       <td style="color:var(--text-muted)">${p.date || ''}</td>
       <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();confirmRemove('${p.ticker}')">Remove</button></td>
@@ -1654,3 +1745,704 @@ async function applySplit(ticker, ratio) {
 
 // === START ===
 init();
+
+// ════════════════════════════════════════════════════════════════
+// POSITION AUDIT — grade badge, hover card, detail modal
+// ════════════════════════════════════════════════════════════════
+
+const GRADE_CLASS = { A: 'grade-a', B: 'grade-b', C: 'grade-c', D: 'grade-d', F: 'grade-f' };
+
+function gradeClassFor(grade) {
+  return grade ? (GRADE_CLASS[grade[0]] || 'grade-unknown') : 'grade-none';
+}
+
+/** The badge lives in the sticky ticker cell, so it stays visible while the
+ *  table scrolls horizontally. One element carries every state: run button
+ *  when unaudited, spinner while running, letter grade once complete. */
+function gradeBadge(ticker) {
+  if (_auditRunning[ticker]) {
+    return `<span class="grade-badge running" title="Auditing ${ticker}…"><span class="grade-spin"></span></span>`;
+  }
+  const a = _audits[ticker];
+  const attrs = `onmouseenter="showGradeTip(event,'${ticker}')" onmouseleave="hideGradeTip()"`
+              + ` onclick="event.stopPropagation();onGradeClick(event,'${ticker}')"`;
+
+  if (!a) {
+    return `<span class="grade-badge grade-none" ${attrs} title="Run distribution audit">·</span>`;
+  }
+  const cls = [gradeClassFor(a.grade)];
+  if (a.stale) cls.push('stale');
+  if (a.confidence === 'low') cls.push('low-conf');
+  return `<span class="grade-badge ${cls.join(' ')}" ${attrs}>${a.grade || '?'}</span>`;
+}
+
+function showGradeTip(ev, ticker) {
+  hideGradeTip();
+  const a = _audits[ticker];
+  const tip = document.createElement('div');
+  tip.className = 'grade-tip';
+  tip.id = 'grade-tip';
+
+  if (!a) {
+    tip.innerHTML = `<div class="grade-tip-head">${ticker}</div>
+      <div class="grade-tip-verdict">Not audited yet.</div>
+      <div class="grade-tip-foot">Click to check whether the yield is paying for itself.</div>`;
+  } else {
+    const d = a.detail || {};
+    const c = d.components || {};
+    const ratio = d.headline_ratio;
+    const rows = [];
+    if (ratio != null) {
+      rows.push(['Coverage', `${ratio.toFixed(2)}× ${ratio >= 1 ? 'earned' : 'of payout earned'}`]);
+    }
+    if (a.kind === 'bdc') {
+      if (c.nav_trend?.cagr != null) rows.push(['NAV/share', fmtSigned(c.nav_trend.cagr) + '/yr']);
+      if (c.dist_stability?.cuts != null) rows.push(['Dividend cuts', String(c.dist_stability.cuts)]);
+    } else {
+      if (c.nav_trend?.cagr != null) rows.push(['NAV trend', fmtSigned(c.nav_trend.cagr) + '/yr']);
+      if (c.payout_power?.ratio_to_earning_power != null) {
+        rows.push(['Payout vs earnings', fmtPayoutRatio(c.payout_power)]);
+      }
+    }
+    const pos = c.your_return?.position;
+    if (pos?.annualized != null) rows.push(['Your return', fmtSigned(pos.annualized) + '/yr']);
+
+    const warns = (a.flags || []).filter(f => f.severity === 'warn' || f.severity === 'error');
+    const foot = [];
+    if (a.rubric_changed) foot.push('<span class="grade-tip-warn">Rubric changed since this ran</span>');
+    else if (a.stale) foot.push(`<span class="grade-tip-warn">${a.age_days}d old — re-run</span>`);
+    if (a.confidence === 'low') foot.push('<span class="grade-tip-warn">Low confidence</span>');
+    if (warns.length) foot.push(`${warns.length} data flag${warns.length > 1 ? 's' : ''}`);
+    foot.push('Click for full audit');
+
+    tip.innerHTML = `
+      <div class="grade-tip-head">
+        <span class="grade-badge ${gradeClassFor(a.grade)}" style="cursor:default;margin:0">${a.grade || '?'}</span>
+        <span>${ticker}</span>
+        ${a.score != null ? `<span style="color:var(--text-muted);font-weight:400">${a.score.toFixed(0)}/100</span>` : ''}
+      </div>
+      <div class="grade-tip-verdict">${a.verdict || ''}</div>
+      ${rows.map(([k, v]) => `<div class="grade-tip-row"><span>${k}</span><span>${v}</span></div>`).join('')}
+      <div class="grade-tip-foot">${foot.join(' · ')}</div>`;
+  }
+
+  document.body.appendChild(tip);
+  positionNear(tip, ev);
+}
+
+function hideGradeTip() {
+  document.getElementById('grade-tip')?.remove();
+}
+
+/** Anchor a floating element near the click/hover point, clamped to viewport. */
+function positionNear(el, ev) {
+  const pad = 8;
+  const r = el.getBoundingClientRect();
+  let left = (ev?.clientX ?? window.innerWidth / 2) + 14;
+  let top = (ev?.clientY ?? window.innerHeight / 2) + 14;
+  if (left + r.width + pad > window.innerWidth) left = window.innerWidth - r.width - pad;
+  if (top + r.height + pad > window.innerHeight) top = Math.max(pad, window.innerHeight - r.height - pad);
+  el.style.left = Math.max(pad, left) + 'px';
+  el.style.top = Math.max(pad, top) + 'px';
+}
+
+/** A fund earning ~nothing produces an arbitrarily large multiple; say what's
+ *  actually happening instead of quoting a capped number as if it were precise. */
+function fmtPayoutRatio(comp) {
+  const r = comp.ratio_to_earning_power;
+  const power = comp.earning_power;
+  if (r == null) return '—';
+  if (power != null && power <= 0.5) return 'pays out, earns ~nothing';
+  return (r >= 10 ? '>10' : r.toFixed(1)) + '×';
+}
+
+function fmtSigned(v, digits = 1) {
+  if (v == null) return '—';
+  return (v >= 0 ? '+' : '') + v.toFixed(digits) + '%';
+}
+
+function onGradeClick(ev, ticker) {
+  hideGradeTip();
+  if (_auditRunning[ticker]) return;
+  if (_audits[ticker]) openAuditModal(ticker, ev);
+  else runAudit(ticker);
+}
+
+async function runAudit(ticker, reopen = false) {
+  _auditRunning[ticker] = true;
+  renderApp();
+  try {
+    const result = await POST('/api/audit/' + ticker, {});
+    _audits = { ..._audits, [ticker]: { ...result, age_days: 0, stale: false, rubric_changed: false } };
+    toast(`${ticker} audited — ${result.grade || 'not gradeable'}`);
+  } catch (e) {
+    toast('Audit failed: ' + e.message);
+  } finally {
+    delete _auditRunning[ticker];
+    renderApp();
+    if (reopen) openAuditModal(ticker);
+  }
+}
+
+async function auditAllHeld() {
+  const held = _holdings.filter(h => h.shares > 0).map(h => h.ticker);
+  toast(`Auditing ${held.length} positions…`);
+  for (const t of held) {
+    _auditRunning[t] = true;
+    renderApp();
+    try {
+      const r = await POST('/api/audit/' + t, {});
+      _audits = { ..._audits, [t]: { ...r, age_days: 0, stale: false, rubric_changed: false } };
+    } catch (e) { /* keep going; one bad ticker shouldn't stop the sweep */ }
+    delete _auditRunning[t];
+    renderApp();
+  }
+  toast('Audit sweep complete');
+}
+
+// ── Full audit modal ──────────────────────────────────────────
+
+function openAuditModal(ticker) {
+  const a = _audits[ticker];
+  if (!a) return runAudit(ticker, true);
+  const d = a.detail || {};
+  const c = d.components || {};
+  const isBdc = a.kind === 'bdc';
+
+  const confNote = { high: '', medium: 'Medium confidence', low: 'Low confidence' }[a.confidence] || '';
+  const staleNote = a.rubric_changed
+    ? '<span class="grade-tip-warn">Rubric changed since this ran — re-run for a current grade</span>'
+    : a.stale ? `<span class="grade-tip-warn">${a.age_days} days old</span>` : '';
+
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="closeModal()">
+      <div class="modal modal-wide" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="grade-badge ${gradeClassFor(a.grade)}" style="cursor:default;margin:0;min-width:30px;height:24px;font-size:13px">${a.grade || '?'}</span>
+            <div>
+              <h2 style="margin:0">${ticker} — Distribution Audit</h2>
+              <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+                ${a.score != null ? `Score ${a.score.toFixed(1)}/100 · ` : ''}${isBdc ? 'BDC rubric' : 'CEF rubric'}
+                · Run ${(a.run_at || '').replace('T', ' ').slice(0, 16)}
+                ${confNote ? ' · ' + confNote : ''}${staleNote ? ' · ' + staleNote : ''}
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius);margin-bottom:14px;line-height:1.5">
+            ${a.verdict || ''}
+          </div>
+          ${isBdc ? bdcAuditBody(d, c) : cefAuditBody(d, c)}
+          ${auditComponentTable(c, d, isBdc)}
+          ${auditFlags(a.flags)}
+          ${auditRubricNote(a)}
+        </div>
+        <div class="settings-actions" style="padding:12px 16px">
+          ${isBdc ? `<button class="btn btn-ghost btn-sm" onclick="openBdcEntry('${ticker}')">Enter quarter</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="showAuditHistory('${ticker}')">History</button>
+          <button class="btn btn-primary btn-sm" onclick="closeModal();runAudit('${ticker}', true)">Re-run audit</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function cefAuditBody(d, c) {
+  const w = d.windows || {};
+  const order = [['6m', '6 months'], ['1y', '1 year'], ['2y', '2 years'], ['3y', '3 years'], ['life', 'Since inception']];
+  const rows = order.filter(([k]) => w[k]).map(([k, label]) => {
+    const x = w[k];
+    const cls = x.ratio == null ? '' : x.ratio >= 1 ? 'positive' : x.ratio >= 0.7 ? '' : 'negative';
+    return `<tr>
+      <td class="left">${label}</td>
+      <td style="color:var(--text-2)">${x.years}y</td>
+      <td>${fmtSigned(x.earned)}</td>
+      <td>${x.distributed.toFixed(1)}%</td>
+      <td class="${cls}">${x.ratio != null ? x.ratio.toFixed(2) + '×' : '—'}</td>
+      <td style="color:var(--text-2)">$${x.nav_start.toFixed(2)} → $${x.nav_end.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  const cov = c.coverage || {};
+  return `
+    <h4 style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">
+      Earned vs distributed
+    </h4>
+    <div class="modal-scroll-x"><table style="width:100%">
+      <thead><tr>
+        <th class="left" style="position:static">Window</th>
+        <th style="position:static">Span</th>
+        <th style="position:static" title="Annualized NAV total return">Earned</th>
+        <th style="position:static" title="Distributions ÷ starting NAV, annualized">Paid</th>
+        <th style="position:static" title="Earned ÷ paid. Below 1.0 means part of the payout came from principal.">Cover</th>
+        <th style="position:static">NAV</th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" style="color:var(--text-muted)">No measurable windows.</td></tr>'}</tbody>
+    </table></div>
+    <div class="settings-hint">
+      Grading uses the trailing 1Y and 3Y windows plus a long-run figure taken as the
+      <strong>median of rolling 3-year windows</strong>${cov.rolling_3y_windows ? ` (${cov.rolling_3y_windows} of them)` : ''},
+      not the single inception-to-today row above — one bad start date shouldn't decide the grade.
+    </div>`;
+}
+
+function bdcAuditBody(d, c) {
+  const qs = (d.quarters || []).slice().reverse();
+  if (!qs.length) {
+    return `<div class="settings-hint">No quarterly figures entered yet. Use “Enter quarter” below —
+      the runbook in docs/ walks through where each number comes from.</div>`;
+  }
+  const rows = qs.map(q => {
+    const cover = (q.nii_per_share != null && q.dividend_per_share)
+      ? q.nii_per_share / q.dividend_per_share : null;
+    const cls = cover == null ? '' : cover >= 1 ? 'positive' : cover >= 0.9 ? '' : 'negative';
+    return `<tr>
+      <td class="left">${q.quarter_end}</td>
+      <td>${q.nii_per_share != null ? '$' + q.nii_per_share.toFixed(3) : '—'}</td>
+      <td>${q.dividend_per_share != null ? '$' + q.dividend_per_share.toFixed(3) : '—'}</td>
+      <td class="${cls}">${cover != null ? cover.toFixed(2) + '×' : '—'}</td>
+      <td>${q.nav_per_share != null ? '$' + q.nav_per_share.toFixed(2) : '—'}</td>
+      <td>${q.non_accrual_pct != null ? q.non_accrual_pct.toFixed(1) + '%' : '—'}</td>
+    </tr>`;
+  }).join('');
+  return `
+    <h4 style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">
+      Filed quarterly figures
+    </h4>
+    <table style="width:100%;margin-bottom:6px">
+      <thead><tr>
+        <th class="left" style="position:static">Quarter</th>
+        <th style="position:static">NII/sh</th>
+        <th style="position:static">Div/sh</th>
+        <th style="position:static">Cover</th>
+        <th style="position:static">NAV/sh</th>
+        <th style="position:static" title="Non-accruals at fair value">Non-acc</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function auditComponentTable(c, d, isBdc) {
+  const weights = d.effective_weights || {};
+  const labels = isBdc
+    ? { nii_coverage: 'NII coverage', nav_trend: 'NAV/share trend', dist_stability: 'Dividend stability', your_return: 'Your return' }
+    : { coverage: 'Distribution coverage', nav_trend: 'NAV trend', payout_power: 'Payout vs earning power', your_return: 'Your return' };
+
+  const rows = Object.entries(labels).map(([key, label]) => {
+    const comp = c[key] || {};
+    const score = comp.score;
+    const w = weights[key];
+    let note = '';
+    if (key === 'payout_power' && comp.payout_rate_on_nav != null) {
+      note = `paying ${comp.payout_rate_on_nav.toFixed(1)}% of NAV against ${comp.earning_power != null ? fmtSigned(comp.earning_power) : '—'} earning power`;
+    } else if (key === 'nav_trend' && comp.cagr != null) {
+      note = `${fmtSigned(comp.cagr)}/yr${comp.consecutive_down_years > 1 ? ` · ${comp.consecutive_down_years} down years running` : ''}`;
+    } else if (key === 'your_return') {
+      const p = comp.position;
+      note = p ? (p.annualized != null
+          ? `${fmtSigned(p.annualized)}/yr over ${p.hold_years}y vs ${comp.cash_benchmark}% cash`
+          : `${fmtSigned(p.total_return_pct)} total — too short to annualize`)
+        : 'not held';
+    } else if (key === 'coverage' && comp.ratios) {
+      note = Object.entries(comp.ratios).filter(([, v]) => v != null)
+        .map(([k, v]) => `${k}: ${v.toFixed(2)}×`).join(' · ');
+    } else if (key === 'nii_coverage' && comp.ratio != null) {
+      note = `${comp.ratio.toFixed(2)}× across ${comp.quarters_used} quarters`;
+    } else if (key === 'dist_stability') {
+      note = `${comp.cuts || 0} cut(s)${comp.raises_into_decline ? `, ${comp.raises_into_decline} raise(s) into a falling NAV` : ''}`;
+    }
+    return `<tr>
+      <td class="left">${label}</td>
+      <td>${score != null ? score.toFixed(0) : '<span style="color:var(--text-muted)">n/a</span>'}</td>
+      <td style="color:var(--text-2)">${w != null ? w.toFixed(0) + '%' : '—'}</td>
+      <td class="left" style="color:var(--text-2);font-size:12px">${note}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <h4 style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px">
+      How the grade was built
+    </h4>
+    <div class="modal-scroll-x"><table style="width:100%">
+      <thead><tr>
+        <th class="left" style="position:static">Component</th>
+        <th style="position:static">Score</th>
+        <th style="position:static" title="Weight actually applied — components with no data reweight the rest">Weight</th>
+        <th class="left" style="position:static">Detail</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function auditFlags(flags) {
+  if (!flags?.length) return '';
+  const icon = { error: '✕', warn: '!', info: 'i' };
+  const color = { error: 'var(--red)', warn: 'var(--yellow)', info: 'var(--text-muted)' };
+  return `
+    <h4 style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px">
+      Data checks
+    </h4>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${flags.map(f => `
+        <div style="display:flex;gap:8px;font-size:12px;line-height:1.45">
+          <span style="color:${color[f.severity] || 'var(--text-muted)'};font-weight:700;flex-shrink:0">${icon[f.severity] || '·'}</span>
+          <span style="color:var(--text-2)">${f.message}</span>
+        </div>`).join('')}
+    </div>
+    <div class="settings-hint" style="margin-top:8px">
+      Data discrepancies never change the grade — a stale or missing figure is a tooling
+      problem, not a fund problem. They lower confidence instead.
+    </div>`;
+}
+
+function auditRubricNote(a) {
+  const s = a.settings || {};
+  const w = s['audit.weights'] || {};
+  const parts = Object.entries(w).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}%`).join(' · ');
+  return `
+    <details class="settings-advanced" style="margin-top:14px">
+      <summary>Rubric this grade was computed under</summary>
+      <div class="settings-hint" style="margin:0">
+        ${parts}<br>
+        Cash benchmark ${s['audit.cash_benchmark_pct']}% ·
+        Bands A≥${s['audit.grade_bands']?.A} B≥${s['audit.grade_bands']?.B} C≥${s['audit.grade_bands']?.C} D≥${s['audit.grade_bands']?.D}
+        ${a.rubric_changed ? '<br><span class="grade-tip-warn">Current settings differ from these — re-run to compare like with like.</span>' : ''}
+      </div>
+    </details>`;
+}
+
+async function showAuditHistory(ticker) {
+  try {
+    const rows = await GET(`/api/audit/${ticker}/history`);
+    const body = rows.map(r => `
+      <tr>
+        <td class="left">${(r.run_at || '').replace('T', ' ').slice(0, 16)}</td>
+        <td><span class="grade-badge ${gradeClassFor(r.grade)}" style="cursor:default;margin:0">${r.grade || '?'}</span></td>
+        <td>${r.score != null ? r.score.toFixed(1) : '—'}</td>
+        <td class="left" style="font-size:12px;color:var(--text-2)">${r.verdict || ''}</td>
+      </tr>`).join('');
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" onclick="closeModal()">
+        <div class="modal modal-wide" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <h2>${ticker} — Audit history</h2>
+            <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+          </div>
+          <div class="modal-body">
+            <table style="width:100%">
+              <thead><tr>
+                <th class="left" style="position:static">Run</th>
+                <th style="position:static">Grade</th>
+                <th style="position:static">Score</th>
+                <th class="left" style="position:static">Verdict</th>
+              </tr></thead>
+              <tbody>${body || '<tr><td colspan="4">No history.</td></tr>'}</tbody>
+            </table>
+          </div>
+          <div class="settings-actions" style="padding:12px 16px">
+            <button class="btn btn-ghost btn-sm" onclick="openAuditModal('${ticker}')">← Back to audit</button>
+          </div>
+        </div>
+      </div>`;
+  } catch (e) { toast('Could not load history: ' + e.message); }
+}
+
+// ════════════════════════════════════════════════════════════════
+// SETTINGS PANEL (behind the Sage logo)
+// ════════════════════════════════════════════════════════════════
+
+let _settingsDraft = null;
+
+function openSettings(ev) {
+  document.getElementById('settings-panel')?.remove();
+  _settingsDraft = JSON.parse(JSON.stringify(_settings));
+
+  const panel = document.createElement('div');
+  panel.className = 'settings-panel';
+  panel.id = 'settings-panel';
+  panel.onclick = e => e.stopPropagation();
+  panel.innerHTML = settingsPanelHtml();
+  document.body.appendChild(panel);
+
+  // Anchor under the logo rather than centring — the logo is the affordance.
+  const logo = document.querySelector('.nav-logo');
+  const r = logo ? logo.getBoundingClientRect() : null;
+  if (r) {
+    panel.style.left = Math.max(8, r.left) + 'px';
+    panel.style.top = (r.bottom + 10) + 'px';
+  } else {
+    positionNear(panel, ev);
+  }
+  setTimeout(() => document.addEventListener('click', closeSettingsOnOutside), 0);
+}
+
+function closeSettingsOnOutside(e) {
+  if (!document.getElementById('settings-panel')?.contains(e.target)) closeSettings();
+}
+
+function closeSettings() {
+  document.getElementById('settings-panel')?.remove();
+  document.removeEventListener('click', closeSettingsOnOutside);
+  _settingsDraft = null;
+}
+
+function draft(key, fallback) {
+  const v = _settingsDraft?.[key];
+  return v === undefined || v === null ? fallback : v;
+}
+
+function settingsPanelHtml() {
+  const w = draft('audit.weights', {});
+  const cw = draft('audit.coverage_windows', {});
+  const bands = draft('audit.grade_bands', {});
+  const caps = draft('audit.hard_caps', {});
+  const bw = draft('audit.bdc_weights', {});
+
+  const numRow = (label, path, value, step = 1, hint = '') => `
+    <div class="settings-row">
+      <label title="${hint}">${label}</label>
+      <input type="number" step="${step}" value="${value ?? ''}"
+             oninput="setDraft('${path}', this.value)">
+    </div>`;
+
+  const wTotal = Object.values(w).reduce((s, v) => s + (+v || 0), 0);
+  const cwTotal = Object.values(cw).reduce((s, v) => s + (+v || 0), 0);
+  const bwTotal = Object.values(bw).reduce((s, v) => s + (+v || 0), 0);
+  const totalNote = (t) => `<div class="settings-total ${Math.abs(t - 100) < 0.01 ? 'ok' : 'bad'}">Total ${t}%${Math.abs(t - 100) < 0.01 ? '' : ' — must be 100%'}</div>`;
+
+  return `
+    <div class="settings-section">
+      <h4>Audit rubric — CEF</h4>
+      <div class="settings-hint">How much each component moves the letter grade.</div>
+      ${numRow('Distribution coverage', 'audit.weights.coverage', w.coverage, 1, 'Earned vs distributed — the core question')}
+      ${numRow('NAV trend', 'audit.weights.nav_trend', w.nav_trend)}
+      ${numRow('Payout vs earning power', 'audit.weights.payout_power', w.payout_power)}
+      ${numRow('Your realized return', 'audit.weights.your_return', w.your_return)}
+      ${totalNote(wTotal)}
+    </div>
+
+    <div class="settings-section">
+      <h4>Coverage window blend</h4>
+      <div class="settings-hint">
+        Weighting inside the coverage component. Long-run is the median of rolling
+        3-year windows, so no single start date can decide the grade.
+      </div>
+      ${numRow('Trailing 1 year', 'audit.coverage_windows.y1', cw.y1)}
+      ${numRow('Trailing 3 years', 'audit.coverage_windows.y3', cw.y3)}
+      ${numRow('Long-run (rolling)', 'audit.coverage_windows.longrun', cw.longrun)}
+      ${totalNote(cwTotal)}
+    </div>
+
+    <div class="settings-section">
+      <h4>Benchmarks</h4>
+      ${numRow('Cash benchmark %', 'audit.cash_benchmark_pct', draft('audit.cash_benchmark_pct'), 0.25, 'Your realized return is scored against this')}
+      ${numRow('Stale after (days)', 'audit.stale_days', draft('audit.stale_days'), 1)}
+      ${numRow('Discount alert (pp)', 'display.disc_alert_threshold', draft('display.disc_alert_threshold'), 0.5, 'Flag when discount is this many points wider than its average')}
+    </div>
+
+    <div class="settings-section">
+      <h4>Display</h4>
+      <div class="settings-row">
+        <label>Group tables by type</label>
+        <input type="checkbox" ${draft('display.group_by_type', true) ? 'checked' : ''}
+               oninput="setDraft('display.group_by_type', this.checked)">
+      </div>
+    </div>
+
+    <details class="settings-advanced">
+      <summary>Advanced — grade bands, hard caps, BDC rubric</summary>
+      <div class="settings-section">
+        <h4>Grade bands</h4>
+        <div class="settings-hint">Minimum score for each letter.</div>
+        ${numRow('A', 'audit.grade_bands.A', bands.A)}
+        ${numRow('B', 'audit.grade_bands.B', bands.B)}
+        ${numRow('C', 'audit.grade_bands.C', bands.C)}
+        ${numRow('D', 'audit.grade_bands.D', bands.D)}
+      </div>
+      <div class="settings-section">
+        <h4>Hard caps</h4>
+        <div class="settings-hint">
+          Ceilings that fire regardless of blended score, so a strong recent run
+          can't mask chronic distribution destruction.
+        </div>
+        <div class="settings-row">
+          <label>Caps enabled</label>
+          <input type="checkbox" ${caps.enabled ? 'checked' : ''}
+                 oninput="setDraft('audit.hard_caps.enabled', this.checked)">
+        </div>
+        ${numRow('Coverage floor (×)', 'audit.hard_caps.coverage_floor_ratio', caps.coverage_floor_ratio, 0.05, 'Cap if coverage is under this on both 1Y and 3Y')}
+        ${numRow('NAV CAGR floor (%)', 'audit.hard_caps.nav_cagr_floor', caps.nav_cagr_floor, 0.5)}
+        ${numRow('Payout ceiling (×)', 'audit.hard_caps.payout_power_ceiling', caps.payout_power_ceiling, 0.1)}
+      </div>
+      <div class="settings-section">
+        <h4>Audit rubric — BDC</h4>
+        <div class="settings-hint">Graded on filed NII coverage rather than inferred NAV total return.</div>
+        ${numRow('NII coverage', 'audit.bdc_weights.nii_coverage', bw.nii_coverage)}
+        ${numRow('NAV/share trend', 'audit.bdc_weights.nav_trend', bw.nav_trend)}
+        ${numRow('Dividend stability', 'audit.bdc_weights.dist_stability', bw.dist_stability)}
+        ${numRow('Your realized return', 'audit.bdc_weights.your_return', bw.your_return)}
+        ${totalNote(bwTotal)}
+      </div>
+    </details>
+
+    <div class="settings-hint">
+      Retuning marks every stored audit stale — a grade computed under different
+      rules isn't comparable to a current one. Each audit records the rubric it ran under.
+    </div>
+    <div class="settings-actions">
+      <button class="btn btn-ghost btn-sm" onclick="resetSettings()">Reset defaults</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save</button>
+    </div>`;
+}
+
+/** Nested paths ("audit.weights.coverage") write into the draft object. */
+function setDraft(path, raw) {
+  const parts = path.split('.');
+  // Setting keys themselves contain a dot ("audit.weights"), so the key is the
+  // first two segments and anything after that is a field inside its object.
+  const key = parts.slice(0, 2).join('.');
+  const field = parts.slice(2).join('.');
+  const value = typeof raw === 'boolean' ? raw : (raw === '' ? null : +raw);
+  if (!field) {
+    _settingsDraft[key] = value;
+  } else {
+    _settingsDraft[key] = { ...(_settingsDraft[key] || {}), [field]: value };
+  }
+  // Re-render only the running totals so focus stays in the input being typed.
+  const panel = document.getElementById('settings-panel');
+  if (!panel) return;
+  const totals = panel.querySelectorAll('.settings-total');
+  const sums = [
+    Object.values(_settingsDraft['audit.weights'] || {}).reduce((s, v) => s + (+v || 0), 0),
+    Object.values(_settingsDraft['audit.coverage_windows'] || {}).reduce((s, v) => s + (+v || 0), 0),
+    Object.values(_settingsDraft['audit.bdc_weights'] || {}).reduce((s, v) => s + (+v || 0), 0),
+  ];
+  totals.forEach((el, i) => {
+    const ok = Math.abs(sums[i] - 100) < 0.01;
+    el.className = 'settings-total ' + (ok ? 'ok' : 'bad');
+    el.textContent = `Total ${sums[i]}%` + (ok ? '' : ' — must be 100%');
+  });
+}
+
+async function saveSettings() {
+  try {
+    const resp = await PUT('/api/settings', { settings: _settingsDraft });
+    _settings = resp.settings;
+    closeSettings();
+    if (resp.rubric_changed) {
+      _audits = await GET('/api/audit').catch(() => _audits);
+      toast('Settings saved — stored audits marked stale');
+    } else {
+      toast('Settings saved');
+    }
+    renderApp();
+  } catch (e) {
+    toast('Could not save: ' + e.message);
+  }
+}
+
+async function resetSettings() {
+  try {
+    const resp = await POST('/api/settings/reset', {});
+    _settings = resp.settings;
+    _audits = await GET('/api/audit').catch(() => _audits);
+    closeSettings();
+    toast('Settings reset to defaults');
+    renderApp();
+  } catch (e) {
+    toast('Could not reset: ' + e.message);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// BDC quarterly fundamentals entry
+// ════════════════════════════════════════════════════════════════
+
+async function openBdcEntry(ticker) {
+  let rows = [];
+  try { rows = await GET('/api/audit/bdc/' + ticker); } catch (e) {}
+  const existing = rows.map(q => `
+    <tr>
+      <td class="left">${q.quarter_end}</td>
+      <td>${q.nii_per_share ?? '—'}</td>
+      <td>${q.dividend_per_share ?? '—'}</td>
+      <td>${q.nav_per_share ?? '—'}</td>
+      <td>${q.non_accrual_pct ?? '—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="deleteBdcQuarter('${ticker}','${q.quarter_end}')">✕</button></td>
+    </tr>`).join('');
+
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="closeModal()">
+      <div class="modal modal-med" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <div>
+            <h2>${ticker} — Quarterly figures</h2>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+              From the latest 10-Q. See the BDC audit runbook for where each number lives.
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="settings-row"><label>Quarter end (YYYY-MM-DD)</label>
+            <input type="text" id="bdc-q" placeholder="2026-06-30" style="width:120px"></div>
+          <div class="settings-row"><label>Net investment income / share</label>
+            <input type="number" step="0.001" id="bdc-nii"></div>
+          <div class="settings-row"><label>Dividend declared / share</label>
+            <input type="number" step="0.001" id="bdc-div"></div>
+          <div class="settings-row"><label>NAV / share</label>
+            <input type="number" step="0.01" id="bdc-nav"></div>
+          <div class="settings-row"><label>Non-accruals (% of fair value)</label>
+            <input type="number" step="0.1" id="bdc-na"></div>
+          <div class="settings-hint">
+            NII covering the dividend at 1.0× or better means the payout is earned.
+            Below that, the shortfall is coming from somewhere else.
+          </div>
+          ${rows.length ? `
+            <h4 style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin:14px 0 8px">Entered</h4>
+            <table style="width:100%">
+              <thead><tr>
+                <th class="left" style="position:static">Quarter</th>
+                <th style="position:static">NII</th><th style="position:static">Div</th>
+                <th style="position:static">NAV</th><th style="position:static">Non-acc</th>
+                <th style="position:static"></th>
+              </tr></thead>
+              <tbody>${existing}</tbody>
+            </table>` : ''}
+        </div>
+        <div class="settings-actions" style="padding:12px 16px">
+          <button class="btn btn-primary btn-sm" onclick="saveBdcQuarter('${ticker}')">Save quarter</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function saveBdcQuarter(ticker) {
+  const val = id => {
+    const el = document.getElementById(id);
+    return el && el.value !== '' ? (id === 'bdc-q' ? el.value.trim() : +el.value) : null;
+  };
+  const quarter_end = val('bdc-q');
+  if (!quarter_end) return toast('Quarter end date is required');
+  try {
+    await PUT('/api/audit/bdc/' + ticker, {
+      quarter_end,
+      nii_per_share: val('bdc-nii'),
+      dividend_per_share: val('bdc-div'),
+      nav_per_share: val('bdc-nav'),
+      non_accrual_pct: val('bdc-na'),
+    });
+    toast('Quarter saved');
+    openBdcEntry(ticker);
+  } catch (e) { toast('Save failed: ' + e.message); }
+}
+
+async function deleteBdcQuarter(ticker, quarterEnd) {
+  try {
+    await DELETE(`/api/audit/bdc/${ticker}/${quarterEnd}`);
+    openBdcEntry(ticker);
+  } catch (e) { toast('Delete failed: ' + e.message); }
+}

@@ -19,8 +19,11 @@
 - `cef/static/` — frontend (HTML/JS/CSS), dark theme
 - `cef/static/styles.css` — dark theme + white nav override; uses `.global-tab-nav` / `.global-tab-link`
 - `cef/api/app.py` — FastAPI app factory
-- `cef/api/routes/` — funds, prices, holdings, distributions, screener, nav_history, imports
+- `cef/api/routes/` — funds, prices, holdings, distributions, screener, nav_history, imports, settings, audit
+- `cef/services/audit.py` — position audit engine (grading, coverage windows, discrepancy checks)
+- `cef/settings.py` — user-tunable settings; code defaults, DB rows override
 - `cef/database.py` — SQLite schema + migrations
+- `docs/bdc-audit-runbook.md` — quarterly BDC procedure (also published as a shareable page)
 - `cef.db` — production database (never commit, never modify directly during dev)
 - `cef_demo.db` — simulation/demo copy (safe to use for testing)
 - `simulate.py` — 3-year portfolio simulation
@@ -33,6 +36,43 @@
 - `distributions` table — dividend/distribution records
 - `nav_history` table — exists but empty (NAV sparklines is a planned feature)
 - `screener_cache` table — pre-computed screener data
+- `settings` table — key/JSON overrides; a missing row means "use the code default"
+- `audits` table — one row per audit run, history kept; `settings_json` snapshots the
+  rubric each grade was computed under, so old grades stay interpretable after retuning
+- `bdc_fundamentals` table — manually entered BDC quarterly figures (NII/NAV/dividend)
+
+## Position Audit
+Answers one question per holding: is the yield paying for itself, or is the payout
+coming out of principal? Badge sits in the sticky ticker cell — click to run, hover
+for a summary, click again for the full breakdown.
+
+- **CEFs** grade on earned yield (NAV total return) vs distributed yield, blended
+  across trailing 1Y/3Y plus a long-run figure. That long-run figure is the **median
+  of rolling 3-year windows**, not a single inception-to-today measurement — one
+  start date landing on a market peak would otherwise decide the grade (BSTZ anchors
+  on 2021-08-20, the tech top).
+- **BDCs** grade on filed NII coverage instead. Not available from any free API, so
+  it comes from manual quarterly entry. See the runbook.
+- Blended scores map to A–F via `audit.grade_bands`, with hard caps that fire
+  regardless of score. A fund with too little data is graded `None`, never `F` —
+  "couldn't measure" must not read as "bad".
+- Data discrepancies are reported but never move the grade; they lower confidence.
+- Settings live behind the Sage logo. Changing the rubric marks every stored audit
+  stale rather than silently mixing incomparable grades.
+
+### Gotchas found while building this
+- CEFConnect row ordering is **not consistent across windows**: `/5D` returns
+  newest-first, `/1Y` and `/5Y` return oldest-first. Always sort by date.
+- `/5D` returns zero rows for funds that report NAV weekly (SPE). The fetch falls
+  back `5D → 1Y → 5Y`; without it those funds look like they don't exist.
+- The 5Y series is sparse for some tickers (XFLT: 15 rows vs 95 for 1Y), so the
+  audit merges windows rather than trusting the widest one.
+- Yahoo's dividend feed has real gaps (DMA is missing Jul 2023–Nov 2024 and
+  Sep 2025–Jan 2026). Broker records in `distributions` fill them. Coverage *ratios*
+  are unaffected either way — a missing payment shifts earned and distributed equally.
+- `holdings.acquired_date` is often null and falls back to the first *recorded*
+  distribution, which post-dates the actual purchase. Never annualize a hold shorter
+  than 6 months off that guess.
 
 ## Portfolio Context
 - 9-fund CEF portfolio, ~$18k invested, 10.2% yield, ~$153/mo distributions

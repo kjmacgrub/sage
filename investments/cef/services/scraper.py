@@ -230,46 +230,82 @@ def fetch_fund_data(ticker: str) -> dict:
     return data
 
 
+def cefconnect_history(ticker: str, window: str = "5Y") -> list[dict]:
+    """Price/NAV history for a window, always sorted oldest-first.
+
+    The API's own ordering is NOT consistent across windows — /5D comes back
+    newest-first while /1Y and /5Y come back oldest-first — so never rely on
+    row position. Always sort by DataDate.
+    """
+    try:
+        r = httpx.get(
+            f"https://www.cefconnect.com/api/v3/pricinghistory/{ticker}/{window}",
+            headers=HEADERS, timeout=10,
+        )
+        if r.status_code != 200:
+            return []
+        rows = r.json().get("Data", {}).get("PriceHistory", [])
+    except Exception:
+        return []
+
+    out = []
+    for row in rows or []:
+        row_date = (row.get("DataDate") or "").split("T")[0]
+        if not row_date:
+            continue
+        row_price, row_nav, row_disc = row.get("Data"), row.get("NAVData"), row.get("DiscountData")
+        if row_disc is None and row_price and row_nav:
+            row_disc = (row_price / row_nav - 1) * 100
+        out.append({
+            "ticker": ticker,
+            "date": row_date,
+            "price": round(row_price, 4) if row_price else None,
+            "nav": round(row_nav, 4) if row_nav else None,
+            "premium_discount": round(row_disc, 2) if row_disc is not None else None,
+        })
+    out.sort(key=lambda r: r["date"])
+    return out
+
+
 def _fetch_cefconnect(ticker: str) -> dict:
-    # Step 1: get latest price, NAV, discount from the JSON API
+    # Step 1: latest price, NAV, discount from the JSON API.
+    # Fall back to wider windows before giving up: funds that report NAV weekly
+    # rather than daily (SPE, for one) return zero rows for a 5-day window, which
+    # would otherwise look identical to "this ticker doesn't exist".
     price = nav = premium_discount = None
     price_history = []
-    try:
-        api_url = f"https://www.cefconnect.com/api/v3/pricinghistory/{ticker}/5D"
-        r = httpx.get(api_url, headers=HEADERS, timeout=10)
-        if r.status_code == 200:
-            rows = r.json().get("Data", {}).get("PriceHistory", [])
-            if rows:
-                latest = rows[0]  # most recent first
-                price = latest.get("Data")
-                nav = latest.get("NAVData")
-                disc = latest.get("DiscountData")
-                data_date = (latest.get("DataDate") or "").split("T")[0] or date.today().isoformat()
-                if disc is not None:
-                    premium_discount = round(disc, 2)
-                elif price and nav:
-                    premium_discount = round((price / nav - 1) * 100, 2)
-                # Collect prior days for gap-filling
-                for row in rows[1:]:
-                    row_date = (row.get("DataDate") or "").split("T")[0]
-                    row_price = row.get("Data")
-                    row_nav = row.get("NAVData")
-                    row_disc = row.get("DiscountData")
-                    if row_date and row_price:
-                        if row_disc is None and row_price and row_nav:
-                            row_disc = round((row_price / row_nav - 1) * 100, 2)
-                        price_history.append({
-                            "ticker": ticker,
-                            "date": row_date,
-                            "price": round(row_price, 4),
-                            "nav": round(row_nav, 4) if row_nav else None,
-                            "premium_discount": round(row_disc, 2) if row_disc is not None else None,
-                        })
-    except Exception:
-        pass
+    rows = []
+    for window in ("5D", "1Y", "5Y"):
+        rows = cefconnect_history(ticker, window)
+        if any(r.get("nav") for r in rows):
+            break
+    if rows:
+        latest = rows[-1]  # sorted oldest-first
+        price = latest.get("price")
+        nav = latest.get("nav")
+        premium_discount = latest.get("premium_discount")
+        data_date = latest.get("date") or date.today().isoformat()
+        # Keep recent prior days for gap-filling; a 5Y fallback series would
+        # otherwise dump years of weekly rows into the daily prices table.
+        price_history = [r for r in rows[:-1] if r.get("price")][-10:]
 
     if price is None:
         return _empty(ticker)
+
+    # Step 1a: weekly-NAV funds carry a stale CEFConnect price, which throws the
+    # discount off. Take the live price from Yahoo and recompute against the
+    # latest NAV so the discount reflects today rather than last Friday.
+    try:
+        stale_days = (date.today() - datetime.fromisoformat(data_date).date()).days
+        if stale_days > 2:
+            live = _yahoo_quote(ticker)
+            if live:
+                price = live
+                data_date = date.today().isoformat()
+                if nav:
+                    premium_discount = round((price / nav - 1) * 100, 2)
+    except Exception:
+        pass
 
     # Step 1b: fetch 1Y history for average discount and 5Y for NAV CAGR
     avg_discount_1y = None
@@ -349,6 +385,20 @@ def _fetch_cefconnect(ticker: str) -> dict:
         **yield_metrics,
         "history": price_history,
     }
+
+
+def _yahoo_quote(ticker: str) -> float | None:
+    """Just the live last price — used to refresh a stale CEFConnect quote."""
+    try:
+        r = httpx.get(
+            f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range=1d&interval=1d",
+            headers=HEADERS, timeout=10,
+        )
+        if r.status_code != 200:
+            return None
+        return r.json()["chart"]["result"][0]["meta"].get("regularMarketPrice")
+    except Exception:
+        return None
 
 
 def _fetch_yahoo(ticker: str) -> dict:

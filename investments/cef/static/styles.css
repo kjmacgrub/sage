@@ -184,6 +184,14 @@ thead th {
   background: var(--surface2);
 }
 
+.col-num {
+  width: 36px;
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
 .col-sticky {
   position: sticky;
   left: 0;
@@ -586,3 +594,220 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 [data-theme="light"] .col-sticky,
 [data-theme="light"] .col-sticky-2,
 [data-theme="light"] .col-sticky-3 { background: var(--bg); }
+
+/* ══════════════════════════════════════════════════════════════
+   Position audit — grade badge, hover card, group headers
+   ══════════════════════════════════════════════════════════════ */
+
+.grade-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  vertical-align: middle;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.08s ease, filter 0.08s ease;
+}
+.grade-badge:hover { transform: scale(1.12); filter: brightness(1.15); }
+
+.grade-a { background: var(--green-dim); color: var(--green); border-color: var(--green); }
+.grade-b { background: rgba(46,204,113,0.10); color: var(--green); border-color: rgba(46,204,113,0.45); }
+.grade-c { background: rgba(240,192,64,0.12); color: var(--yellow); border-color: rgba(240,192,64,0.5); }
+.grade-d { background: rgba(231,76,60,0.10); color: #e8a33d; border-color: rgba(231,76,60,0.45); }
+.grade-f { background: var(--red-dim); color: var(--red); border-color: var(--red); }
+
+/* Never audited — an affordance, not a result */
+.grade-none {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  font-weight: 500;
+}
+.grade-none:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Audited but not gradeable — insufficient data, distinct from a bad grade */
+.grade-unknown {
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--text-muted);
+}
+
+/* Stale: aged out, or the rubric changed since it ran */
+.grade-badge.stale { opacity: 0.5; }
+.grade-badge.stale::after {
+  content: '';
+  width: 4px; height: 4px;
+  margin-left: 3px;
+  border-radius: 50%;
+  background: var(--yellow);
+}
+
+/* Low confidence — hollow rather than solid */
+.grade-badge.low-conf { background: transparent; }
+
+.grade-badge.running {
+  border: 1px solid var(--border);
+  color: var(--accent);
+  cursor: wait;
+}
+.grade-spin {
+  display: inline-block;
+  width: 9px; height: 9px;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: grade-spin 0.7s linear infinite;
+}
+@keyframes grade-spin { to { transform: rotate(360deg); } }
+
+/* ── Hover card ── */
+.grade-tip {
+  position: fixed;
+  z-index: 400;
+  max-width: 330px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text);
+  pointer-events: none;
+}
+.grade-tip-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+.grade-tip-verdict { color: var(--text-2); margin-bottom: 7px; }
+.grade-tip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.grade-tip-row span:first-child { color: var(--text-muted); }
+.grade-tip-foot {
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.grade-tip-warn { color: var(--yellow); }
+
+/* ── Group header rows ── */
+tr.group-header td {
+  background: var(--surface2);
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  left: 0;
+}
+tr.group-header:hover td { background: var(--surface2); }
+.group-meta {
+  margin-left: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+/* ── Coverage cell ── */
+.cov-ratio { font-variant-numeric: tabular-nums; font-weight: 600; }
+.cov-good { color: var(--green); }
+.cov-mid  { color: var(--yellow); }
+.cov-bad  { color: var(--red); }
+
+/* ══════════════════════════════════════════════════════════════
+   Settings panel (behind the Sage logo)
+   ══════════════════════════════════════════════════════════════ */
+
+.nav-logo { cursor: pointer; }
+.nav-logo:hover { filter: brightness(1.25); }
+
+.settings-panel {
+  position: fixed;
+  z-index: 300;
+  width: 380px;
+  max-height: 78vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  padding: 14px 16px;
+}
+.settings-section { margin-bottom: 18px; }
+.settings-section h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 9px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+  font-size: 12.5px;
+}
+.settings-row label { color: var(--text-2); flex: 1; }
+.settings-row input[type=number] { width: 68px; text-align: right; }
+.settings-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: -2px 0 8px;
+  line-height: 1.4;
+}
+.settings-total { font-size: 11px; margin-top: 2px; }
+.settings-total.bad { color: var(--red); }
+.settings-total.ok { color: var(--text-muted); }
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.settings-advanced summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  user-select: none;
+}
+.settings-advanced summary:hover { color: var(--accent); }
+
+[data-theme="light"] .grade-tip,
+[data-theme="light"] .settings-panel { box-shadow: 0 8px 28px rgba(0,0,0,0.16); }
+[data-theme="light"] tr.group-header td { background: #eef0f4; }
+
+/* .modal sets a fixed width:420px, which an inline max-width cannot widen.
+   Audit content needs more room, so widen explicitly. */
+.modal.modal-wide { width: 720px; }
+.modal.modal-med  { width: 560px; }
+.modal-body table { width: 100%; }
+/* Wide tables scroll inside their own container rather than clipping. */
+.modal-scroll-x { overflow-x: auto; margin-bottom: 6px; }

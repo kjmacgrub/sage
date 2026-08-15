@@ -136,6 +136,49 @@ def init_db():
                 nav         REAL NOT NULL,
                 UNIQUE(ticker, date)
             );
+
+            -- User-tunable settings. A missing row means "use the code default"
+            -- (see settings.py:DEFAULTS), so resetting is just a DELETE.
+            CREATE TABLE IF NOT EXISTS settings (
+                key         TEXT PRIMARY KEY,
+                value       TEXT NOT NULL,          -- JSON
+                updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            -- One row per audit run; history is kept so grade drift is visible.
+            -- settings_json snapshots the rubric the grade was computed under,
+            -- so an old grade stays interpretable after the rubric is retuned.
+            CREATE TABLE IF NOT EXISTS audits (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker        TEXT NOT NULL,
+                run_at        TEXT NOT NULL DEFAULT (datetime('now')),
+                kind          TEXT NOT NULL DEFAULT 'cef',   -- cef | bdc
+                grade         TEXT,                          -- A+ .. F
+                score         REAL,
+                confidence    TEXT,                          -- high | medium | low
+                verdict       TEXT,                          -- one-line summary
+                detail_json   TEXT,                          -- windows, components, inputs
+                flags_json    TEXT,                          -- discrepancies + caveats
+                settings_json TEXT                           -- rubric snapshot
+            );
+            CREATE INDEX IF NOT EXISTS idx_audits_ticker_run
+                ON audits(ticker, run_at DESC);
+
+            -- Manually entered BDC quarterly fundamentals. BDCs publish NII
+            -- coverage directly, which is a cleaner signal than CEF NAV total
+            -- return, but it lives in 10-Q filings rather than any free API.
+            CREATE TABLE IF NOT EXISTS bdc_fundamentals (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker             TEXT NOT NULL,
+                quarter_end        TEXT NOT NULL,
+                nii_per_share      REAL,
+                nav_per_share      REAL,
+                dividend_per_share REAL,
+                non_accrual_pct    REAL,     -- at fair value
+                notes              TEXT,
+                added_at           TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(ticker, quarter_end)
+            );
         """)
 
 

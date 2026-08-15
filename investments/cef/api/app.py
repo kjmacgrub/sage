@@ -6,7 +6,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from ..database import init_db
-from .routes import funds, prices, holdings, distributions, screener, nav_history, imports
+from .routes import (funds, prices, holdings, distributions, screener,
+                     nav_history, imports, settings, audit)
 
 load_dotenv()
 
@@ -34,6 +35,8 @@ def create_app() -> FastAPI:
     app.include_router(screener.router, prefix="/api/screener")
     app.include_router(nav_history.router, prefix="/api/nav_history")
     app.include_router(imports.router, prefix="/api/imports")
+    app.include_router(settings.router, prefix="/api/settings")
+    app.include_router(audit.router, prefix="/api/audit")
 
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
