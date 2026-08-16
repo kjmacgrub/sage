@@ -10,7 +10,9 @@ let _distributions = [];
 let _screenData = [];
 let _screenState = { running: false, done: 0, total: 0, errors: [] };
 let _screenFilters = { minYield: null, maxPremium: null, monthlyOnly: false, minHistory: null, minNavChange: null, hideWatchlist: false };
-let _importParsed = null;
+let _importCsv = null;   // raw Schwab CSV awaiting confirm
+let _importPlan = null;
+let _importResult = null;  // survives the re-render after a confirmed import
 let _showInactive = false;
 let _inactiveFunds = null;  // null = not yet loaded
 let _screenPollTimer = null;
@@ -585,32 +587,26 @@ async function reactivateFund(ticker) {
 }
 
 // === IMPORT TAB ===
-const DIVIDEND_ACTIONS = new Set([
-  'Cash Dividend', 'Non-Qualified Div', 'Qualified Dividend',
-  'Pr Yr Cash Div', 'Special Dividend', 'Long Term Cap Gain', 'Pr Yr Div Reinvest',
-]);
-const TRADE_ACTIONS = new Set(['Buy', 'Sell', 'Reinvest Shares']);
-
-function parseSchwabDate(s) {
-  const m = s.match(/as of (\d{2}\/\d{2}\/\d{4})/);
-  const d = m ? m[1] : s.trim();
-  const [mo, dy, yr] = d.split('/');
-  return `${yr}-${mo}-${dy}`;
-}
-
-function parseSchwabAmt(s) {
-  return parseFloat((s || '').replace(/[$,]/g, '')) || 0;
-}
+// The CSV is parsed and applied server-side (cef/services/schwab_import.py) so
+// this upload and the command-line importer share one implementation. Parsing
+// it here as well is how the two drifted apart in the first place.
 
 function renderImport() {
   return `
-    <div style="max-width:600px;margin:0 auto;display:flex;flex-direction:column;gap:24px">
+    <div style="max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:24px">
       <div>
         <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em">Import Schwab Transactions</div>
-        <p style="font-size:13px;color:var(--text-2);margin:0 0 12px">
-          In Schwab: go to <strong>Accounts → History → Export</strong>, select <strong>All</strong> date range, download the CSV, then select it below.
+        <p style="font-size:13px;color:var(--text-2);margin:0 0 12px;line-height:1.55">
+          In Schwab: <strong>Accounts → History → Export</strong>, choose the <strong>All</strong>
+          date range, download the CSV, then select it below. Re-importing the same file is safe —
+          distributions are rebuilt from the export rather than added to.
         </p>
         <input type="file" accept=".csv" onchange="onSchwabUpload(this)" style="color:var(--text-2)">
+        <div id="import-status" style="font-size:13px;color:var(--text-2);margin-top:8px"></div>
+        ${_importResult ? `<div style="margin-top:12px;padding:10px 12px;border-left:3px solid var(--green);
+          background:rgba(46,204,113,0.08);border-radius:var(--radius-sm);font-size:13px;line-height:1.5">
+          <strong style="color:var(--green)">Import complete.</strong> ${_importResult}
+        </div>` : ''}
       </div>
       <div id="import-preview" style="display:none">
         <div id="import-preview-content"></div>
@@ -625,135 +621,109 @@ function renderImport() {
 async function onSchwabUpload(input) {
   const file = input.files[0];
   if (!file) return;
-  const text = await file.text();
-  const lines = text.split(/\r?\n/);
-
-  // Find header row — Schwab wraps fields in quotes: "Date","Action","Symbol",...
-  let headerIdx = lines.findIndex(l => /^"?Date"?,/.test(l) && l.includes('Action') && l.includes('Symbol'));
-  if (headerIdx < 0) { toast('Could not find header row in CSV'); return; }
-
-  const distributions = [];
-  const trades = [];
-
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    // Simple CSV split respecting quoted fields
-    const cols = parseCsvLine(line);
-    if (cols.length < 8) continue;
-
-    const [dateRaw, action, symbol, , quantityRaw, priceRaw, feesRaw, amountRaw] = cols;
-
-    // Skip options (symbol contains a space)
-    if (!symbol || symbol.includes(' ')) continue;
-    const ticker = symbol.trim().toUpperCase();
-    if (!/^[A-Z]{1,6}$/.test(ticker)) continue;
-
-    const date = parseSchwabDate(dateRaw);
-    const amount = parseSchwabAmt(amountRaw);
-
-    if (DIVIDEND_ACTIONS.has(action)) {
-      distributions.push({ ticker, date, amount });
-    } else if (TRADE_ACTIONS.has(action)) {
-      trades.push({
-        ticker,
-        date,
-        action,
-        shares: parseFloat(quantityRaw) || null,
-        price: parseSchwabAmt(priceRaw) || null,
-        fees: parseSchwabAmt(feesRaw) || null,
-        amount,
-      });
-    }
-  }
-
-  _importParsed = { distributions, trades };
-
-  // Show preview panel
-  const previewEl = document.getElementById('import-preview');
-  if (previewEl) previewEl.style.display = '';
+  _importResult = null;
+  const status = document.getElementById('import-status');
+  if (status) status.textContent = 'Reading ' + file.name + '…';
+  _importCsv = await file.text();
 
   try {
-    const summary = await POST('/api/imports/preview', _importParsed);
-    const d = summary.distributions;
-    const t = summary.trades;
-    const dr = summary.date_range;
-    const newTickers = summary.new_tickers || [];
-    const previewContent = document.getElementById('import-preview-content');
-    if (previewContent) {
-      previewContent.innerHTML = `
-        <table style="width:100%;font-size:13px;border-collapse:collapse">
-          <thead>
-            <tr>
-              <th class="left" style="position:static;padding:6px 10px;border-bottom:1px solid var(--border)">Category</th>
-              <th style="position:static;padding:6px 10px;border-bottom:1px solid var(--border)">Total</th>
-              <th style="position:static;padding:6px 10px;border-bottom:1px solid var(--border)">In Portfolio</th>
-              <th style="position:static;padding:6px 10px;border-bottom:1px solid var(--border)">Watchlist</th>
-              <th style="position:static;padding:6px 10px;border-bottom:1px solid var(--border)" title="New tickers added as inactive">New (inactive)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="left" style="padding:6px 10px">Distributions</td>
-              <td style="padding:6px 10px">${d.total}</td>
-              <td style="padding:6px 10px;color:var(--green)">${d.in_portfolio}</td>
-              <td style="padding:6px 10px;color:var(--text-2)">${d.in_watchlist}</td>
-              <td style="padding:6px 10px;color:var(--accent)">${d.new_inactive}</td>
-            </tr>
-            <tr>
-              <td class="left" style="padding:6px 10px">Trades</td>
-              <td style="padding:6px 10px">${t.total}</td>
-              <td style="padding:6px 10px">—</td>
-              <td style="padding:6px 10px">—</td>
-              <td style="padding:6px 10px">—</td>
-            </tr>
-          </tbody>
-        </table>
-        ${newTickers.length ? `<div style="font-size:12px;color:var(--accent);margin-top:8px">New tickers: ${newTickers.join(', ')}</div>` : ''}
-        ${dr.min ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">Date range: ${dr.min} → ${dr.max}</div>` : ''}`;
+    const plan = await POST('/api/imports/preview', { csv: _importCsv });
+    renderImportPlan(plan);
+    if (status) {
+      status.innerHTML = `Read <strong>${file.name}</strong> — ${plan.tickers} tickers, `
+        + `${plan.date_range.min || ''} to ${plan.date_range.max || ''}`;
     }
-    const btn = document.getElementById('import-confirm-btn');
-    if (btn) btn.disabled = false;
-  } catch(e) {
-    toast('Preview failed: ' + e.message);
+  } catch (e) {
+    if (status) status.innerHTML = `<span style="color:var(--red)">${e.message}</span>`;
+    document.getElementById('import-preview').style.display = 'none';
   }
 }
 
+function renderImportPlan(plan) {
+  _importPlan = plan;
+  document.getElementById('import-preview').style.display = '';
+  const btn = document.getElementById('import-confirm-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Confirm Import'; }
+
+  const section = (title, body) => body
+    ? `<h4 style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin:16px 0 8px">${title}</h4>${body}`
+    : '';
+
+  const acquired = plan.acquired.length ? `<table style="width:100%;font-size:13px">
+      <thead><tr><th class="left" style="position:static">Ticker</th>
+        <th class="left" style="position:static">Current</th>
+        <th class="left" style="position:static">From export</th></tr></thead>
+      <tbody>${plan.acquired.map(a => `<tr>
+        <td class="left">${a.ticker}</td>
+        <td class="left" style="color:var(--text-muted)">${a.from || '—'}</td>
+        <td class="left positive">${a.to}</td></tr>`).join('')}</tbody></table>` : '';
+
+  const shares = plan.shares.length ? `<table style="width:100%;font-size:13px">
+      <thead><tr><th class="left" style="position:static">Ticker</th>
+        <th style="position:static">Stored</th><th style="position:static">Export</th>
+        <th style="position:static">Change</th></tr></thead>
+      <tbody>${plan.shares.map(s => `<tr>
+        <td class="left">${s.ticker}</td><td>${s.from}</td><td>${s.to}</td>
+        <td class="${s.to >= s.from ? 'positive' : 'negative'}">${(s.to - s.from) >= 0 ? '+' : ''}${(s.to - s.from).toFixed(0)}</td>
+        </tr>`).join('')}</tbody></table>` : '';
+
+  const divs = plan.divs.length ? (() => {
+    const shown = plan.divs.slice().sort((a, b) => Math.abs(b.to - b.from) - Math.abs(a.to - a.from));
+    const net = plan.divs.reduce((s, d) => s + (d.to - d.from), 0);
+    return `<table style="width:100%;font-size:13px">
+      <thead><tr><th class="left" style="position:static">Ticker</th>
+        <th style="position:static">Stored</th><th style="position:static">Export</th>
+        <th style="position:static">Change</th></tr></thead>
+      <tbody>${shown.slice(0, 8).map(d => `<tr>
+        <td class="left">${d.ticker}</td><td>${fmt$(d.from)}</td><td>${fmt$(d.to)}</td>
+        <td class="${d.to >= d.from ? 'positive' : 'negative'}">${fmtGain$(d.to - d.from)}</td>
+        </tr>`).join('')}
+        ${shown.length > 8 ? `<tr><td class="left" colspan="3" style="color:var(--text-muted)">+ ${shown.length - 8} more</td><td></td></tr>` : ''}
+        <tr><td class="left" style="font-weight:600">Net</td><td></td><td></td>
+          <td class="${net >= 0 ? 'positive' : 'negative'}" style="font-weight:600">${fmtGain$(net)}</td></tr>
+      </tbody></table>`;
+  })() : '';
+
+  document.getElementById('import-preview-content').innerHTML = `
+    <div style="display:flex;gap:20px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:13px">
+      <div><div style="font-size:11px;color:var(--text-muted)">Trades</div><div>${plan.trades}</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted)">Distribution rows</div><div>${plan.distributions}</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted)">Tickers</div><div>${plan.tickers}</div></div>
+      ${plan.merged_dates ? `<div title="Several payments on one date are summed into a single row — a regular dividend alongside a special or a year-end capital gain"><div style="font-size:11px;color:var(--text-muted)">Same-date merges</div><div>${plan.merged_dates}</div></div>` : ''}
+    </div>
+    ${section('Acquired dates', acquired)}
+    ${section('Share counts', shares)}
+    ${section('Distributions received', divs)}
+    ${plan.new_tickers.length ? section('Not imported — untracked tickers',
+      `<div style="font-size:13px;color:var(--text-2);line-height:1.5">
+        ${plan.new_tickers.join(', ')}
+        <div style="color:var(--text-muted);margin-top:6px">Everything traded in the account
+        appears in the export, so these are left alone rather than filed as funds. Add any you
+        want tracked via <strong>+ Add Fund</strong>, then re-import to pick up their history.</div>
+      </div>`) : ''}`;
+}
+
 async function confirmImport() {
-  if (!_importParsed) return;
+  if (!_importCsv) return;
   const btn = document.getElementById('import-confirm-btn');
   const resultEl = document.getElementById('import-result');
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Importing…'; }
   try {
-    const res = await POST('/api/imports/confirm', _importParsed);
-    if (resultEl) resultEl.innerHTML = `<span style="color:var(--green)">✓ Saved ${res.distributions_saved} distributions, ${res.trades_saved} trades</span>`;
+    const res = await POST('/api/imports/confirm', { csv: _importCsv });
+    // renderApp() rebuilds this tab, so the outcome has to live in state
+    // rather than in an element that is about to be replaced.
+    _importResult = `${res.distributions} distribution rows written, ${res.trades} new trades, `
+      + `${res.holdings} positions updated`
+      + (res.skipped_tickers ? `, ${res.skipped_tickers} untracked tickers skipped.` : '.');
+    _importCsv = null;
+    _importPlan = null;
     await loadAll();
     renderApp();
-    toast(`Import complete: ${res.distributions_saved} distributions, ${res.trades_saved} trades`);
-  } catch(e) {
+    toast(`Import complete — ${res.holdings} positions updated`);
+  } catch (e) {
     if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
     if (btn) { btn.disabled = false; btn.textContent = 'Confirm Import'; }
   }
-}
-
-function parseCsvLine(line) {
-  const cols = [];
-  let cur = '';
-  let inQuote = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      inQuote = !inQuote;
-    } else if (ch === ',' && !inQuote) {
-      cols.push(cur.trim());
-      cur = '';
-    } else {
-      cur += ch;
-    }
-  }
-  cols.push(cur.trim());
-  return cols;
 }
 
 // === ADD FUND TAB ===
