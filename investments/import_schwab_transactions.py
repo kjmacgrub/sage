@@ -210,14 +210,25 @@ def main():
         # period the position was a different size.
         con.execute("DELETE FROM distributions WHERE ticker=?", (t,))
         income = [e for e in events if e["action"] in INCOME and e["amount"]]
+
+        # distributions is UNIQUE(ticker, ex_date), so several payments landing
+        # on one date must be summed into a single row rather than inserted
+        # separately — otherwise each overwrites the last and the money vanishes.
+        # This is common: a regular dividend alongside a special or a year-end
+        # capital gain. DMA paid three on 2024-12-31; BBDC does it routinely.
+        merged = collections.OrderedDict()
         for e in income:
-            n = shares_at(timeline, e["date"]) or computed_shares
+            merged.setdefault(e["date"], []).append(e["amount"])
+
+        for when, amounts in merged.items():
+            total = sum(amounts)
+            n = shares_at(timeline, when) or computed_shares
             con.execute(
                 """INSERT OR REPLACE INTO distributions
                    (ticker, ex_date, amount, shares, total, source)
                    VALUES (?,?,?,?,?, 'schwab')""",
-                (t, e["date"].isoformat(),
-                 round(e["amount"] / n, 6) if n else 0, n, round(e["amount"], 2)))
+                (t, when.isoformat(),
+                 round(total / n, 6) if n else 0, n, round(total, 2)))
 
         total = round(sum(e["amount"] for e in income), 2)
         con.execute(

@@ -1075,14 +1075,27 @@ async function openDivModal(ticker) {
       else trendBadge = `<span style="color:var(--text-2)">≈ Stable</span>`;
     }
     const totalIncome = rows.reduce((s, d) => s + d.total, 0);
+    // The header shows holdings.dividends_received and this tile sums the rows
+    // below. They describe the same money, so a gap means the two are out of
+    // sync — say which is which rather than printing two silent totals.
+    const recorded = holding.dividends_received;
+    const drift = recorded != null ? recorded - totalIncome : 0;
+    const mismatch = Math.abs(drift) > 0.01;
 
     body.innerHTML = `
       <div style="display:flex;gap:16px;margin-bottom:12px;padding:8px;background:var(--surface2);border-radius:var(--radius-sm)">
         <div><div style="font-size:11px;color:var(--text-muted)">Latest</div><div>${fmt$(latest)}/sh</div></div>
         <div><div style="font-size:11px;color:var(--text-muted)">6-Period Avg</div><div>${prev6avg > 0 ? fmt$(prev6avg) + '/sh' : '—'}</div></div>
         <div><div style="font-size:11px;color:var(--text-muted)">Trend</div><div>${trendBadge || '—'}</div></div>
-        <div><div style="font-size:11px;color:var(--text-muted)">Total Received</div><div class="positive">${fmt$(totalIncome)}</div></div>
+        <div><div style="font-size:11px;color:var(--text-muted)">${mismatch ? 'Sum of rows below' : 'Total Received'}</div><div class="positive">${fmt$(totalIncome)}</div></div>
       </div>
+      ${mismatch ? `<div style="margin-bottom:12px;padding:9px 11px;border-left:3px solid var(--yellow);
+        background:rgba(240,192,64,0.08);border-radius:var(--radius-sm);font-size:12px;line-height:1.5">
+        The ${fmt$(recorded)} above is the recorded total for this position; the rows below
+        sum to ${fmt$(totalIncome)}, a difference of ${fmtGain$(drift)}.
+        ${drift > 0 ? 'Some payments are missing from the list — most often several landing on one date, since only one row per date can be stored.'
+                    : 'The list holds more than the recorded total; re-run the transaction import to resync.'}
+      </div>` : ''}
       <table style="width:100%">
         <thead>
           <tr>
