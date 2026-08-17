@@ -90,14 +90,21 @@ def parse_csv(text):
 
 
 def share_timeline(events):
-    """[(date, shares_after)], the date the current lot opened, final count.
+    """[(date, shares_after)], date the current lot opened, final count, partial?
 
     Only a genuine sale down to zero restarts the clock, so the acquired date
     reflects the lot actually held rather than one exited years ago.
+
+    "partial" means the count went negative, which can only happen when the
+    export starts mid-position: shares were sold that were bought before the
+    export's first row. The reconstruction is then meaningless for this ticker
+    (a short-window export would turn EXG's 300 shares into -200), so callers
+    must not write share counts or acquired dates from it.
     """
     shares = 0.0
     opened = None
     timeline = []
+    partial = False
     for e in events:
         neutral = e["action"] in REORG_NEUTRAL
         if e["action"] in RESET:
@@ -111,8 +118,13 @@ def share_timeline(events):
             shares -= abs(e["qty"])
             if shares <= 1e-6:
                 opened = None
+        # Check the running total after any action, not just sales: a
+        # reorganization leg carries its own negative quantity and takes the
+        # ACQUIRE branch, so BSTZ's -46 would otherwise slip past unnoticed.
+        if shares < -1e-6:
+            partial = True
         timeline.append((e["date"], shares))
-    return timeline, opened, shares
+    return timeline, opened, shares, partial
 
 
 def shares_at(timeline, when):
@@ -151,7 +163,7 @@ def build_plan(conn, events):
     known = {r["ticker"] for r in conn.execute("SELECT ticker FROM funds")}
 
     plan = {"acquired": [], "shares": [], "divs": [], "new_tickers": [],
-            "trades": 0, "distributions": 0, "merged_dates": 0,
+            "partial": [], "trades": 0, "distributions": 0, "merged_dates": 0,
             "tickers": len(by_ticker), "date_range": {}}
 
     dates = [e["date"] for e in events]
@@ -163,7 +175,9 @@ def build_plan(conn, events):
         if t not in known:
             plan["new_tickers"].append(t)
             continue
-        timeline, opened, final = share_timeline(evs)
+        timeline, opened, final, partial = share_timeline(evs)
+        if partial:
+            plan["partial"].append(t)
         income = merge_income(evs)
 
         # Mirror what apply_import will do: rows on the export's own dates get
@@ -188,7 +202,7 @@ def build_plan(conn, events):
         plan["merged_dates"] += sum(1 for _, _, n in income if n > 1)
 
         cur = held.get(t)
-        if cur and cur["shares"] > 0:
+        if cur and cur["shares"] > 0 and not partial:
             if opened and cur["acquired_date"] != opened.isoformat():
                 plan["acquired"].append({"ticker": t, "from": cur["acquired_date"],
                                          "to": opened.isoformat()})
@@ -216,7 +230,8 @@ def apply_import(conn, events):
     known = {r["ticker"] for r in conn.execute("SELECT ticker FROM funds")}
     held_shares = {r["ticker"]: r["shares"] for r in conn.execute(
         "SELECT ticker, shares FROM holdings")}
-    counts = {"trades": 0, "distributions": 0, "holdings": 0, "skipped_tickers": 0}
+    counts = {"trades": 0, "distributions": 0, "holdings": 0,
+              "skipped_tickers": 0, "partial_tickers": 0}
 
     for t, evs in by_ticker.items():
         # Only touch tickers already tracked. A brokerage export contains
@@ -231,7 +246,7 @@ def apply_import(conn, events):
             "INSERT OR IGNORE INTO holdings (ticker, shares, cost_basis, dividends_received) "
             "VALUES (?, 0, 0, 0)", (t,))
 
-        timeline, opened, final = share_timeline(evs)
+        timeline, opened, final, partial = share_timeline(evs)
 
         for e in evs:
             if e["action"] in TRADE_ACTIONS:
@@ -267,9 +282,9 @@ def apply_import(conn, events):
         divs_total = round(conn.execute(
             "SELECT COALESCE(SUM(total),0) FROM distributions WHERE ticker=?",
             (t,)).fetchone()[0], 2)
-        # Only touch shares and the acquired date for positions still open;
-        # a ticker that appears solely as history keeps its zeroed holding row.
-        if held_shares.get(t, 0) > 0 or final > 0:
+        # Only touch shares and the acquired date for positions still open, and
+        # never from a partial reconstruction — see share_timeline.
+        if not partial and (held_shares.get(t, 0) > 0 or final > 0):
             conn.execute(
                 """UPDATE holdings SET shares=?, dividends_received=?,
                        acquired_date=COALESCE(?, acquired_date),
@@ -280,6 +295,8 @@ def apply_import(conn, events):
                  opened.isoformat() if opened else None,
                  opened.isoformat() if opened else None, t))
         else:
+            if partial:
+                counts["partial_tickers"] += 1
             conn.execute(
                 "UPDATE holdings SET dividends_received=?, updated_at=datetime('now') "
                 "WHERE ticker=?", (divs_total, t))

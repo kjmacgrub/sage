@@ -691,6 +691,13 @@ function renderImportPlan(plan) {
       <div><div style="font-size:11px;color:var(--text-muted)">Tickers</div><div>${plan.tickers}</div></div>
       ${plan.merged_dates ? `<div title="Several payments on one date are summed into a single row — a regular dividend alongside a special or a year-end capital gain"><div style="font-size:11px;color:var(--text-muted)">Same-date merges</div><div>${plan.merged_dates}</div></div>` : ''}
     </div>
+    ${plan.partial.length ? `<div style="margin-top:14px;padding:10px 12px;border-left:3px solid var(--yellow);
+      background:rgba(240,192,64,0.08);border-radius:var(--radius-sm);font-size:12.5px;line-height:1.5">
+      <strong>Partial export detected</strong> for ${plan.partial.join(', ')}. These were sold during the
+      export window but bought before it starts, so share counts can't be rebuilt from this file.
+      Distributions and trades will still import; share counts and acquired dates are left untouched.
+      Export with the <strong>All</strong> date range to update those.
+    </div>` : ''}
     ${section('Acquired dates', acquired)}
     ${section('Share counts', shares)}
     ${section('Distributions received', divs)}

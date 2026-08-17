@@ -54,6 +54,12 @@ def main():
                   f"  ({d['payments']} payments)")
         print(f"  {'TOTAL':6s} {o:9.2f} -> {n:9.2f}  {n-o:+9.2f}")
 
+    if plan["partial"]:
+        print(f"\nPARTIAL EXPORT — {len(plan['partial'])} ticker(s) sold in the window but bought")
+        print("  before it starts. Share counts and acquired dates left untouched for these;")
+        print("  use the All date range to update them.")
+        print(f"  {' '.join(plan['partial'])}")
+
     if plan["new_tickers"]:
         print(f"\nNOT IMPORTED — {len(plan['new_tickers'])} untracked tickers in the export.")
         print("  Add any that are funds you want tracked via + Add Fund, then re-import.")
