@@ -13,6 +13,8 @@ let _screenFilters = { minYield: null, maxPremium: null, monthlyOnly: false, min
 let _importCsv = null;   // raw Schwab CSV awaiting confirm
 let _importPlan = null;
 let _importResult = null;  // survives the re-render after a confirmed import
+let _summaryView = 'current';   // 'current' | 'lifetime'
+let _lifetime = null;           // GET /api/holdings/lifetime
 let _showInactive = false;
 let _inactiveFunds = null;  // null = not yet loaded
 let _screenPollTimer = null;
@@ -246,7 +248,10 @@ function renderPortfolio() {
   const sorted = sortData(posWithDelta, _sortCol || 'ticker', _sortCol ? _sortAsc : true);
 
   return `
-    <div class="summary-bar">
+    ${_summaryView === 'lifetime'
+      ? lifetimeSummaryBar()
+      : `<div class="summary-bar">
+      ${summaryToggle()}
       <div class="summary-item" title="Cost basis: ${fmt$(totalCost)}" style="cursor:help">
         <div class="summary-label">Market Value <span style="font-size:10px;opacity:0.5">ⓘ</span></div>
         <div class="summary-value">${fmt$(totalMkt)}</div>
@@ -263,7 +268,7 @@ function renderPortfolio() {
         <div class="summary-label">Yield on Cost <span style="font-size:10px;opacity:0.5">TTM</span></div>
         <div class="summary-value positive">${yieldOnCost != null ? yieldOnCost.toFixed(2) + '%' : '—'}</div>
       </div>
-    </div>
+    </div>`}
 
     <div class="table-wrap">
       <table>
@@ -411,6 +416,64 @@ function coverageCell(h) {
     ? 'The payout is fully earned.'
     : `About ${Math.round((1 - r) * 100)}% of the payout is coming out of principal.`;
   return `<td class="cov-ratio ${cls}" title="${src} ${verdict}">${r.toFixed(2)}×</td>`;
+}
+
+/** Current vs Lifetime. Both states swap the same four tiles rather than adding
+ *  a row, so there is never a mix of current and all-time figures on screen. */
+function summaryToggle() {
+  const btn = (v, label, tip) =>
+    `<button class="summary-toggle-btn${_summaryView === v ? ' active' : ''}"
+       onclick="setSummaryView('${v}')" title="${tip}">${label}</button>`;
+  return `<div class="summary-toggle">
+    ${btn('current', 'Current', 'Positions you hold right now')}
+    ${btn('lifetime', 'Lifetime', 'Every CEF and BDC ever held, including closed positions')}
+  </div>`;
+}
+
+async function setSummaryView(v) {
+  _summaryView = v;
+  if (v === 'lifetime' && !_lifetime) {
+    try { _lifetime = await GET('/api/holdings/lifetime'); }
+    catch (e) { toast('Could not load lifetime figures: ' + e.message); _summaryView = 'current'; }
+  }
+  renderApp();
+}
+
+function lifetimeSummaryBar() {
+  const L = _lifetime;
+  if (!L) return `<div class="summary-bar">${summaryToggle()}
+    <div class="summary-item"><div class="summary-label">Loading…</div></div></div>`;
+
+  const note = L.incomplete.length
+    ? `${L.incomplete.join(', ')} were bought before your earliest Schwab export, so their `
+      + `realized gain can't be reconstructed. Their distributions are counted; the gain is not, `
+      + `so this figure is understated by whatever those made or lost.`
+    : '';
+
+  return `<div class="summary-bar">
+      ${summaryToggle()}
+      <div class="summary-item" title="Proceeds minus cost on ${L.closed_positions} closed positions">
+        <div class="summary-label">Realized <span style="font-size:10px;opacity:0.5">ⓘ</span></div>
+        <div class="summary-value ${L.realized >= 0 ? 'positive' : 'negative'}">${fmtGain$(L.realized)}</div>
+      </div>
+      <div class="summary-item" title="Every distribution ever received, held and sold positions alike">
+        <div class="summary-label">Distributions <span style="font-size:10px;opacity:0.5">ⓘ</span></div>
+        <div class="summary-value positive">${fmt$(L.dividends)}</div>
+      </div>
+      <div class="summary-item" title="Open gain on the ${L.held_positions} positions held now">
+        <div class="summary-label">Unrealized <span style="font-size:10px;opacity:0.5">ⓘ</span></div>
+        <div class="summary-value ${L.unrealized >= 0 ? 'positive' : 'negative'}">${fmtGain$(L.unrealized)}</div>
+      </div>
+      <div class="summary-item" title="Realized + distributions + unrealized, CEF and BDC only">
+        <div class="summary-label">Lifetime <span style="font-size:10px;opacity:0.5">CEF/BDC</span></div>
+        <div class="summary-value ${L.lifetime >= 0 ? 'positive' : 'negative'}">${fmtGain$(L.lifetime)}</div>
+      </div>
+    </div>
+    <div class="lifetime-note">
+      ${L.closed_positions} closed + ${L.held_positions} current positions.
+      ETF, stock and options activity is excluded.
+      ${note ? `<br><span class="grade-tip-warn">${note}</span>` : ''}
+    </div>`;
 }
 
 // === WATCHLIST TAB ===

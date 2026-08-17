@@ -832,3 +832,36 @@ tr.group-header:hover td { background: var(--surface2); }
 [data-theme="light"] .grade-d { color: #9c4a15; background: rgba(231,76,60,0.13); border-color: rgba(156,74,21,0.45); }
 [data-theme="light"] .grade-f { color: #b3271a; border-color: rgba(179,39,26,0.60); }
 [data-theme="light"] .grade-unknown { color: var(--text-2); border-color: var(--text-2); }
+
+/* ── Current / Lifetime summary toggle ── */
+/* Sits inside .summary-bar (a flex row) and is pushed right so it never
+   competes with the figures for the leading position. */
+.summary-toggle {
+  order: 99;
+  margin-left: auto;
+  align-self: center;
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.summary-toggle-btn {
+  padding: 4px 11px;
+  font-size: 11.5px;
+  font-family: inherit;
+  color: var(--text-2);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.summary-toggle-btn:hover { color: var(--text); background: var(--surface2); }
+.summary-toggle-btn.active { color: var(--accent); background: var(--surface2); font-weight: 600; }
+.summary-toggle-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.lifetime-note {
+  margin: -8px 0 16px;
+  padding: 0 4px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}

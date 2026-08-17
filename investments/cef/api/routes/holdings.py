@@ -75,6 +75,84 @@ def list_holdings():
         return result
 
 
+# Share-count-changing actions, mirroring services/schwab_import.py.
+_ACQUIRE = {"Buy", "Rights Exercise", "Stock Merger", "Reorg Adj", "Reorganized Issue",
+            "Journaled Shares", "Internal Transfer", "Reinvest Shares", "Pr Yr Div Reinvest"}
+
+
+@router.get("/lifetime")
+def lifetime_summary():
+    """Account-level score across every CEF/BDC ever held, not just current ones.
+
+    Lifetime = realized on closed positions + all distributions + current
+    unrealized. Scoped to CEF and BDC: the account also carries ETF, stock and
+    options activity from other strategies that would swamp the figure.
+
+    A position whose buys predate the earliest transaction export cannot have
+    its realized gain reconstructed. Those are reported separately rather than
+    counted as zero, which would silently understate the result.
+    """
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT h.ticker, h.shares, h.cost_basis, h.dividends_received, p.price
+            FROM holdings h
+            JOIN funds f ON f.ticker = h.ticker
+            LEFT JOIN prices p ON p.ticker = h.ticker
+              AND p.date = (SELECT MAX(date) FROM prices WHERE ticker = h.ticker)
+            WHERE f.type IN ('CEF','BDC')
+        """).fetchall()
+
+        trades = {}
+        for r in conn.execute(
+                "SELECT ticker, action, shares, amount FROM broker_trades ORDER BY date"):
+            trades.setdefault(r["ticker"], []).append(dict(r))
+
+    realized = dividends = unrealized = 0.0
+    closed = held = 0
+    incomplete = []
+
+    for r in rows:
+        legs = trades.get(r["ticker"], [])
+        if not legs and not (r["dividends_received"] or 0):
+            continue
+
+        qty, ok = 0.0, True
+        for leg in legs:
+            s = leg["shares"] or 0
+            if leg["action"] in _ACQUIRE:
+                qty += s
+            elif leg["action"] == "Sell":
+                qty -= abs(s)
+            elif leg["action"] == "Reverse Split":
+                qty = abs(s)
+            if qty < -1e-6:
+                ok = False
+        # Trustworthy only if the reconstruction lands on the shares held today.
+        ok = ok and abs(qty - (r["shares"] or 0)) < 0.01
+
+        dividends += r["dividends_received"] or 0
+
+        if (r["shares"] or 0) > 0:
+            held += 1
+            if r["price"] and r["cost_basis"]:
+                unrealized += r["price"] * r["shares"] - r["cost_basis"]
+        elif ok:
+            closed += 1
+            realized += sum(leg["amount"] or 0 for leg in legs)
+        else:
+            incomplete.append(r["ticker"])
+
+    return {
+        "realized": round(realized, 2),
+        "dividends": round(dividends, 2),
+        "unrealized": round(unrealized, 2),
+        "lifetime": round(realized + dividends + unrealized, 2),
+        "closed_positions": closed,
+        "held_positions": held,
+        "incomplete": sorted(incomplete),
+    }
+
+
 @router.put("/{ticker}")
 def upsert_holding(ticker: str, holding: HoldingIn):
     with get_db() as conn:
