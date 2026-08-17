@@ -137,6 +137,37 @@ def shares_at(timeline, when):
     return n
 
 
+CORPORATE = {"Rights Exercise", "Stock Merger", "Reorg Adj", "Reorganized Issue",
+             "Reverse Split", "Journaled Shares", "Internal Transfer"}
+
+
+def lot_cost(events, opened):
+    """Average cost of the currently-held lot, or None if it can't be trusted.
+
+    Only plain buys and sells are reconstructable. A rights exercise, merger or
+    reorganization carries basis the export doesn't state — TYG arrived by
+    merger with no cash amount at all, so a naive sum would call its $3,096
+    basis zero. Return None in those cases and leave the stored value alone.
+    """
+    if not opened:
+        return None
+    cost = qty = 0.0
+    for e in events:
+        if e["date"] < opened:
+            continue
+        if e["action"] in CORPORATE:
+            return None
+        q, amt = e["qty"] or 0, e["amount"] or 0
+        if e["action"] in ACQUIRE:
+            cost += -amt if amt < 0 else 0
+            qty += q
+        elif e["action"] in DISPOSE and qty > 0:
+            sold = abs(q)
+            cost *= max(0.0, qty - sold) / qty      # average-cost reduction
+            qty -= sold
+    return round(cost, 2) if qty > 0 else None
+
+
 def merge_income(events):
     """Income summed per date.
 
@@ -231,7 +262,7 @@ def apply_import(conn, events):
     held_shares = {r["ticker"]: r["shares"] for r in conn.execute(
         "SELECT ticker, shares FROM holdings")}
     counts = {"trades": 0, "distributions": 0, "holdings": 0,
-              "skipped_tickers": 0, "partial_tickers": 0}
+              "skipped_tickers": 0, "partial_tickers": 0, "cost_filled": 0}
 
     for t, evs in by_ticker.items():
         # Only touch tickers already tracked. A brokerage export contains
@@ -285,13 +316,23 @@ def apply_import(conn, events):
         # Only touch shares and the acquired date for positions still open, and
         # never from a partial reconstruction — see share_timeline.
         if not partial and (held_shares.get(t, 0) > 0 or final > 0):
+            # Fill a missing cost basis, never overwrite one. A stored value may
+            # carry basis from a merger or rights exercise that the export
+            # cannot reconstruct.
+            cost = lot_cost(evs, opened)
+            existing_cost = conn.execute(
+                "SELECT cost_basis FROM holdings WHERE ticker=?", (t,)).fetchone()
+            fill_cost = cost if (cost and not (existing_cost and existing_cost["cost_basis"])) else None
+            if fill_cost:
+                counts["cost_filled"] += 1
             conn.execute(
                 """UPDATE holdings SET shares=?, dividends_received=?,
+                       cost_basis=COALESCE(?, cost_basis),
                        acquired_date=COALESCE(?, acquired_date),
                        div_tracking_since=COALESCE(?, div_tracking_since),
                        updated_at=datetime('now')
                    WHERE ticker=?""",
-                (final, divs_total,
+                (final, divs_total, fill_cost,
                  opened.isoformat() if opened else None,
                  opened.isoformat() if opened else None, t))
         else:

@@ -155,10 +155,16 @@ function renderPortfolio() {
       </div>`;
   }
 
-  // Summary bar
+  // Summary bar. Every figure here describes the *current* portfolio, so the
+  // distribution rows must be filtered to held tickers too — otherwise income
+  // from long-sold positions is measured against today's cost basis, which is
+  // how Yield on Cost reached 24.7%.
+  const heldTickers = new Set(positions.map(h => h.ticker));
+  const heldDists = _distributions.filter(d => heldTickers.has(d.ticker));
+
   const totalCost = positions.reduce((s, h) => s + (h.cost_basis || 0), 0);
   const totalMkt  = positions.reduce((s, h) => s + (h.market_value || 0), 0);
-  const totalDivs = _distributions.reduce((s, d) => s + d.total, 0);
+  const totalDivs = heldDists.reduce((s, d) => s + d.total, 0);
   const totalUnr  = totalMkt - totalCost;
 
   const now = new Date();
@@ -168,14 +174,14 @@ function renderPortfolio() {
 
   // Dividends by year from distributions
   const divsByYear = {};
-  for (const d of _distributions) {
+  for (const d of heldDists) {
     const yr = d.ex_date.substring(0, 4);
     divsByYear[yr] = (divsByYear[yr] || 0) + d.total;
   }
   const ttmCutoff = new Date(now);
   ttmCutoff.setFullYear(ttmCutoff.getFullYear() - 1);
   const ttmCutoffStr = ttmCutoff.toISOString().slice(0, 10);
-  const ttmDivs = _distributions
+  const ttmDivs = heldDists
     .filter(d => d.ex_date > ttmCutoffStr)
     .reduce((s, d) => s + d.total, 0);
   const yieldOnCost = totalCost && ttmDivs ? (ttmDivs / totalCost * 100) : null;
@@ -183,7 +189,7 @@ function renderPortfolio() {
   // Last month's dividends
   const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const lastMonthStr = lastMonthDate.toISOString().slice(0, 7); // "YYYY-MM"
-  const lastMonthDivs = _distributions
+  const lastMonthDivs = heldDists
     .filter(d => d.ex_date.substring(0, 7) === lastMonthStr)
     .reduce((s, d) => s + d.total, 0);
   const lastMonthLabel = lastMonthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
