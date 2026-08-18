@@ -14,6 +14,11 @@ let _importCsv = null;   // raw Schwab CSV awaiting confirm
 let _importPlan = null;
 let _importResult = null;  // survives the re-render after a confirmed import
 let _summaryView = 'current';   // 'current' | 'lifetime'
+let _screenKind = 'cef';        // 'cef' | 'bdc' — different sources entirely
+let _bdcScreen = [];            // GET /api/bdc-screener/funds
+let _bdcState = { running: false, done: 0, total: 0, errors: [] };
+let _bdcPollTimer = null;
+let _bdcShowLow = false;   // include rows too stale or unverifiable to rank
 let _lifetime = null;           // GET /api/holdings/lifetime
 let _showInactive = false;
 let _inactiveFunds = null;  // null = not yet loaded
@@ -1448,7 +1453,151 @@ function clearScreenFilters() {
   renderApp();
 }
 
+/** CEF and BDC screens are separate pipelines, not a filter over one dataset:
+ *  CEFConnect carries no BDC data, and the SEC's XBRL feed carries no CEFs. The
+ *  toggle swaps the source and the columns together. */
+function screenKindToggle() {
+  const btn = (v, label, tip) =>
+    `<button class="summary-toggle-btn${_screenKind === v ? ' active' : ''}"
+       onclick="setScreenKind('${v}')" title="${tip}">${label}</button>`;
+  return `<div class="summary-toggle" style="order:0;margin:0 0 12px">
+    ${btn('cef', 'CEFs', 'Closed-end funds, from CEFConnect')}
+    ${btn('bdc', 'BDCs', 'Business development companies, from SEC XBRL filings')}
+  </div>`;
+}
+
+async function setScreenKind(kind) {
+  _screenKind = kind;
+  _sortCol = null;
+  if (kind === 'bdc' && !_bdcScreen.length) await loadBdcScreen();
+  renderApp();
+}
+
+async function loadBdcScreen() {
+  try {
+    const r = await GET('/api/bdc-screener/funds');
+    _bdcScreen = r.funds || [];
+    _bdcState = r.state || _bdcState;
+  } catch (e) { _bdcScreen = []; }
+}
+
+async function refreshBdcScreen() {
+  try {
+    await POST('/api/bdc-screener/refresh', {});
+    toast('Fetching BDC filings from SEC — a couple of minutes');
+    if (_bdcPollTimer) clearInterval(_bdcPollTimer);
+    _bdcPollTimer = setInterval(async () => {
+      const st = await GET('/api/bdc-screener/status').catch(() => null);
+      if (!st) return;
+      _bdcState = st;
+      if (!st.running) { clearInterval(_bdcPollTimer); _bdcPollTimer = null; await loadBdcScreen(); }
+      renderApp();
+    }, 3000);
+    renderApp();
+  } catch (e) { toast('Could not start: ' + e.message); }
+}
+
+function toggleBdcLow() { _bdcShowLow = !_bdcShowLow; renderApp(); }
+
+function renderBdcScreen() {
+  // Low-confidence rows are excluded by default, not merely marked: they sort
+  // to the very top on coverage (NSLR's 9.8x is from a 2022 filing), so leaving
+  // them in makes the ranking actively misleading.
+  const all = _bdcScreen.filter(f => f.coverage != null);
+  const lowCount = all.filter(f => f.confidence === 'low').length;
+  const rows = _bdcShowLow ? all : all.filter(f => f.confidence !== 'low');
+  const noData = _bdcScreen.length === 0;
+  const sorted = sortData(rows, _sortCol || 'coverage', _sortCol ? _sortAsc : false);
+  const running = _bdcState.running;
+  const pct = _bdcState.total ? Math.round(_bdcState.done / _bdcState.total * 100) : 0;
+
+  const covCell = (c, conf) => {
+    if (c == null) return '<td style="color:var(--text-muted)">—</td>';
+    const cls = c >= 1.05 ? 'cov-good' : c >= 0.95 ? 'cov-mid' : 'cov-bad';
+    const mark = conf === 'low' ? '<span title="Not fit to rank on — stale filing or unverifiable payout" style="color:var(--yellow)"> ?</span>'
+               : conf === 'medium' ? '<span title="Filing is a little old, or the payout came from dividend history rather than the filing" style="color:var(--text-muted)"> ·</span>' : '';
+    return `<td class="cov-ratio ${cls}">${c.toFixed(2)}×${mark}</td>`;
+  };
+
+  return `
+    <div style="padding:0 0 24px">
+      ${screenKindToggle()}
+      ${running ? `<div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">
+          Reading SEC filings… ${_bdcState.done} / ${_bdcState.total}</div>
+        <div style="height:4px;background:var(--surface2);border-radius:2px">
+          <div style="height:4px;background:var(--accent);border-radius:2px;width:${pct}%;transition:width .3s"></div>
+        </div></div>` : ''}
+
+      <div class="toolbar">
+        <span style="color:var(--text-2);font-size:13px">
+          ${noData ? 'No BDC data yet' : `${sorted.length} of ${_bdcScreen.length} BDCs`}
+          ${_bdcScreen.length && _bdcScreen[0].fetched_at
+            ? ` · updated ${_bdcScreen[0].fetched_at.slice(0, 10)}` : ''}</span>
+        ${lowCount ? `<button class="btn btn-ghost btn-sm${_bdcShowLow ? ' active' : ''}"
+          onclick="toggleBdcLow()"
+          title="Filings too old to rank on, or a payout that can't be checked against dividends actually paid">
+          ${_bdcShowLow ? 'Hide' : 'Show'} ${lowCount} unrankable</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="refreshBdcScreen()" ${running ? 'disabled' : ''}>
+          ${running ? 'Refreshing…' : '↻ Refresh from SEC'}</button>
+      </div>
+
+      <div class="settings-hint" style="margin:0 0 12px">
+        Net investment income vs <strong>total</strong> distributions, including supplementals —
+        the figure SEC filings tag. The position audit measures against the regular dividend only,
+        so a company paying large supplementals (MAIN) screens lower here than it grades there.
+        Filings lag the earnings release by a few weeks.
+      </div>
+
+      ${noData ? `<div class="empty-state"><h3>No BDC data yet</h3>
+         <p>Click <strong>Refresh from SEC</strong> to pull the universe from XBRL filings.</p></div>` : `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="col-num">#</th>
+            ${th('ticker','Ticker',true,1)}
+            ${th('name','Name',true,2)}
+            ${th('coverage','Coverage',false,false,'Net investment income ÷ total distributions, trailing 4 quarters. At or above 1.0× the payout is earned.')}
+            ${th('yield_pct','Yield',false,false,'Trailing 12-month distributions ÷ price')}
+            ${th('price','Price')}
+            ${th('nav_per_share','NAV/sh',false,false,'Net asset value per share, as filed')}
+            ${th('price_to_nav','P/NAV',false,false,'Premium or discount to net asset value. Negative = trading below NAV.')}
+            ${th('nav_trend','NAV Trend',false,false,'Annualized change in NAV per share across available quarters')}
+            ${th('nii_ttm','NII TTM')}
+            ${th('dist_ttm','Dist TTM')}
+            ${th('latest_quarter','As Of',true,false,'Period end of the most recent filing this row is built from')}
+          </tr></thead>
+          <tbody>
+            ${sorted.map((f, i) => `
+              <tr>
+                <td class="col-num">${i + 1}</td>
+                <td class="left col-sticky">
+                  <span class="ticker-cell">
+                    ${f.in_portfolio ? '<span title="In portfolio" style="color:var(--green);font-size:8px;margin-right:4px">●</span>'
+                      : f.in_watchlist ? '<span title="On watchlist" style="color:var(--accent);font-size:8px;margin-right:4px">●</span>' : ''}
+                    <a class="ticker-link" href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${f.cik}&type=10-Q"
+                       target="_blank">${f.ticker}</a>${gradeBadge(f.ticker)}
+                  </span>
+                </td>
+                <td class="left col-sticky-2" style="color:var(--text-2)">${(f.name || '').slice(0, 38)}</td>
+                ${covCell(f.coverage, f.confidence)}
+                <td class="positive">${f.yield_pct != null ? f.yield_pct.toFixed(2) + '%' : '—'}</td>
+                <td>${fmt$(f.price)}</td>
+                <td>${fmt$(f.nav_per_share)}</td>
+                <td class="${f.price_to_nav < 0 ? 'disc-deep' : ''}">${f.price_to_nav != null ? f.price_to_nav.toFixed(1) + '%' : '—'}</td>
+                <td class="${gainClass(f.nav_trend)}">${f.nav_trend != null ? fmtPct(f.nav_trend) : '—'}</td>
+                <td>${f.nii_ttm != null ? '$' + f.nii_ttm.toFixed(2) : '—'}</td>
+                <td>${f.dist_ttm != null ? '$' + f.dist_ttm.toFixed(2) : '—'}</td>
+                <td style="color:var(--text-muted)">${f.latest_quarter || '—'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`}
+    </div>`;
+}
+
 function renderScreen() {
+  if (_screenKind === 'bdc') return renderBdcScreen();
   const state = _screenData.length === 0 ? 'empty' : 'loaded';
   const isRunning = _screenPollTimer != null;
 
@@ -1483,6 +1632,7 @@ function renderScreen() {
 
   return `
     <div style="padding:0 0 24px">
+      ${screenKindToggle()}
       ${progressHtml}
 
       <div class="filter-panel">

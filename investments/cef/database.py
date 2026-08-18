@@ -170,6 +170,32 @@ def init_db():
             -- Manually entered BDC quarterly fundamentals. BDCs publish NII
             -- coverage directly, which is a cleaner signal than CEF NAV total
             -- return, but it lives in 10-Q filings rather than any free API.
+            -- Screener rows for the BDC universe, sourced from SEC XBRL rather
+            -- than CEFConnect (which carries no BDC data at all). Coverage here
+            -- is against TOTAL distributions including supplementals, which is
+            -- what XBRL tags -- the audit measures against the regular dividend.
+            CREATE TABLE IF NOT EXISTS bdc_screener_cache (
+                ticker         TEXT PRIMARY KEY,
+                cik            INTEGER,
+                name           TEXT,
+                price          REAL,
+                nav_per_share  REAL,
+                price_to_nav   REAL,     -- (price/nav - 1) * 100, negative = discount
+                div_ttm        REAL,     -- trailing 12m distributions per share
+                yield_pct      REAL,
+                nii_ttm        REAL,
+                dist_ttm       REAL,
+                coverage       REAL,     -- nii_ttm / dist_ttm
+                nav_trend      REAL,     -- %/yr across available quarters
+                quarters       INTEGER,
+                latest_quarter TEXT,
+                dist_source    TEXT,     -- 'yahoo' when the filed tag was unreliable
+                stale_days     INTEGER,
+                confidence     TEXT,     -- high | medium | low; low is hidden by default
+                error          TEXT,
+                fetched_at     TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS bdc_fundamentals (
                 id                 INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker             TEXT NOT NULL,

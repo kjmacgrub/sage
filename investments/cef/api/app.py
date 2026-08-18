@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from ..database import init_db
 from .routes import (funds, prices, holdings, distributions, screener,
-                     nav_history, imports, settings, audit)
+                     nav_history, imports, settings, audit, bdc_screener)
 
 load_dotenv()
 
@@ -37,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(imports.router, prefix="/api/imports")
     app.include_router(settings.router, prefix="/api/settings")
     app.include_router(audit.router, prefix="/api/audit")
+    app.include_router(bdc_screener.router, prefix="/api/bdc-screener")
 
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
