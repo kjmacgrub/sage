@@ -53,9 +53,9 @@ for the flag.
 
 ### The rotation
 
-Four companies, every quarter. Two you own, two you're tracking as candidates —
-both get the same treatment, because a candidate you haven't been following is
-a candidate you can't judge.
+Nine companies, every quarter. Two you own, seven tracked as candidates — both
+get the same treatment, because a candidate you haven't been following is a
+candidate you can't judge.
 
 | Ticker | Company | Why it's in the rotation |
 |---|---|---|
@@ -63,6 +63,26 @@ a candidate you can't judge.
 | **BBDC** | Barings BDC | Held |
 | **MAIN** | Main Street Capital | Candidate |
 | **HTGC** | Hercules Capital | Candidate |
+| **BXSL** | Blackstone Secured Lending | Candidate |
+| **GSBD** | Goldman Sachs BDC | Candidate |
+| **SLRC** | SLR Investment | Candidate |
+| **MSIF** | MSC Income Fund | Candidate |
+| **GLAD** | Gladstone Capital | Candidate |
+
+At roughly fifteen minutes each that's over two hours a quarter. If it starts
+slipping, drop the candidates you're least likely to buy rather than letting
+the whole rotation go stale — a half-updated rotation is worse than a short one.
+
+Company quirks worth knowing before you start:
+
+- **GLAD** has a **September fiscal year end**, so its "third quarter" is the one
+  ending 30 June. Enter the calendar quarter-end date, not the fiscal label.
+- **SLRC** and **GLAD** pay **monthly**. Multiply the monthly rate by three for the
+  quarterly figure; GLAD is $0.15 a month, so $0.45.
+- **BXSL** does not publish a portfolio-level non-accrual percentage anywhere —
+  only per-loan footnotes in the 10-Q. Leave that field blank.
+- **MSIF** publishes its figures in the 10-Q rather than a separate earnings
+  exhibit, so the press-release shortcut doesn't work for it.
 
 Two of these need extra care:
 
