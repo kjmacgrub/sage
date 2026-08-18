@@ -59,17 +59,19 @@ def upsert_quarter(ticker: str, body: dict):
         conn.execute("""
             INSERT INTO bdc_fundamentals
                 (ticker, quarter_end, nii_per_share, nav_per_share,
-                 dividend_per_share, non_accrual_pct, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                 dividend_per_share, special_per_share, non_accrual_pct, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(ticker, quarter_end) DO UPDATE SET
                 nii_per_share=excluded.nii_per_share,
                 nav_per_share=excluded.nav_per_share,
                 dividend_per_share=excluded.dividend_per_share,
+                special_per_share=excluded.special_per_share,
                 non_accrual_pct=excluded.non_accrual_pct,
                 notes=excluded.notes
         """, (ticker.upper(), quarter_end, body.get("nii_per_share"),
               body.get("nav_per_share"), body.get("dividend_per_share"),
-              body.get("non_accrual_pct"), body.get("notes", "")))
+              body.get("special_per_share"), body.get("non_accrual_pct"),
+              body.get("notes", "")))
     return {"ok": True}
 
 

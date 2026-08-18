@@ -40,6 +40,9 @@ def init_db():
             "ALTER TABLE screener_cache ADD COLUMN earned_yield_life REAL",
             "ALTER TABLE screener_cache ADD COLUMN dist_yield_life REAL",
             "ALTER TABLE screener_cache ADD COLUMN yield_life_years REAL",
+            # Specials must be data, not prose: a BDC that quietly stops paying
+            # them cuts your income without touching the regular dividend.
+            "ALTER TABLE bdc_fundamentals ADD COLUMN special_per_share REAL",
         ]:
             try:
                 conn.execute(sql)

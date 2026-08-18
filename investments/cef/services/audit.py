@@ -621,15 +621,29 @@ def _audit_bdc(ticker, conn, s):
     # --- dividend stability ---
     # A cut is a demerit. A raise while NAV/share is falling is a bigger one:
     # that is the BDC form of paying you with your own capital.
-    divs_seq = [q["dividend_per_share"] for q in quarters if q.get("dividend_per_share")]
-    stability_score, cuts, raises_into_decline = None, 0, 0
-    if len(divs_seq) >= 2:
+    #
+    # Judged on TOTAL payout, regular plus special. A company that quietly stops
+    # paying specials has cut your income without touching the headline
+    # dividend — BBDC's total went $0.31 to $0.26, a 16% cut, while the regular
+    # never moved. Scoring the regular alone called that perfectly stable.
+    totals_seq = [(q["dividend_per_share"] or 0) + (q.get("special_per_share") or 0)
+                  for q in quarters if q.get("dividend_per_share") is not None]
+    regular_seq = [q["dividend_per_share"] for q in quarters if q.get("dividend_per_share")]
+    stability_score, cuts, raises_into_decline, specials_stopped = None, 0, 0, 0
+    if len(totals_seq) >= 2:
         stability_score = 100.0
-        for i in range(1, len(divs_seq)):
-            prev, cur = divs_seq[i - 1], divs_seq[i]
+        for i in range(1, len(totals_seq)):
+            prev, cur = totals_seq[i - 1], totals_seq[i]
             if cur < prev * 0.98:
-                cuts += 1
-                stability_score -= 20
+                # A regular-dividend cut is worse than a special lapsing: the
+                # regular is the standing commitment, the special never was.
+                reg_cut = (len(regular_seq) > i and regular_seq[i] < regular_seq[i - 1] * 0.98)
+                if reg_cut:
+                    cuts += 1
+                    stability_score -= 20
+                else:
+                    specials_stopped += 1
+                    stability_score -= 12
             elif cur > prev * 1.02 and nav_cagr is not None and nav_cagr < 0:
                 raises_into_decline += 1
                 stability_score -= 25
@@ -685,6 +699,7 @@ def _audit_bdc(ticker, conn, s):
                                  "quarters_used": len(covers)},
                 "nav_trend": {"score": _r(nav_score), "cagr": _r(nav_cagr)},
                 "dist_stability": {"score": _r(stability_score), "cuts": cuts,
+                                   "specials_stopped": specials_stopped,
                                    "raises_into_decline": raises_into_decline},
                 "your_return": {"score": _r(return_score), "position": position,
                                 "cash_benchmark": cash},

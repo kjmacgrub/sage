@@ -2082,7 +2082,7 @@ function bdcAuditBody(d, c) {
     return `<tr>
       <td class="left">${q.quarter_end}</td>
       <td>${q.nii_per_share != null ? '$' + q.nii_per_share.toFixed(3) : '—'}</td>
-      <td>${q.dividend_per_share != null ? '$' + q.dividend_per_share.toFixed(3) : '—'}</td>
+      <td>${q.dividend_per_share != null ? '$' + q.dividend_per_share.toFixed(3) : '—'}${q.special_per_share ? `<span style="color:var(--text-muted)" title="Special dividend, on top of the regular"> +${q.special_per_share.toFixed(2)}</span>` : ''}</td>
       <td class="${cls}">${cover != null ? cover.toFixed(2) + '×' : '—'}</td>
       <td>${q.nav_per_share != null ? '$' + q.nav_per_share.toFixed(2) : '—'}</td>
       <td>${q.non_accrual_pct != null ? q.non_accrual_pct.toFixed(1) + '%' : '—'}</td>
@@ -2132,7 +2132,10 @@ function auditComponentTable(c, d, isBdc) {
     } else if (key === 'nii_coverage' && comp.ratio != null) {
       note = `${comp.ratio.toFixed(2)}× across ${comp.quarters_used} quarters`;
     } else if (key === 'dist_stability') {
-      note = `${comp.cuts || 0} cut(s)${comp.raises_into_decline ? `, ${comp.raises_into_decline} raise(s) into a falling NAV` : ''}`;
+      const bits = [`${comp.cuts || 0} regular cut(s)`];
+      if (comp.specials_stopped) bits.push(`${comp.specials_stopped} quarter(s) where specials lapsed`);
+      if (comp.raises_into_decline) bits.push(`${comp.raises_into_decline} raise(s) into a falling NAV`);
+      note = bits.join(', ');
     }
     return `<tr>
       <td class="left">${label}</td>
@@ -2474,6 +2477,8 @@ async function openBdcEntry(ticker) {
             <input type="number" step="0.001" id="bdc-nii"></div>
           <div class="settings-row"><label>Dividend declared / share</label>
             <input type="number" step="0.001" id="bdc-div"></div>
+          <div class="settings-row"><label>Special dividend / share <span style="color:var(--text-muted)">(if any)</span></label>
+            <input type="number" step="0.001" id="bdc-special"></div>
           <div class="settings-row"><label>NAV / share</label>
             <input type="number" step="0.01" id="bdc-nav"></div>
           <div class="settings-row"><label>Non-accruals (% of fair value)</label>
@@ -2513,6 +2518,7 @@ async function saveBdcQuarter(ticker) {
       quarter_end,
       nii_per_share: val('bdc-nii'),
       dividend_per_share: val('bdc-div'),
+      special_per_share: val('bdc-special'),
       nav_per_share: val('bdc-nav'),
       non_accrual_pct: val('bdc-na'),
     });

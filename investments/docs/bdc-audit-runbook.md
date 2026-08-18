@@ -100,10 +100,15 @@ rather you ignored.
 
 **This is what they paid you** for that quarter. Use the *regular* dividend.
 
-If there's a *supplemental* or *special* dividend on top, note it in the Notes
-field rather than adding it in. Supplementals are discretionary and are supposed
-to come out of surplus; folding them into the regular figure hides a cut when
-the supplemental later stops.
+If there's a *supplemental* or *special* dividend on top, put it in the separate
+**Special dividend / share** field — not added into the regular figure, and not
+merely described in Notes.
+
+Coverage is measured against the regular dividend, because that's the standing
+commitment. But a company that quietly stops paying specials has cut your income
+without touching the headline dividend, and the grade has to see that. Barings
+did exactly this: total payout went from $0.31 to $0.26, a 16% cut, while the
+regular never moved.
 
 ### 3. Net asset value per share
 
@@ -122,8 +127,12 @@ non-accrual and the BDC stops booking interest from it.
 
 **Use the "at fair value" percentage**, not "at cost." Fair value already reflects
 the writedown, so it's the more current picture. If the release gives only a
-dollar amount, divide by total portfolio fair value. If it doesn't mention
-non-accruals at all, leave the field blank — that's normal for a clean quarter.
+dollar amount, divide by total portfolio fair value.
+
+Some companies don't put this in the earnings release at all — **Barings is one**,
+it appears only in the 10-Q. Leave the field blank in that case rather than
+hunting for it; the grade just weights the other components more heavily. Ares
+does state it, in the portfolio discussion near the end.
 
 ---
 
@@ -137,7 +146,8 @@ non-accruals at all, leave the field blank — that's normal for a clean quarter
    - **Quarter end** — the last day of the quarter, as `YYYY-MM-DD`
      (e.g. `2026-06-30`). Not the filing date.
    - **Net investment income / share**
-   - **Dividend declared / share**
+   - **Dividend declared / share** (regular only)
+   - **Special dividend / share** (blank if none)
    - **NAV / share**
    - **Non-accruals (% of fair value)** — leave blank if not stated
 6. Click **Save quarter**.
@@ -172,9 +182,12 @@ the dividend.
    version of paying you with your own capital, and the app penalizes it harder
    than a cut. A company that raises the payout into a shrinking balance sheet
    is managing the share price, not the business.
-3. **Non-accruals above ~2% of fair value and rising.** Credit is deteriorating.
+3. **Specials that quietly stop.** The regular dividend holds, so nothing looks
+   wrong, but your actual income drops. Recording specials in their own field is
+   what lets the grade catch this.
+4. **Non-accruals above ~2% of fair value and rising.** Credit is deteriorating.
    One-off spikes happen; a rising trend across quarters does not resolve itself.
-4. **NAV per share declining several quarters running** while the dividend holds
+5. **NAV per share declining several quarters running** while the dividend holds
    flat. The dividend is being funded out of the balance sheet.
 
 A dividend **cut** is a demerit in the grade, but it is not automatically a
@@ -250,6 +263,7 @@ Every quarter, per BDC:
   2. Write down:
        NII / share          ← what it earned  (NOT EPS)
        Dividend / share     ← what it paid    (regular only)
+       Special / share      ← blank if none
        NAV / share          ← what it's worth
        Non-accruals %       ← at fair value
   3. Portfolio → click badge → Enter quarter → Save
