@@ -329,6 +329,7 @@ function portfolioBody(sorted, totalMkt) {
           ${type}
           <span class="group-meta">${rows.length} position${rows.length > 1 ? 's' : ''}
             · ${fmt$(value)}${pct != null ? ` · ${pct.toFixed(1)}% of portfolio` : ''}</span>
+          ${type === 'BDC' ? bdcDataStatus(rows.map(h => h.ticker)) : ''}
         </td>
       </tr>`);
     rows.forEach(h => out.push(portfolioRow(h, totalMkt, ++idx)));
@@ -384,6 +385,24 @@ function portfolioRow(h, totalMkt, idx) {
       <td>${fmt$(h.market_value)}</td>
       <td>${h.weight != null ? h.weight.toFixed(1) + '%' : '—'}</td>
     </tr>`;
+}
+
+/** How current the manually-entered BDC data is, for the group header. BDCs are
+ *  the one type whose grade goes stale silently — nothing refetches it — so the
+ *  rotation's status belongs where the group is, not one click deep. */
+function bdcDataStatus(tickers) {
+  const latest = tickers
+    .map(t => (_audits[t]?.detail?.quarters || []).map(q => q.quarter_end).sort().pop())
+    .filter(Boolean);
+  if (!latest.length) return '';
+  const oldest = latest.sort()[0];
+  const missing = tickers.length - latest.length;
+  const days = Math.round((Date.now() - Date.parse(oldest + 'T00:00:00')) / 86400000);
+  const due = days > 135;
+  const q = 'Q' + (Math.floor((+oldest.slice(5, 7) - 1) / 3) + 1) + " '" + oldest.slice(2, 4);
+  return `<span class="group-meta"${due ? ' style="color:var(--yellow)"' : ''}
+    title="Quarterly figures are entered by hand — see the BDC audit runbook">
+    · data through ${q}${due ? ' — update due' : ''}${missing ? ` · ${missing} not yet entered` : ''}</span>`;
 }
 
 /** Coverage ratio from the audit, falling back to the legacy earned/distributed
@@ -545,7 +564,8 @@ function watchlistBody(sorted, held) {
     const rows = groups[type];
     return `
       <tr class="group-header">
-        <td colspan="11">${type}<span class="group-meta">${rows.length} fund${rows.length > 1 ? 's' : ''}</span></td>
+        <td colspan="11">${type}<span class="group-meta">${rows.length} fund${rows.length > 1 ? 's' : ''}</span>${
+          type === 'BDC' ? bdcDataStatus(rows.map(p => p.ticker)) : ''}</td>
       </tr>` + rows.map(p => watchlistRow(p, held.has(p.ticker))).join('');
   }).join('');
 }

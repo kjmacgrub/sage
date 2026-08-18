@@ -51,7 +51,31 @@ for the flag.
 - The company's investor relations page, or [SEC EDGAR](https://www.sec.gov/edgar/searchedgar/companysearch)
 - The Investments app at `http://localhost:8000`
 
-Current BDC positions: **ARCC** (Ares Capital) and **BBDC** (Barings BDC).
+### The rotation
+
+Four companies, every quarter. Two you own, two you're tracking as candidates —
+both get the same treatment, because a candidate you haven't been following is
+a candidate you can't judge.
+
+| Ticker | Company | Why it's in the rotation |
+|---|---|---|
+| **ARCC** | Ares Capital | Held |
+| **BBDC** | Barings BDC | Held |
+| **MAIN** | Main Street Capital | Candidate |
+| **HTGC** | Hercules Capital | Candidate |
+
+Two of these need extra care:
+
+- **MAIN** has paid a $0.30 supplemental for twenty consecutive quarters. Enter it
+  in the Special field. Its net investment income covers the regular dividend
+  comfortably but only about 0.9x of the *total* payout — the rest comes from
+  realized gains on equity stakes. Watch whether that gap widens.
+- **HTGC** pays a $0.40 base plus a $0.07 supplemental, and states the split
+  explicitly in a separate exhibit (99.2) rather than the main release.
+
+**OBDC** (Blue Owl) was graded once and left on the watchlist without being added
+to the rotation. Its data will go stale. Either add it here or remove it from the
+watchlist, rather than leaving a stale grade on screen.
 
 ---
 
@@ -138,11 +162,12 @@ does state it, in the portfolio discussion near the end.
 
 ## Step 3 — Enter them
 
-1. Open `http://localhost:8000` → **Portfolio** tab.
-2. The BDC positions are grouped under a **BDC** heading near the bottom.
-3. Click the small badge to the right of the ticker (a `?` or a letter grade).
-4. In the audit window, click **Enter quarter**.
-5. Fill in:
+1. Open `http://localhost:8000`. Held BDCs (ARCC, BBDC) are on the **Portfolio**
+   tab; candidates (MAIN, HTGC) are on the **Watchlist**. Both tabs group them
+   under a **BDC** heading, which shows how current the data is.
+2. Click the small badge to the right of the ticker (a `?` or a letter grade).
+3. In the audit window, click **Enter quarter**.
+4. Fill in:
    - **Quarter end** — the last day of the quarter, as `YYYY-MM-DD`
      (e.g. `2026-06-30`). Not the filing date.
    - **Net investment income / share**
@@ -150,8 +175,8 @@ does state it, in the portfolio discussion near the end.
    - **Special dividend / share** (blank if none)
    - **NAV / share**
    - **Non-accruals (% of fair value)** — leave blank if not stated
-6. Click **Save quarter**.
-7. Close, then click the badge again and choose **Re-run audit**.
+5. Click **Save quarter**.
+6. Close, then click the badge again and choose **Re-run audit**.
 
 The grade appears on the badge. Hover it for the summary; click for the full
 breakdown.
