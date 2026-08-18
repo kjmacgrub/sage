@@ -53,9 +53,9 @@ for the flag.
 
 ### The rotation
 
-Nine companies, every quarter. Two you own, seven tracked as candidates — both
-get the same treatment, because a candidate you haven't been following is a
-candidate you can't judge.
+Five companies, every quarter — roughly 75 minutes. Two you own, three tracked
+as candidates; both get the same treatment, because a candidate you haven't
+been following is a candidate you can't judge.
 
 | Ticker | Company | Why it's in the rotation |
 |---|---|---|
@@ -63,26 +63,16 @@ candidate you can't judge.
 | **BBDC** | Barings BDC | Held |
 | **MAIN** | Main Street Capital | Candidate |
 | **HTGC** | Hercules Capital | Candidate |
-| **BXSL** | Blackstone Secured Lending | Candidate |
-| **GSBD** | Goldman Sachs BDC | Candidate |
-| **SLRC** | SLR Investment | Candidate |
-| **MSIF** | MSC Income Fund | Candidate |
 | **GLAD** | Gladstone Capital | Candidate |
 
-At roughly fifteen minutes each that's over two hours a quarter. If it starts
-slipping, drop the candidates you're least likely to buy rather than letting
-the whole rotation go stale — a half-updated rotation is worse than a short one.
+If this starts slipping, drop candidates rather than letting the whole rotation
+go stale — a half-updated rotation is worse than a short one.
 
 Company quirks worth knowing before you start:
 
 - **GLAD** has a **September fiscal year end**, so its "third quarter" is the one
-  ending 30 June. Enter the calendar quarter-end date, not the fiscal label.
-- **SLRC** and **GLAD** pay **monthly**. Multiply the monthly rate by three for the
-  quarterly figure; GLAD is $0.15 a month, so $0.45.
-- **BXSL** does not publish a portfolio-level non-accrual percentage anywhere —
-  only per-loan footnotes in the 10-Q. Leave that field blank.
-- **MSIF** publishes its figures in the 10-Q rather than a separate earnings
-  exhibit, so the press-release shortcut doesn't work for it.
+  ending 30 June. Enter the calendar quarter-end date, not the fiscal label. It
+  also pays **monthly** — multiply the $0.15 monthly rate by three for $0.45.
 
 Two of these need extra care:
 
@@ -93,10 +83,20 @@ Two of these need extra care:
 - **HTGC** pays a $0.40 base plus a $0.07 supplemental, and states the split
   explicitly in a separate exhibit (99.2) rather than the main release.
 
-Anything you evaluate but don't add here should be removed from the watchlist
-rather than left behind — an ungraded ticker with stale quarterly data is worse
-than no ticker at all. OBDC (Blue Owl) was assessed in August 2026 and dropped:
-coverage 1.00x, a 16% base-dividend cut, and NAV falling every quarter.
+Anything you evaluate but don't keep should come off the watchlist rather than
+being left behind — an ungraded ticker with stale quarterly data is worse than
+no ticker at all.
+
+Assessed and passed over in August 2026, with their quarters still stored should
+any be reconsidered:
+
+| Ticker | Grade | Why |
+|---|---|---|
+| BXSL | D+ | NII fell every quarter and slipped below the flat $0.77 dividend; NAV $27.15 → $25.53 |
+| GSBD | D+ | Q1 2026 covered only 0.69x; non-accruals 3.2% at fair value |
+| MSIF | C− | Coverage 0.86x; NII fell to $0.26 against a $0.35 regular |
+| SLRC | C+ | Cut its distribution 24% to restore coverage |
+| OBDC | C− | Coverage 1.00x, a 16% base-dividend cut, NAV down every quarter — **deleted**, not just deactivated |
 
 ---
 
