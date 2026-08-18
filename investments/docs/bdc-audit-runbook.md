@@ -73,9 +73,10 @@ Two of these need extra care:
 - **HTGC** pays a $0.40 base plus a $0.07 supplemental, and states the split
   explicitly in a separate exhibit (99.2) rather than the main release.
 
-**OBDC** (Blue Owl) was graded once and left on the watchlist without being added
-to the rotation. Its data will go stale. Either add it here or remove it from the
-watchlist, rather than leaving a stale grade on screen.
+Anything you evaluate but don't add here should be removed from the watchlist
+rather than left behind — an ungraded ticker with stale quarterly data is worse
+than no ticker at all. OBDC (Blue Owl) was assessed in August 2026 and dropped:
+coverage 1.00x, a 16% base-dividend cut, and NAV falling every quarter.
 
 ---
 
