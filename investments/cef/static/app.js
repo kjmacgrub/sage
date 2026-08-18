@@ -464,13 +464,14 @@ function lifetimeSummaryBar() {
         <div class="summary-label">Unrealized <span style="font-size:10px;opacity:0.5">ⓘ</span></div>
         <div class="summary-value ${L.unrealized >= 0 ? 'positive' : 'negative'}">${fmtGain$(L.unrealized)}</div>
       </div>
-      <div class="summary-item" title="Realized + distributions + unrealized, CEF and BDC only">
-        <div class="summary-label">Lifetime <span style="font-size:10px;opacity:0.5">CEF/BDC</span></div>
+      <div class="summary-item" title="Realized + distributions + unrealized, CEF and BDC only${L.earliest ? `, from ${L.earliest} onward — the earliest transaction on record` : ''}">
+        <div class="summary-label">Lifetime <span style="font-size:10px;opacity:0.5">CEF/BDC${
+          L.earliest ? ' · since ' + fmtMonthYear(L.earliest) : ''}</span></div>
         <div class="summary-value ${L.lifetime >= 0 ? 'positive' : 'negative'}">${fmtGain$(L.lifetime)}</div>
       </div>
     </div>
     <div class="lifetime-note">
-      ${L.closed_positions} closed + ${L.held_positions} current positions.
+      ${L.earliest ? `Covers ${L.earliest} to today — the earliest transaction on record. ` : ''}${L.closed_positions} closed + ${L.held_positions} current positions.
       ETF, stock and options activity is excluded.
       ${note ? `<br><span class="grade-tip-warn">${note}</span>` : ''}
     </div>`;
@@ -1917,6 +1918,15 @@ function fmtPayoutRatio(comp) {
   if (r == null) return '—';
   if (power != null && power <= 0.5) return 'pays out, earns ~nothing';
   return (r >= 10 ? '>10' : r.toFixed(1)) + '×';
+}
+
+/** "2021-06-01" -> "Jun 2021". Parsed as parts, not via Date(), so it can't
+ *  shift a day backwards in a timezone west of UTC. */
+function fmtMonthYear(iso) {
+  if (!iso) return '';
+  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [y, m] = iso.split('-');
+  return `${M[(+m || 1) - 1]} ${y}`;
 }
 
 function fmtSigned(v, digits = 1) {

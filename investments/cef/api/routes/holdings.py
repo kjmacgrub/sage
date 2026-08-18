@@ -107,6 +107,18 @@ def lifetime_summary():
                 "SELECT ticker, action, shares, amount FROM broker_trades ORDER BY date"):
             trades.setdefault(r["ticker"], []).append(dict(r))
 
+        # The window the figure actually covers. Anything earlier than this is
+        # simply not in the record, so the label should say where it starts
+        # rather than implying the number reaches back forever.
+        earliest = conn.execute("""
+            SELECT MIN(dt) FROM (
+                SELECT MIN(d.ex_date) dt FROM distributions d
+                  JOIN funds f ON f.ticker = d.ticker WHERE f.type IN ('CEF','BDC')
+                UNION ALL
+                SELECT MIN(b.date) FROM broker_trades b
+                  JOIN funds f ON f.ticker = b.ticker WHERE f.type IN ('CEF','BDC')
+            )""").fetchone()[0]
+
     realized = dividends = unrealized = 0.0
     closed = held = 0
     incomplete = []
@@ -150,6 +162,7 @@ def lifetime_summary():
         "closed_positions": closed,
         "held_positions": held,
         "incomplete": sorted(incomplete),
+        "earliest": earliest,
     }
 
 
