@@ -1566,6 +1566,7 @@ function renderBdcScreen() {
             ${th('nii_ttm','NII TTM')}
             ${th('dist_ttm','Dist TTM')}
             ${th('latest_quarter','As Of',true,false,'Period end of the most recent filing this row is built from')}
+            <th></th>
           </tr></thead>
           <tbody>
             ${sorted.map((f, i) => `
@@ -1589,6 +1590,13 @@ function renderBdcScreen() {
                 <td>${f.nii_ttm != null ? '$' + f.nii_ttm.toFixed(2) : '—'}</td>
                 <td>${f.dist_ttm != null ? '$' + f.dist_ttm.toFixed(2) : '—'}</td>
                 <td style="color:var(--text-muted)">${f.latest_quarter || '—'}</td>
+                <td>${f.in_portfolio
+                  ? '<span style="color:var(--text-muted);font-size:11px">held</span>'
+                  : f.in_watchlist
+                    ? `<button class="btn btn-ghost btn-sm" onclick="removeFromWatchlist('${f.ticker}','BDC')"
+                         title="Remove from watchlist">✓ Watching</button>`
+                    : `<button class="btn btn-ghost btn-sm" onclick="addFromScreener('${f.ticker}','${(f.name||'').replace(/'/g,"\\'")}','BDC')"
+                         title="Add to watchlist as a BDC">+ Watch</button>`}</td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -1728,13 +1736,25 @@ function screenRow(f, wlTickers, heldTickers) {
     </tr>`;
 }
 
-async function addFromScreener(ticker, name) {
+async function addFromScreener(ticker, name, type = 'CEF') {
   try {
-    await POST('/api/funds', { ticker, name, type: 'CEF' });
+    await POST('/api/funds', { ticker, name, type });
     await POST('/api/prices/refresh-one', { ticker });
-    await Promise.all([loadAll(), loadScreenData()]);
+    // Reload whichever screen the ticker came from so the button state updates.
+    await Promise.all([loadAll(), type === 'BDC' ? loadBdcScreen() : loadScreenData()]);
     renderApp();
     toast(`${ticker} added to watchlist`);
+  } catch(e) {
+    toast('Error: ' + e.message);
+  }
+}
+
+async function removeFromWatchlist(ticker, type = 'CEF') {
+  try {
+    await DELETE(`/api/funds/${ticker}`);
+    await Promise.all([loadAll(), type === 'BDC' ? loadBdcScreen() : loadScreenData()]);
+    renderApp();
+    toast(`${ticker} removed from watchlist`);
   } catch(e) {
     toast('Error: ' + e.message);
   }
