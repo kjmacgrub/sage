@@ -5,6 +5,8 @@
 This is a checklist for keeping the BDC positions honest. It assumes you know
 nothing about BDCs and have never done this before. Follow it top to bottom.
 
+For *why* a company is or isn't in the rotation, see [decisions](decisions.md).
+
 ---
 
 ## Why this exists

@@ -19,11 +19,16 @@
 - `cef/static/` — frontend (HTML/JS/CSS), dark theme
 - `cef/static/styles.css` — dark theme + white nav override; uses `.global-tab-nav` / `.global-tab-link`
 - `cef/api/app.py` — FastAPI app factory
-- `cef/api/routes/` — funds, prices, holdings, distributions, screener, nav_history, imports, settings, audit
+- `cef/api/routes/` — funds, prices, holdings, distributions, screener, nav_history, imports, settings, audit, bdc_screener
 - `cef/services/audit.py` — position audit engine (grading, coverage windows, discrepancy checks)
+- `cef/services/schwab_import.py` — Schwab CSV -> DB; shared by the Import tab and the CLI
+- `cef/services/bdc_screener.py` — BDC universe + metrics from SEC XBRL (CEFConnect has no BDCs)
+- `import_schwab_transactions.py` — command-line front end for the same importer
 - `cef/settings.py` — user-tunable settings; code defaults, DB rows override
 - `cef/database.py` — SQLite schema + migrations
 - `docs/bdc-audit-runbook.md` — quarterly BDC procedure (also published as a shareable page)
+- `docs/decisions.md` — why calls were made (what to sell, what to track, rubric
+  design). Read before reversing anything that looks arbitrary.
 - `cef.db` — production database (never commit, never modify directly during dev)
 - `cef_demo.db` — simulation/demo copy (safe to use for testing)
 - `simulate.py` — 3-year portfolio simulation
@@ -39,7 +44,9 @@
 - `settings` table — key/JSON overrides; a missing row means "use the code default"
 - `audits` table — one row per audit run, history kept; `settings_json` snapshots the
   rubric each grade was computed under, so old grades stay interpretable after retuning
-- `bdc_fundamentals` table — manually entered BDC quarterly figures (NII/NAV/dividend)
+- `bdc_fundamentals` table — manually entered BDC quarterly figures (NII/NAV/dividend/special)
+- `bdc_screener_cache` table — BDC universe from SEC XBRL; coverage here is against
+  **total** payout incl. supplementals, unlike the audit's regular-dividend basis
 
 ## Position Audit
 Answers one question per holding: is the yield paying for itself, or is the payout
@@ -75,8 +82,12 @@ for a summary, click again for the full breakdown.
   than 6 months off that guess.
 
 ## Portfolio Context
-- 9-fund CEF portfolio, ~$18k invested, 10.2% yield, ~$153/mo distributions
-- Simulation: Jan 2024–Dec 2026, 31 buys, 0 sells, 30/36 positive cash flow months
+- 19 positions (17 CEF, 2 BDC) — ~$38,596 cost, ~$40,727 market value
+- Held in a **Roth IRA**: distributions are tax-free, so ROC and tax basis don't matter here
+- Lifetime CEF/BDC score is +$12.5k since Jun 2021, and essentially all of it is
+  distributions — realized trading is slightly negative. See `docs/decisions.md`.
+- Three-sleeve plan (income / options / managed index) is in `docs/decisions.md`;
+  judge this sleeve on income, not capital gains.
 
 ## Design
 - Dark theme throughout
