@@ -25,6 +25,9 @@ sized to a reasonable bracket, ending in a **~$400k Roth income bucket**. About
 $1M from selling the current condo funds rent until a future purchase; roughly
 two years of rent to money market, the rest to direct indexing.
 
+**The record starts January 2026.** Anything earlier was a different portfolio —
+see the 2026-08-22 entry. Don't average across that boundary.
+
 Two mechanics worth not forgetting:
 
 - **Tax-loss harvesting does nothing in a Roth.** The managed sleeve has to be
@@ -35,6 +38,46 @@ Two mechanics worth not forgetting:
 - **Wash sales cross into the Roth, and there the loss is permanently
   disallowed**, not deferred. Direct indexing sells hundreds of individual
   names; keep individual stocks out of the Roth and tell Fidelity it exists.
+
+---
+
+## 2026-08-22 — The current portfolio starts January 2026
+
+**Performance before 2026 is a different strategy and should not be averaged in.**
+Everything prior was learning, testing and mistakes. Schwab's "since available"
+column reaches back to May 2024 and shows +$19,908 of investment change over
+2.3 years — *less* than 2026 alone — but that comparison is meaningless, because
+the thing being measured changed.
+
+**2026 to 22 August, both Schwab accounts combined:**
+
+| | |
+|---|---|
+| Average capital at work | $73,728 |
+| Investment change | +$22,029 |
+| **Period return** | **29.9%** |
+| Annualized | 50.7% |
+
+Modified Dietz, weighting each of nine withdrawals by its actual date — the
+$25,000 car wire on 27 March matters most, since capital that left early wasn't
+working. The naive figure (change ÷ beginning value) is 23.6% and understates it.
+
+Split of the gain: **options trading +$19,788, CEF/BDC income +$2,587**, less
+about $338 of net price change on holdings. Reconciles with Schwab's own
+Investment Gain/Loss and Income lines to within rounding.
+
+**The two halves need judging separately.** QQQ 360 and a single Long Put Hedge
+trade produced 62% of the options profit. Powerhour and Consecutive IC — 1,640
+legs between them — made $5,838. The systematic strategies roughly paid their
+way while a few directional calls carried the year. Eight months is also a
+short record: quoting 50% as a run rate assumes the rest of the year resembles
+this one, and the monthly path (February −$1,680, March +$7,849) says it may not.
+
+**Account note:** the Schwab Portfolio Performance screen aggregates the Roth
+(····6967) and the Designated Beneficiary account (····9267). A figure read off
+it is both accounts, not one. 9267 stopped trading 17 April and now just holds
+money; it was abandoned because of pattern-day-trading limits that have since
+been relaxed, so consolidating is worth revisiting.
 
 ---
 
