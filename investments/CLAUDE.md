@@ -23,6 +23,7 @@
 - `cef/services/audit.py` — position audit engine (grading, coverage windows, discrepancy checks)
 - `cef/services/schwab_import.py` — Schwab CSV -> DB; shared by the Import tab and the CLI
 - `cef/services/bdc_screener.py` — BDC universe + metrics from SEC XBRL (CEFConnect has no BDCs)
+- `cef/services/exposure.py` — exposure taxonomy + category→exposure default map
 - `backfill_leverage.py` — populate leverage for already-cached screener rows without a full refresh
 - `import_schwab_transactions.py` — command-line front end for the same importer
 - `cef/settings.py` — user-tunable settings; code defaults, DB rows override
@@ -117,6 +118,30 @@ line and a preferred-levered one has ~40%.
   so a partial update silently nulled the fields it didn't send — it wiped a
   filed ARCC quarter during development. It now updates only keys present in
   the request body; an explicit null still clears a field.
+
+## Exposure
+
+What a fund actually **holds**, as distinct from `funds.type` (CEF/BDC — the
+wrapper) and from the screener's `category` (structure and strategy). Twelve
+buckets, one per fund, in `cef/services/exposure.py`.
+
+Category is the wrong axis for spotting concentration and demonstrably so: it
+split a 24% energy-infrastructure position across `Equity-MLP` (TYG, NML, SRV)
+and `Equity-Sector Equity` (NXG), while merging NXG's midstream exposure with
+BSTZ's tech inside that second bucket. Wrong in both directions at once, which
+is why the concentration stayed invisible with a category column on screen.
+
+- Default is derived from category; `funds.exposure` overrides it when set.
+- Categories too broad to map (`Equity-Sector Equity`) resolve to **None**
+  rather than a guess — "not yet classified", not silently wrong.
+- Covered-call is a strategy, not an exposure: the category maps to US equity,
+  so genuinely global funds like EXG need the override.
+- Currently hand-set: BSTZ (Tech equity), NXG (Energy infrastructure),
+  EXG (Global equity). 332 of 370 screener funds classify automatically.
+- One bucket per fund, deliberately. The moment a fund can sit in two, the
+  concentration total stops being readable.
+- The portfolio breakdown flags any bucket at ≥20% — roughly 4× equal weight
+  across the current book.
 
 ## Portfolio Context
 - 19 positions (17 CEF, 2 BDC) — ~$38,596 cost, ~$40,727 market value

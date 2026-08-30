@@ -62,6 +62,13 @@ def init_db():
             # Different regime, so it rides along with the manual quarterly entry.
             "ALTER TABLE bdc_fundamentals ADD COLUMN total_debt REAL",
             "ALTER TABLE bdc_fundamentals ADD COLUMN total_equity REAL",
+            # Exposure: what the fund actually holds, as opposed to how it is
+            # packaged. CEFConnect's category answers the second question and
+            # is the wrong axis for spotting concentration -- it split a 24%
+            # energy-infrastructure position across two buckets while merging
+            # midstream with tech. Null means "not yet classified"; a value
+            # here overrides the category-derived default.
+            "ALTER TABLE funds ADD COLUMN exposure TEXT",
         ]:
             try:
                 conn.execute(sql)

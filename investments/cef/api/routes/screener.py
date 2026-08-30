@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from ...database import get_db
+from ...services.exposure import resolve as resolve_exposure
 from ...services.scraper import fetch_screener_data, fetch_cef_list
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,6 +22,12 @@ def screener_funds():
         watchlist = {r["ticker"] for r in conn.execute(
             "SELECT ticker FROM funds WHERE active=1"
         ).fetchall()}
+        # Hand-set exposures, so the screener shows the same label the
+        # portfolio does rather than re-deriving a different default.
+        set_exposure = {r["ticker"]: r["exposure"] for r in conn.execute(
+            "SELECT ticker, exposure FROM funds WHERE exposure IS NOT NULL").fetchall()}
+        fund_types = {r["ticker"]: r["type"] for r in conn.execute(
+            "SELECT ticker, type FROM funds").fetchall()}
         portfolio = {r["ticker"] for r in conn.execute(
             "SELECT ticker FROM holdings WHERE shares > 0"
         ).fetchall()}
@@ -28,6 +35,8 @@ def screener_funds():
     for d in data:
         d["in_watchlist"] = d["ticker"] in watchlist
         d["in_portfolio"] = d["ticker"] in portfolio
+        d["exposure"] = resolve_exposure(
+            set_exposure.get(d["ticker"]), d.get("category"), fund_types.get(d["ticker"]))
 
     return {"funds": data, "total": len(data), "state": _state}
 

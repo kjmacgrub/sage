@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
 from ...database import get_db
+from ...services.exposure import resolve as resolve_exposure
 
 router = APIRouter()
 
@@ -32,13 +33,15 @@ class HoldingIn(BaseModel):
 def list_holdings():
     with get_db() as conn:
         rows = conn.execute("""
-            SELECT h.*, f.name, f.type,
+            SELECT h.*, f.name, f.type, f.exposure AS exposure_set,
+                   sc.category AS category,
                    p.price, p.nav, p.premium_discount, p.avg_discount_1y, p.nav_cagr, p.yield_pct,
                    p.has_special_dist, p.regular_yield_pct, p.last_special_date, p.last_special_amount,
                    p.earned_yield_1y, p.dist_yield_1y, p.earned_yield_life, p.dist_yield_life, p.yield_life_years,
                    p2.price AS prev_price
             FROM holdings h
             JOIN funds f ON f.ticker = h.ticker
+            LEFT JOIN screener_cache sc ON sc.ticker = h.ticker
             LEFT JOIN prices p ON p.ticker = h.ticker
               AND p.date = (SELECT MAX(px.date) FROM prices px WHERE px.ticker = h.ticker)
             LEFT JOIN prices p2 ON p2.ticker = h.ticker
@@ -48,6 +51,10 @@ def list_holdings():
         result = []
         for r in rows:
             d = dict(r)
+            # A hand-set exposure wins; otherwise fall back to the category
+            # default, which is None for categories too broad to guess from.
+            d["exposure"] = resolve_exposure(
+                d.pop("exposure_set", None), d.pop("category", None), d.get("type"))
             # For BDCs: use manual_nav to compute disc/prem if no live NAV
             if d.get("manual_nav") and d.get("price"):
                 if not d.get("nav"):
@@ -97,6 +104,7 @@ def lifetime_summary():
             SELECT h.ticker, h.shares, h.cost_basis, h.dividends_received, p.price
             FROM holdings h
             JOIN funds f ON f.ticker = h.ticker
+            LEFT JOIN screener_cache sc ON sc.ticker = h.ticker
             LEFT JOIN prices p ON p.ticker = h.ticker
               AND p.date = (SELECT MAX(date) FROM prices WHERE ticker = h.ticker)
             WHERE f.type IN ('CEF','BDC')

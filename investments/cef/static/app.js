@@ -275,6 +275,8 @@ function renderPortfolio() {
       </div>
     </div>`}
 
+    ${_summaryView === 'lifetime' ? '' : exposureBreakdown(posWithDelta, totalMkt)}
+
     <div class="table-wrap">
       <table>
         <thead>
@@ -283,6 +285,7 @@ function renderPortfolio() {
             ${th('ticker', 'Ticker', true, 1)}
             ${th('name', 'Name', true, 2)}
             ${th('type', 'Type', true, 3)}
+            ${th('exposure', 'Exposure', true, false, 'What the fund is actually exposed to, as distinct from how it is packaged. CEFConnect\'s category describes structure and strategy; correlation runs along this axis instead. Click a value to reassign it.')}
             ${th('shares', 'Shares')}
             ${th('price', 'Price')}
             ${th('price_change_pct', 'Day %')}
@@ -373,6 +376,7 @@ function portfolioRow(h, totalMkt, idx) {
       </td>
       <td class="left col-sticky-2" style="color:var(--text-2)">${h.name || ''}</td>
       <td class="left col-sticky-3"><span class="badge-type ${(h.type||'').toLowerCase()}">${h.type || ''}</span></td>
+      ${exposureCell(h)}
       <td>${h.shares != null ? h.shares.toLocaleString() : '—'}</td>
       <td>${fmt$(h.price)}</td>
       <td class="${gainClass(h.price_change_pct)}">${h.price_change_pct != null ? (h.price_change_pct >= 0 ? '+' : '') + h.price_change_pct.toFixed(2) + '%' : '—'}</td>
@@ -1688,6 +1692,7 @@ function renderScreen() {
               ${th('ticker', 'Ticker', true, 1)}
               ${th('name', 'Name', true, 2)}
               ${th('category', 'Category', true, 3)}
+              ${th('exposure', 'Exposure', true, false, 'What the fund holds, as distinct from the category beside it, which describes how it is packaged. Funds in different categories can be the same bet.')}
               ${th('yield_pct', 'Yield')}
               ${th('dist_freq', 'Freq', true)}
               ${th('premium_discount', 'Disc/Prem')}
@@ -1724,6 +1729,118 @@ function leverageCell(f) {
   return `<td style="color:${color}" title="${tip}">${f.leverage_pct.toFixed(0)}%${pref ? '<span style="color:var(--text-muted)" title="Includes preferred shares">ᵖ</span>' : ''}</td>`;
 }
 
+// ---------------------------------------------------------------------------
+// Exposure — what a fund holds, as opposed to how it is packaged.
+//
+// Kept distinct from `type` (CEF/BDC, the wrapper) and from the screener's
+// `category` (structure and strategy). Correlation runs along this axis: a 24%
+// energy-infrastructure position was invisible while category split it between
+// "Equity-MLP" and "Equity-Sector Equity" and merged the latter with tech.
+// ---------------------------------------------------------------------------
+
+let _exposures = null;
+
+async function loadExposures() {
+  if (_exposures) return _exposures;
+  try {
+    const r = await GET('/api/funds/exposures');
+    _exposures = r.exposures || [];
+  } catch { _exposures = []; }
+  return _exposures;
+}
+
+function exposureCell(h) {
+  const v = h.exposure;
+  const label = v || '<span style="color:var(--text-muted)">unset</span>';
+  return `<td class="left" style="color:var(--text-2);font-size:12px;white-space:nowrap;cursor:pointer;text-decoration:underline dotted"
+    onclick="event.stopPropagation(); openExposurePicker('${h.ticker}')"
+    title="${v ? v : 'Not yet classified'} — click to reassign">${label}</td>`;
+}
+
+async function openExposurePicker(ticker) {
+  const list = await loadExposures();
+  if (!list.length) return toast('Could not load the exposure list');
+  const current = (_holdings.find(h => h.ticker === ticker) || {}).exposure || '';
+  const opts = list.map(e =>
+    `<button class="btn btn-ghost btn-sm" style="justify-content:flex-start;width:100%;${e === current ? 'font-weight:700' : ''}"
+       onclick="setExposure('${ticker}','${e}')">${e === current ? '✓ ' : ''}${e}</button>`).join('');
+  const html = `
+    <div class="modal-backdrop" onclick="closeModal()">
+      <div class="modal" onclick="event.stopPropagation()" style="max-width:340px">
+        <div class="modal-header">
+          <div><h2>${ticker} — Exposure</h2>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+              What it actually holds, not how it's packaged.
+            </div></div>
+          <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:2px">
+          ${opts}
+          <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;width:100%;color:var(--text-muted);margin-top:6px"
+            onclick="setExposure('${ticker}','')">Clear — fall back to the category default</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modal-root').innerHTML = html;
+}
+
+async function setExposure(ticker, exposure) {
+  try {
+    await PUT('/api/funds/' + ticker + '/exposure', { exposure: exposure || null });
+    closeModal();
+    await loadAll();
+    renderApp();
+    toast(exposure ? `${ticker} → ${exposure}` : `${ticker} exposure cleared`);
+  } catch (e) {
+    toast('Could not save: ' + e.message);
+  }
+}
+
+// Concentration by exposure. Sorted by weight, because the whole point is that
+// the largest shared bet should be the first thing you see.
+function exposureBreakdown(positions, totalMkt) {
+  if (!positions.length || !totalMkt) return '';
+  const by = {};
+  positions.forEach(h => {
+    const k = h.exposure || 'Unclassified';
+    by[k] = (by[k] || 0) + (h.market_value || 0);
+  });
+  const rows = Object.entries(by)
+    .map(([k, v]) => ({ name: k, mv: v, pct: v / totalMkt * 100 }))
+    .sort((a, b) => b.mv - a.mv);
+  const top = rows[0];
+
+  const bars = rows.map(r => {
+    // Flag at a fifth of the sleeve — roughly four times equal weight across
+    // the current book. At that size a single shared factor decides the
+    // outcome regardless of how many separate funds are holding it.
+    const heavy = r.pct >= 20;
+    return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:2px 0">
+      <div style="width:150px;flex-shrink:0;color:var(--text-2);${heavy ? 'font-weight:700' : ''}">${r.name}</div>
+      <div style="flex:1;background:var(--surface2);border-radius:3px;height:14px;position:relative;min-width:60px">
+        <div style="width:${Math.max(1, r.pct)}%;background:${heavy ? 'var(--yellow)' : 'var(--accent)'};height:100%;border-radius:3px"></div>
+      </div>
+      <div style="width:46px;text-align:right;${heavy ? 'font-weight:700' : ''}">${r.pct.toFixed(1)}%</div>
+      <div style="width:70px;text-align:right;color:var(--text-muted)">${fmt$(r.mv)}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <details class="exposure-panel" style="margin-bottom:14px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--text-2);padding:4px 0">
+        Concentration by exposure — largest is <strong>${top.name}</strong> at ${top.pct.toFixed(1)}%
+        <span style="color:var(--text-muted)">(${rows.length} buckets)</span>
+      </summary>
+      <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius);margin-top:6px">
+        ${bars}
+        <div class="settings-hint" style="margin-top:8px">
+          Grouped by what each fund holds, not by its CEFConnect category — funds in
+          different categories can be the same bet. Click any Exposure cell to reassign.
+        </div>
+      </div>
+    </details>`;
+}
+
 function screenRow(f, wlTickers, heldTickers) {
   const inWl = wlTickers.has(f.ticker);
   const inPort = heldTickers.has(f.ticker);
@@ -1743,6 +1860,7 @@ function screenRow(f, wlTickers, heldTickers) {
       </td>
       <td class="left col-sticky-2" style="color:var(--text-2)">${f.name || ''}</td>
       <td class="left col-sticky-3" style="color:var(--text-muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;max-width:120px">${f.category || '—'}</td>
+      <td class="left" style="color:var(--text-2);font-size:12px;white-space:nowrap">${f.exposure || '<span style="color:var(--text-muted)">—</span>'}</td>
       ${yieldCell(f)}
       <td style="color:var(--text-2)">${f.dist_freq || '—'}</td>
       <td class="${discClass(f.premium_discount)}" title="${f.avg_discount_1y != null ? '1Y avg: ' + fmtDisc(f.avg_discount_1y) : ''}">${fmtDisc(f.premium_discount)}</td>

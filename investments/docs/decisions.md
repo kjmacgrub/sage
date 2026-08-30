@@ -81,6 +81,41 @@ been relaxed, so consolidating is worth revisiting.
 
 ---
 
+## 2026-08-30 — Exposure is a separate axis from category
+
+The energy-infrastructure concentration was invisible for a structural reason,
+not an attention one: **CEFConnect's category describes how a fund is packaged,
+and correlation runs along what it holds.**
+
+Category split the position across `Equity-MLP` (TYG, NML, SRV) and
+`Equity-Sector Equity` (NXG), and inside that second bucket merged NXG's
+midstream exposure with BSTZ's tech. It separates what should group and groups
+what should separate — so a category column on screen the whole time never had
+a chance of surfacing it.
+
+**Named `exposure`, not the alternatives.** `category` is taken and is
+CEFConnect's. `industry` implies a GICS sector of operating companies, which is
+meaningless for a convertibles or preferreds fund. `focus` is vague. `sleeve`
+already means the three-sleeve income/options/managed-index plan above and
+would collide.
+
+**One bucket per fund.** The moment a fund can sit in two, the concentration
+total stops being a number you can read off the screen — which is the only
+thing this column is for.
+
+**Defaults derived, exceptions by hand.** 332 of 370 funds map mechanically
+from category. The rest resolve to null rather than a guess: `Equity-Sector
+Equity` genuinely contains different bets, and asserting one would be worse
+than leaving a gap. Covered-call turned out to be the same trap in miniature —
+it's a strategy, not an exposure, so EXG needed an override to stop being
+filed as US equity.
+
+Resulting picture, which is the point: **energy infrastructure 23.7%** across
+four funds that move as one, then convertibles 16.7%, global equity 13.4%,
+US equity 11.4%. The trim-to-two suggestion from the leverage work stands.
+
+---
+
 ## 2026-08-30 — Leverage tracked as risk, separate from the grade
 
 Prompted by asking how exposed the sleeve is to a violent downturn. The audit

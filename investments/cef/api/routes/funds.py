@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import httpx
 from ...database import get_db
+from ...services.exposure import EXPOSURES, resolve as resolve_exposure
 
 router = APIRouter()
 
@@ -12,11 +13,44 @@ class FundIn(BaseModel):
     type: str = "CEF"
 
 
+class ExposureIn(BaseModel):
+    exposure: str | None = None
+
+
 @router.get("")
 def list_funds():
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM funds WHERE active=1 ORDER BY ticker").fetchall()
-        return [dict(r) for r in rows]
+        rows = conn.execute("""
+            SELECT f.*, sc.category
+            FROM funds f
+            LEFT JOIN screener_cache sc ON sc.ticker = f.ticker
+            WHERE f.active=1 ORDER BY f.ticker""").fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["exposure_set"] = d.get("exposure")
+            d["exposure"] = resolve_exposure(d.get("exposure"), d.pop("category", None), d.get("type"))
+            out.append(d)
+        return out
+
+
+@router.get("/exposures")
+def list_exposures():
+    """The taxonomy itself, so the UI never hard-codes a copy of it."""
+    return {"exposures": EXPOSURES}
+
+
+@router.put("/{ticker}/exposure")
+def set_exposure(ticker: str, body: ExposureIn):
+    value = (body.exposure or "").strip() or None
+    if value is not None and value not in EXPOSURES:
+        raise HTTPException(400, f"Unknown exposure: {value}")
+    with get_db() as conn:
+        cur = conn.execute("UPDATE funds SET exposure=? WHERE ticker=?",
+                           (value, ticker.upper()))
+        if cur.rowcount == 0:
+            raise HTTPException(404, f"No fund {ticker.upper()}")
+    return {"ok": True, "ticker": ticker.upper(), "exposure": value}
 
 
 @router.post("")
