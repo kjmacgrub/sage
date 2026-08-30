@@ -23,6 +23,7 @@
 - `cef/services/audit.py` — position audit engine (grading, coverage windows, discrepancy checks)
 - `cef/services/schwab_import.py` — Schwab CSV -> DB; shared by the Import tab and the CLI
 - `cef/services/bdc_screener.py` — BDC universe + metrics from SEC XBRL (CEFConnect has no BDCs)
+- `backfill_leverage.py` — populate leverage for already-cached screener rows without a full refresh
 - `import_schwab_transactions.py` — command-line front end for the same importer
 - `cef/settings.py` — user-tunable settings; code defaults, DB rows override
 - `cef/database.py` — SQLite schema + migrations
@@ -40,7 +41,8 @@
 - `prices` table — price/NAV history
 - `distributions` table — dividend/distribution records
 - `nav_history` table — exists but empty (NAV sparklines is a planned feature)
-- `screener_cache` table — pre-computed screener data
+- `screener_cache` table — pre-computed screener data, including leverage
+  (ratio, preferred/debt split, band, indicative cushion, as-of date)
 - `settings` table — key/JSON overrides; a missing row means "use the code default"
 - `audits` table — one row per audit run, history kept; `settings_json` snapshots the
   rubric each grade was computed under, so old grades stay interpretable after retuning
@@ -80,6 +82,41 @@ for a summary, click again for the full breakdown.
 - `holdings.acquired_date` is often null and falls back to the first *recorded*
   distribution, which post-dates the actual purchase. Never annualize a hold shorter
   than 6 months off that guess.
+
+## Leverage
+
+Answers a different question from the audit: not "is the yield earned" but
+"how far can the market fall before this fund is forced to sell into it".
+Reported beside the grade and deliberately **never folded into it** — a levered
+fund is not a badly-run fund. It also stays out of `flags`, which exist to lower
+confidence when data is doubtful; a known leverage ratio isn't doubtful data.
+
+The load-bearing field is the **preferred/debt split**, not the headline ratio.
+The 1940 Act tests debt at 300% asset coverage and preferred at 200%, so at an
+identical 30% ratio a debt-levered fund has ~10% of portfolio decline before the
+line and a preferred-levered one has ~40%.
+
+### Gotchas found while building this
+- Leverage is **not in the CEFConnect v3 JSON API** — only in the fund page
+  HTML, in a `…leverageBlock` div. `fetch_screener_data` already fetches that
+  page, so parsing costs no extra request.
+- CEFConnect **omits the block entirely for unleveraged funds** (EXG). Recorded
+  as unknown, never as zero: if the markup ever changes, a risk metric that
+  silently reads "unleveraged" for every fund is the failure mode that hurts.
+- Asset values refresh daily while leverage amounts refresh monthly-to-
+  semi-annually, so mixing them can imply sub-300% coverage on a fund nowhere
+  near its limit (NPFD reads 271%). `_leverage_cushion` returns None rather
+  than a scary number whenever debt + preferred ≠ regulatory, or the result
+  goes negative. Ranks reliably; will not support precise breach math.
+- AVK and HGLB report Total Debt ≠ Regulatory Leverage. HGLB's figures are over
+  a year stale, which is what `leverage_stale` marks.
+- BDCs are tested at **150%** asset coverage (SBCAA 2018), not 300%/200%. Not
+  scrapeable, so `total_debt` / `total_equity` ride along with the manual
+  quarterly entry in `bdc_fundamentals`.
+- `PUT /api/audit/bdc/{ticker}` used to write **every** column on every call,
+  so a partial update silently nulled the fields it didn't send — it wiped a
+  filed ARCC quarter during development. It now updates only keys present in
+  the request body; an explicit null still clears a field.
 
 ## Portfolio Context
 - 19 positions (17 CEF, 2 BDC) — ~$38,596 cost, ~$40,727 market value

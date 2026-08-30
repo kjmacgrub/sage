@@ -55,23 +55,26 @@ def upsert_quarter(ticker: str, body: dict):
     quarter_end = (body.get("quarter_end") or "").strip()
     if not quarter_end:
         raise HTTPException(400, "quarter_end (YYYY-MM-DD) is required.")
+
+    # Update only the fields the caller actually sent. Writing every column on
+    # every PUT means a request carrying one field silently nulls the rest —
+    # a partial update aimed at the leverage figures wiped a filed quarter's
+    # NII, NAV and non-accruals during development. An explicit null still
+    # clears a field; an omitted key now leaves it alone.
+    editable = ("nii_per_share", "nav_per_share", "dividend_per_share",
+                "special_per_share", "non_accrual_pct", "notes",
+                "total_debt", "total_equity")
+    sent = {k: body[k] for k in editable if k in body}
+
     with get_db() as conn:
-        conn.execute("""
-            INSERT INTO bdc_fundamentals
-                (ticker, quarter_end, nii_per_share, nav_per_share,
-                 dividend_per_share, special_per_share, non_accrual_pct, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(ticker, quarter_end) DO UPDATE SET
-                nii_per_share=excluded.nii_per_share,
-                nav_per_share=excluded.nav_per_share,
-                dividend_per_share=excluded.dividend_per_share,
-                special_per_share=excluded.special_per_share,
-                non_accrual_pct=excluded.non_accrual_pct,
-                notes=excluded.notes
-        """, (ticker.upper(), quarter_end, body.get("nii_per_share"),
-              body.get("nav_per_share"), body.get("dividend_per_share"),
-              body.get("special_per_share"), body.get("non_accrual_pct"),
-              body.get("notes", "")))
+        cols = ["ticker", "quarter_end"] + list(sent)
+        placeholders = ", ".join("?" for _ in cols)
+        updates = ", ".join(f"{k}=excluded.{k}" for k in sent) or "ticker=ticker"
+        conn.execute(
+            f"""INSERT INTO bdc_fundamentals ({", ".join(cols)})
+                VALUES ({placeholders})
+                ON CONFLICT(ticker, quarter_end) DO UPDATE SET {updates}""",
+            [ticker.upper(), quarter_end] + list(sent.values()))
     return {"ok": True}
 
 

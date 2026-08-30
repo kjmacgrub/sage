@@ -81,6 +81,51 @@ been relaxed, so consolidating is worth revisiting.
 
 ---
 
+## 2026-08-30 — Leverage tracked as risk, separate from the grade
+
+Prompted by asking how exposed the sleeve is to a violent downturn. The audit
+answered "is the yield earned" and had nothing to say about "how far can the
+market fall before this fund is forced to sell into it" — the mechanism that
+turns a drawdown into a permanent loss.
+
+**The objection was that all CEFs run ~30% leverage, so screening on it would
+flunk everything.** The data says otherwise. Across the 17 held CEFs:
+
+| | Share of sleeve |
+|---|---|
+| Levered ≥20% | 61% |
+| Levered <5% | 39% |
+
+Six funds are effectively unleveraged (EXG at 0%, ECAT 0.17%, BSTZ 0.76%,
+AOD 2.78%, HGLB 2.79%, USA 4.98%). Eleven run 24–41%. Look-through borrowed
+exposure is ~$7,958, about 20% of the sleeve.
+
+**The metric is the preferred/debt split, not the ratio.** Debt is tested at
+300% asset coverage, preferred at 200%. At an identical 30% ratio that's a 10%
+cushion versus a 40% one. Only NCV, NCZ and TYG carry preferred; the five most
+levered — XFLT 40.6%, NPFD 36.9%, AVK 36.6%, NXG 34.2%, FSCO 32.6% — are all
+debt, the fragile kind. So it ranks, and the ranking is not the one the headline
+ratio gives you.
+
+**Reported beside the grade, never inside it.** Same reasoning as the screener-
+vs-audit coverage split: different questions, don't reconcile them. A levered
+fund is not a badly-run fund. It's also kept out of `flags`, which lower
+confidence when data is doubtful — a known leverage ratio isn't doubtful.
+
+**Deliberately not precise.** CEFConnect refreshes assets daily and leverage
+monthly-to-semi-annually, so the two can't be mixed into real breach math; NPFD
+reads 271% coverage, which is below the statutory floor and therefore stale
+rather than true. The cushion is suppressed rather than guessed whenever the
+figures don't reconcile. Bands rank; the cushion is indicative only.
+
+**Findings that reshaped the portfolio picture, not just the tooling:**
+the sleeve is *not* mainly corporate debt. Energy infrastructure is the largest
+single factor at 24% across four funds (TYG, NML, NXG, SRV) that will move as
+one. Equity is 31%, converts 17%, credit and BDC together ~21%. The open
+suggestion is trimming the energy overlap from four names to two.
+
+---
+
 ## 2026-08-18 — BDC rotation settled at five
 
 **ARCC, BBDC (held), MAIN, HTGC, GLAD (tracked).** Roughly 75 minutes a quarter.

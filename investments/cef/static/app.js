@@ -1694,6 +1694,7 @@ function renderScreen() {
               ${th('coverage_1y', '1Y E/D', false, false, 'Earned yield (total return on NAV) vs Distributed yield (distributions ÷ NAV), trailing 1 year. Green = distribution out-earned, NAV growing; red = NAV eroding. Sorted by the earned−distributed gap.')}
               ${th('coverage_life', 'Life E/D', false, false, 'Earned vs Distributed yield, annualized over up to 5 years (or since inception). Green = sustainable; red = NAV-eroding.')}
               ${th('dist_cagr', 'Dist/yr', false, false, 'Annualized distribution change rate since inception (first → last complete year)')}
+              ${th('leverage_pct', 'Lev', false, false, 'Effective leverage as a % of total assets. The 1940 Act tests debt at 300% asset coverage but preferred at only 200%, so identical ratios differ sharply in how far the market can fall before a forced deleveraging. Blank = not reported, which is unknown rather than zero.')}
               ${th('inception_date', 'Since', true)}
               <th></th>
             </tr>
@@ -1704,6 +1705,23 @@ function renderScreen() {
         </table>
       </div>` : (state !== 'empty' ? `<div class="empty-state"><p>No funds match the current filters.</p></div>` : '')}
     </div>`;
+}
+
+function leverageCell(f) {
+  if (f.leverage_pct == null) {
+    return `<td style="color:var(--text-muted)" title="Not reported by the data source — unknown, not zero">—</td>`;
+  }
+  const color = LEVERAGE_COLORS[f.leverage_band] || 'var(--text-2)';
+  // Preferred carries a looser 200% test, so flag the structure, not just the size.
+  const pref = (f.leverage_type || '').includes('preferred');
+  const tip = [
+    `${f.leverage_band} · ${f.leverage_type || 'unknown'}`,
+    f.leverage_cushion_pct != null
+      ? `~${f.leverage_cushion_pct.toFixed(0)}% decline to the binding coverage test`
+      : 'cushion not estimable — reported figures sampled at different dates',
+    f.leverage_as_of ? `as of ${f.leverage_as_of}${f.leverage_stale ? ' (stale)' : ''}` : '',
+  ].filter(Boolean).join('\n');
+  return `<td style="color:${color}" title="${tip}">${f.leverage_pct.toFixed(0)}%${pref ? '<span style="color:var(--text-muted)" title="Includes preferred shares">ᵖ</span>' : ''}</td>`;
 }
 
 function screenRow(f, wlTickers, heldTickers) {
@@ -1731,6 +1749,7 @@ function screenRow(f, wlTickers, heldTickers) {
       ${yieldPairCell(f.earned_yield_1y, f.dist_yield_1y, '1-Year')}
       ${yieldPairCell(f.earned_yield_life, f.dist_yield_life, 'Lifetime', f.yield_life_years)}
       <td>${distChg}</td>
+      ${leverageCell(f)}
       <td style="color:var(--text-muted)">${yrs != null ? yrs + 'y' : '—'}</td>
       <td>${inWl ? '' : `<button class="btn btn-ghost btn-sm" onclick="addFromScreener('${f.ticker}','${(f.name||'').replace(/'/g,"\\'")}')">+ Watch</button>`}</td>
     </tr>`;
@@ -2218,6 +2237,7 @@ function openAuditModal(ticker) {
             weights scale up to fill it. Across the current portfolio that shifts a
             grade by about 2 points either way — comparable to a held fund's grade,
             but not identical to one.</div>` : ''}
+          ${auditLeverage(d, isBdc)}
           ${auditFlags(a.flags)}
           ${auditRubricNote(a)}
         </div>
@@ -2358,6 +2378,63 @@ function auditComponentTable(c, d, isBdc) {
       </tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
+}
+
+
+const LEVERAGE_COLORS = {
+  'none': 'var(--green)', 'low': 'var(--green)', 'moderate': 'var(--text-2)',
+  'high': 'var(--yellow)', 'very high': 'var(--red)',
+};
+
+// Leverage sits beside the grade, never inside it. "Is the yield paying for
+// itself" and "how far can the market fall before this fund is forced to sell"
+// are different questions, and a levered fund is not a badly-run fund.
+function auditLeverage(d, isBdc) {
+  const l = d.leverage;
+  // Audits stored before leverage tracking existed have no block at all —
+  // say so rather than silently dropping the section.
+  if (!l) return `<h4 style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px">
+      Leverage</h4>
+    <div class="settings-hint">This audit predates leverage tracking. Re-run it to record the fund's leverage structure.</div>`;
+
+  const head = `<h4 style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px">
+      Leverage <span style="text-transform:none;letter-spacing:0;font-weight:400">— reported, not graded</span>
+    </h4>`;
+
+  if (!l.available) {
+    return `${head}<div class="settings-hint">${l.note}</div>`;
+  }
+
+  let chip, facts;
+  if (isBdc) {
+    chip = `<span style="color:var(--text-2);font-weight:600">${l.asset_coverage_pct}% coverage</span>`;
+    facts = [
+      ['Debt / equity', l.debt_to_equity != null ? l.debt_to_equity.toFixed(2) + '×' : '—'],
+      ['Asset coverage', l.asset_coverage_pct != null ? l.asset_coverage_pct.toFixed(0) + '%' : '—'],
+      ['Regulatory floor', '150%'],
+      ['As of', l.as_of || '—'],
+    ];
+  } else {
+    const color = LEVERAGE_COLORS[l.leverage_band] || 'var(--text-2)';
+    chip = `<span style="color:${color};font-weight:600;text-transform:capitalize">${l.leverage_band}</span>`;
+    facts = [
+      ['Effective leverage', l.leverage_pct != null ? l.leverage_pct.toFixed(1) + '%' : '—'],
+      ['Structure', l.leverage_type || '—'],
+      ['Coverage test', (l.leverage_type || '').includes('preferred') ? '300% debt / 200% preferred' : '300% debt'],
+      ['Cushion to breach', l.leverage_cushion_pct != null ? '~' + l.leverage_cushion_pct.toFixed(0) + '% decline' : 'not estimable'],
+      ['As of', (l.leverage_as_of || '—') + (l.leverage_stale ? ' (stale)' : '')],
+    ];
+  }
+
+  const rows = facts.map(([k, v]) => `<tr>
+      <td class="left" style="color:var(--text-2)">${k}</td>
+      <td class="left">${v}</td>
+    </tr>`).join('');
+
+  return `${head}
+    <div style="margin-bottom:8px">${chip}</div>
+    <div class="modal-scroll-x"><table style="width:100%"><tbody>${rows}</tbody></table></div>
+    <div class="settings-hint" style="margin-top:8px">${l.note}</div>`;
 }
 
 function auditFlags(flags) {
@@ -2683,9 +2760,19 @@ async function openBdcEntry(ticker) {
             <input type="number" step="0.01" id="bdc-nav"></div>
           <div class="settings-row"><label>Non-accruals (% of fair value)</label>
             <input type="number" step="0.1" id="bdc-na"></div>
+          <div class="settings-row"><label>Total debt outstanding <span style="color:var(--text-muted)">($M, optional)</span></label>
+            <input type="number" step="0.001" id="bdc-debt"></div>
+          <div class="settings-row"><label>Total net assets <span style="color:var(--text-muted)">($M, optional)</span></label>
+            <input type="number" step="0.001" id="bdc-equity"></div>
           <div class="settings-hint">
             NII covering the dividend at 1.0× or better means the payout is earned.
             Below that, the shortfall is coming from somewhere else.
+          </div>
+          <div class="settings-hint">
+            Debt and net assets are optional and drive the leverage panel only —
+            they never move the grade. BDCs are tested at 150% asset coverage
+            rather than the 300% that applies to a CEF's debt, so the same ratio
+            leaves far more room here.
           </div>
           ${rows.length ? `
             <h4 style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin:14px 0 8px">Entered</h4>
@@ -2721,6 +2808,8 @@ async function saveBdcQuarter(ticker) {
       special_per_share: val('bdc-special'),
       nav_per_share: val('bdc-nav'),
       non_accrual_pct: val('bdc-na'),
+      total_debt: val('bdc-debt'),
+      total_equity: val('bdc-equity'),
     });
     toast('Quarter saved');
     openBdcEntry(ticker);

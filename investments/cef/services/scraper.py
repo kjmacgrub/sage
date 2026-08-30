@@ -627,6 +627,7 @@ def fetch_screener_data(ticker: str):
     yield_metrics = _compute_yield_metrics(ticker)
 
     yield_pct = dist_freq = inception_date = category = None
+    leverage = _empty_leverage()
     try:
         page = httpx.get(
             f"https://www.cefconnect.com/fund/{ticker}",
@@ -664,6 +665,7 @@ def fetch_screener_data(ticker: str):
                 except Exception:
                     pass
             category = find_td(r"Category:")
+            leverage = parse_leverage(page.text)
     except Exception:
         pass
 
@@ -690,6 +692,7 @@ def fetch_screener_data(ticker: str):
         "last_special_date": special["last_special_date"],
         "last_special_amount": special["last_special_amount"],
         **yield_metrics,
+        **leverage,
     }
 
 
@@ -713,3 +716,181 @@ def _empty(ticker: str) -> dict:
         "earned_yield_1y": None, "dist_yield_1y": None,
         "earned_yield_life": None, "dist_yield_life": None, "yield_life_years": None,
     }
+
+
+# ---------------------------------------------------------------------------
+# Leverage
+#
+# The v3 JSON API doesn't carry leverage — it's only in the fund page HTML,
+# in a block that splits preferred shares from debt. That split is the whole
+# point: the 1940 Act requires 300% asset coverage for debt but only 200% for
+# preferred, so two funds at an identical 30% headline ratio can be four times
+# apart in how far the market can fall before they're forced to deleverage.
+#
+# Read these as a *ranking*, not as breach math. CEFConnect's own tooltip warns
+# that leverage amounts refresh monthly-to-semi-annually while asset values
+# refresh daily, so a stale numerator against today's denominator can imply
+# sub-300% coverage on a fund that is nowhere near its limit (NPFD does exactly
+# this). `_leverage_cushion` returns None rather than a scary number whenever
+# the inputs disagree — "couldn't measure" must not read as "in trouble".
+# ---------------------------------------------------------------------------
+
+LEVERAGE_FIELDS = {
+    "PreferredShare": "preferred_usd",
+    "TotalBorrowings": "debt_usd",
+    "Act1940LeverageUSDm": "regulatory_usd",
+    "LeverageUSDmPC": "effective_usd",
+    "LeverageRatio_PC": "leverage_pct",
+}
+
+# Ordered low → high; the band is the headline, the ratio is the detail.
+LEVERAGE_BANDS = ["none", "low", "moderate", "high", "very high"]
+
+
+def _leverage_amount(s: str) -> float | None:
+    """'$350.024M' -> 350.024 (millions). Handles K/M/B suffixes."""
+    if not s:
+        return None
+    s = s.strip()
+    m = re.match(r"^\$?\s*(-?[\d,]+(?:\.\d+)?)\s*([KMB])?%?$", s, re.I)
+    if not m:
+        return None
+    try:
+        val = float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+    mult = {"K": 0.001, "M": 1.0, "B": 1000.0}.get((m.group(2) or "M").upper(), 1.0)
+    return val * mult
+
+
+def _leverage_band(pct: float | None, has_preferred: bool) -> str | None:
+    if pct is None:
+        return None
+    if pct < 5:
+        idx = 0
+    elif pct < 20:
+        idx = 1
+    elif pct < 30:
+        idx = 2
+    elif pct < 40:
+        idx = 3
+    else:
+        idx = 4
+    # Preferred leverage is tested at 200% rather than 300% coverage, so the
+    # same ratio buys materially more room. Soften by one band, never below
+    # "moderate" — preferred is cheaper to carry, not free.
+    if has_preferred and idx >= 3:
+        idx -= 1
+    return LEVERAGE_BANDS[idx]
+
+
+def _leverage_cushion(debt, preferred, regulatory, effective_usd, pct):
+    """
+    Indicative % portfolio decline before the binding 1940 Act coverage test
+    is hit, or None when the reported figures can't support the arithmetic.
+
+    Binding requirement is max(3 x debt, 2 x (debt + preferred)): the debt test
+    is senior and stricter, the preferred test applies to the whole stack.
+    """
+    if not (pct and effective_usd) or pct <= 0:
+        return None
+    debt = debt or 0.0
+    preferred = preferred or 0.0
+    if debt <= 0 and preferred <= 0:
+        return None
+    # Regulatory leverage should equal debt + preferred. When it doesn't, the
+    # fields were sampled at different dates (AVK, HGLB) — refuse to compute.
+    if regulatory and abs(regulatory - (debt + preferred)) > max(0.01, regulatory * 0.02):
+        return None
+    total_assets = effective_usd / (pct / 100.0)
+    if total_assets <= 0:
+        return None
+    required = max(3.0 * debt, 2.0 * (debt + preferred))
+    cushion = (1.0 - required / total_assets) * 100.0
+    # A negative cushion means the reported coverage is already under the
+    # statutory floor, which a live fund cannot be — the inputs are stale.
+    return round(cushion, 1) if cushion >= 0 else None
+
+
+def _empty_leverage() -> dict:
+    return {"leverage_pct": None, "leverage_type": None, "leverage_band": None,
+            "leverage_cushion_pct": None, "preferred_usd": None, "debt_usd": None,
+            "regulatory_usd": None, "leverage_as_of": None, "leverage_stale": 0}
+
+
+def parse_leverage(page_html: str) -> dict:
+    """Pull the leverage block out of an already-fetched CEFConnect fund page."""
+    out = _empty_leverage()
+    try:
+        soup = BeautifulSoup(page_html, "html.parser")
+        block = soup.find(id=re.compile(r"leverageBlock$"))
+        if not block:
+            # CEFConnect omits the block entirely for unleveraged funds (EXG).
+            # Deliberately left unknown rather than recorded as "none": if the
+            # page markup ever changes, a risk metric that silently reads
+            # "unleveraged" for every fund is the failure mode that hurts.
+            return out
+
+        raw = {}
+        for span in block.find_all("span", id=re.compile(r"dvLeverage_(\w+)Header$")):
+            key = re.search(r"dvLeverage_(\w+)Header$", span.get("id", ""))
+            td = span.find_parent("td")
+            sib = td.find_next_sibling("td") if td else None
+            if key and sib:
+                raw[key.group(1)] = sib.get_text(strip=True)
+
+        vals = {}
+        for src, dest in LEVERAGE_FIELDS.items():
+            vals[dest] = _leverage_amount(raw.get(src, ""))
+
+        as_of = block.find(class_="as-of-date")
+        if as_of:
+            m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", as_of.get_text())
+            if m:
+                out["leverage_as_of"] = f"{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
+                # Funds report leverage as infrequently as semi-annually; past a
+                # year the ratio describes a portfolio that may no longer exist.
+                age = (date.today() - date.fromisoformat(out["leverage_as_of"])).days
+                out["leverage_stale"] = 1 if age > 365 else 0
+
+        debt, pref = vals.get("debt_usd"), vals.get("preferred_usd")
+        pct = vals.get("leverage_pct")
+
+        if pct is None and not debt and not pref:
+            return out  # unleveraged funds render no figures (EXG)
+
+        has_pref = bool(pref and pref > 0)
+        if not (debt or pref):
+            ltype = "none"
+        elif has_pref and debt:
+            ltype = "preferred+debt"
+        elif has_pref:
+            ltype = "preferred"
+        else:
+            ltype = "debt"
+
+        out.update({
+            "leverage_pct": round(pct, 2) if pct is not None else None,
+            "leverage_type": ltype,
+            "leverage_band": _leverage_band(pct, has_pref),
+            "leverage_cushion_pct": _leverage_cushion(
+                debt, pref, vals.get("regulatory_usd"), vals.get("effective_usd"), pct),
+            "preferred_usd": pref,
+            "debt_usd": debt,
+            "regulatory_usd": vals.get("regulatory_usd"),
+        })
+    except Exception:
+        pass
+    return out
+
+
+def fetch_leverage(ticker: str) -> dict:
+    """Standalone leverage fetch (the screener reuses its own page request)."""
+    try:
+        r = httpx.get(f"https://www.cefconnect.com/fund/{ticker.upper()}",
+                      headers=HEADERS, timeout=15, follow_redirects=True)
+        if r.status_code == 200:
+            return parse_leverage(r.text)
+    except Exception:
+        pass
+    return _empty_leverage()

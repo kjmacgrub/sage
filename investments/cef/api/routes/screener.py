@@ -66,12 +66,16 @@ def _do_refresh():
                                   (ticker, name, price, nav, premium_discount, avg_discount_1y,
                                    nav_change_1y, nav_cagr, yield_pct, dist_freq, inception_date, category, dist_cagr,
                                    has_special_dist, regular_yield_pct, last_special_date, last_special_amount,
-                                   earned_yield_1y, dist_yield_1y, earned_yield_life, dist_yield_life, yield_life_years, fetched_at)
+                                   earned_yield_1y, dist_yield_1y, earned_yield_life, dist_yield_life, yield_life_years,
+                                   leverage_pct, leverage_type, leverage_band, leverage_cushion_pct,
+                                   preferred_usd, debt_usd, regulatory_usd, leverage_as_of, leverage_stale, fetched_at)
                                 VALUES
                                   (:ticker, :name, :price, :nav, :premium_discount, :avg_discount_1y,
                                    :nav_change_1y, :nav_cagr, :yield_pct, :dist_freq, :inception_date, :category, :dist_cagr,
                                    :has_special_dist, :regular_yield_pct, :last_special_date, :last_special_amount,
-                                   :earned_yield_1y, :dist_yield_1y, :earned_yield_life, :dist_yield_life, :yield_life_years, datetime('now'))
+                                   :earned_yield_1y, :dist_yield_1y, :earned_yield_life, :dist_yield_life, :yield_life_years,
+                                   :leverage_pct, :leverage_type, :leverage_band, :leverage_cushion_pct,
+                                   :preferred_usd, :debt_usd, :regulatory_usd, :leverage_as_of, :leverage_stale, datetime('now'))
                                 ON CONFLICT(ticker) DO UPDATE SET
                                     name=excluded.name, price=excluded.price, nav=excluded.nav,
                                     premium_discount=excluded.premium_discount,
@@ -92,6 +96,15 @@ def _do_refresh():
                                     earned_yield_life=excluded.earned_yield_life,
                                     dist_yield_life=excluded.dist_yield_life,
                                     yield_life_years=excluded.yield_life_years,
+                                    leverage_pct=excluded.leverage_pct,
+                                    leverage_type=excluded.leverage_type,
+                                    leverage_band=excluded.leverage_band,
+                                    leverage_cushion_pct=excluded.leverage_cushion_pct,
+                                    preferred_usd=excluded.preferred_usd,
+                                    debt_usd=excluded.debt_usd,
+                                    regulatory_usd=excluded.regulatory_usd,
+                                    leverage_as_of=excluded.leverage_as_of,
+                                    leverage_stale=excluded.leverage_stale,
                                     fetched_at=excluded.fetched_at
                             """, {**data, "name": name})
             except Exception as e:

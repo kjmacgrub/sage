@@ -43,6 +43,25 @@ def init_db():
             # Specials must be data, not prose: a BDC that quietly stops paying
             # them cuts your income without touching the regular dividend.
             "ALTER TABLE bdc_fundamentals ADD COLUMN special_per_share REAL",
+            # Leverage. Tracked as a risk dimension in its own right, never
+            # folded into the A-F distribution grade: a levered fund is not a
+            # badly-run fund. The preferred/debt split is the load-bearing
+            # field -- the 1940 Act tests debt at 300% coverage and preferred
+            # at 200%, so identical headline ratios can be four times apart in
+            # how far the market can fall before a forced deleveraging.
+            "ALTER TABLE screener_cache ADD COLUMN leverage_pct REAL",
+            "ALTER TABLE screener_cache ADD COLUMN leverage_type TEXT",
+            "ALTER TABLE screener_cache ADD COLUMN leverage_band TEXT",
+            "ALTER TABLE screener_cache ADD COLUMN leverage_cushion_pct REAL",
+            "ALTER TABLE screener_cache ADD COLUMN preferred_usd REAL",
+            "ALTER TABLE screener_cache ADD COLUMN debt_usd REAL",
+            "ALTER TABLE screener_cache ADD COLUMN regulatory_usd REAL",
+            "ALTER TABLE screener_cache ADD COLUMN leverage_as_of TEXT",
+            "ALTER TABLE screener_cache ADD COLUMN leverage_stale INTEGER DEFAULT 0",
+            # BDCs are tested at 150% asset coverage (SBCAA 2018), not 300%.
+            # Different regime, so it rides along with the manual quarterly entry.
+            "ALTER TABLE bdc_fundamentals ADD COLUMN total_debt REAL",
+            "ALTER TABLE bdc_fundamentals ADD COLUMN total_equity REAL",
         ]:
             try:
                 conn.execute(sql)

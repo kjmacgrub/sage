@@ -308,6 +308,88 @@ def _discrepancies(ticker, conn, fresh):
 # CEF audit
 # --------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Leverage context
+#
+# Reported alongside the grade, never inside it. "Is the yield paying for
+# itself" and "how far can the market fall before this fund is forced to sell"
+# are different questions -- the same split already documented between the
+# screener's total-payout coverage and the audit's regular-dividend basis.
+# A levered fund is not a badly-run fund; it is a fund with a shorter fuse.
+#
+# Nor does it touch `flags`: those lower confidence because the data is
+# doubtful, and a known leverage ratio is not doubtful data.
+# ---------------------------------------------------------------------------
+
+_LEVERAGE_NOTE = {
+    "none":      "Effectively unleveraged -- no forced-deleveraging risk.",
+    "low":       "Lightly levered; a severe drawdown is unlikely to force selling.",
+    "moderate":  "Typical CEF leverage. Amplifies both directions.",
+    "high":      "Heavily levered -- NAV falls faster than the market, and the "
+                 "discount usually widens at the same time.",
+    "very high": "Among the most levered structures; expect outsized drawdowns "
+                 "and real risk of deleveraging into a bottom.",
+}
+
+
+def _leverage_context(ticker, conn):
+    row = conn.execute(
+        """SELECT leverage_pct, leverage_type, leverage_band, leverage_cushion_pct,
+                  preferred_usd, debt_usd, leverage_as_of, leverage_stale
+           FROM screener_cache WHERE ticker=?""", (ticker,)).fetchone()
+    if row is None or row["leverage_band"] is None:
+        return {"available": False,
+                "note": "Leverage not reported by the data source. Unknown, "
+                        "not zero -- absence of a figure is not absence of leverage."}
+
+    d = dict(row)
+    band, ltype = d["leverage_band"], d["leverage_type"]
+    note = _LEVERAGE_NOTE.get(band, "")
+    if ltype and "preferred" in ltype:
+        note += (" Part of the leverage is preferred shares, tested at 200% "
+                 "asset coverage rather than the 300% debt test -- materially "
+                 "more room before a breach.")
+    if d["leverage_cushion_pct"] is not None:
+        note += (f" Indicative cushion: roughly a {d['leverage_cushion_pct']:.0f}% "
+                 "portfolio decline before the binding coverage test is hit.")
+    else:
+        note += (" No cushion estimate: the reported debt, preferred and asset "
+                 "figures were sampled at different dates and don't reconcile.")
+    if d["leverage_stale"]:
+        note += f" Figures are as of {d['leverage_as_of']} and may be well out of date."
+
+    return {"available": True, **{k: _r(d[k]) if isinstance(d[k], float) else d[k]
+                                  for k in d}, "note": note.strip()}
+
+
+def _bdc_leverage_context(ticker, conn):
+    """BDCs are tested at 150% asset coverage (SBCAA 2018), not 300%/200%."""
+    row = conn.execute(
+        """SELECT quarter_end, total_debt, total_equity FROM bdc_fundamentals
+           WHERE ticker=? AND total_debt IS NOT NULL AND total_equity IS NOT NULL
+           ORDER BY quarter_end DESC LIMIT 1""", (ticker,)).fetchone()
+    if row is None:
+        return {"available": False,
+                "note": "No debt/equity entered yet. Add total debt and total net "
+                        "assets with the quarterly figures to track asset coverage."}
+    debt, equity = row["total_debt"], row["total_equity"]
+    if not debt or debt <= 0 or not equity:
+        return {"available": False, "note": "Debt/equity figures incomplete."}
+    assets = debt + equity
+    coverage = assets / debt * 100.0
+    # Required: assets/debt >= 150%. Decline to breach on equity value.
+    cushion = (1.0 - (1.5 * debt) / assets) * 100.0
+    return {"available": True, "as_of": row["quarter_end"],
+            "debt_to_equity": _r(debt / equity, 2),
+            "asset_coverage_pct": _r(coverage, 1),
+            "cushion_pct": _r(cushion, 1) if cushion >= 0 else None,
+            "note": (f"Asset coverage {coverage:.0f}% against a 150% floor; roughly a "
+                     f"{cushion:.0f}% decline in portfolio value before it binds."
+                     if cushion >= 0 else
+                     "Reported coverage is already below the 150% floor -- figures "
+                     "are stale or mis-entered.")}
+
+
 def _audit_cef(ticker, conn, s):
     flags, notes = [], []
 
@@ -554,6 +636,7 @@ def _audit_cef(ticker, conn, s):
             "nav_points": len(navs),
             "distribution_count": len(divs),
             "notes": notes,
+            "leverage": _leverage_context(ticker, conn),
         },
         "flags": flags,
     }
@@ -705,6 +788,7 @@ def _audit_bdc(ticker, conn, s):
                                 "cash_benchmark": cash},
             },
             "effective_weights": effective,
+            "leverage": _bdc_leverage_context(ticker, conn),
         },
         "flags": flags,
     }
