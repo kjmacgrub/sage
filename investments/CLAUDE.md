@@ -136,8 +136,10 @@ is why the concentration stayed invisible with a category column on screen.
   rather than a guess — "not yet classified", not silently wrong.
 - Covered-call is a strategy, not an exposure: the category maps to US equity,
   so genuinely global funds like EXG need the override.
-- Currently hand-set: BSTZ (Tech equity), NXG (Energy infrastructure),
-  EXG (Global equity). 332 of 370 screener funds classify automatically.
+- Currently hand-set: BSTZ (Tech equity), NXG + ASGI (Energy infrastructure),
+  EXG (Global equity), BMEZ (Healthcare equity), BANX (Credit / loans).
+  Nothing on the watchlist is unclassified; most screener funds map
+  automatically from category.
 - One bucket per fund, deliberately. The moment a fund can sit in two, the
   concentration total stops being readable.
 - The portfolio breakdown flags any bucket at ≥20% — roughly 4× equal weight
@@ -148,7 +150,11 @@ is why the concentration stayed invisible with a category column on screen.
   the bucket is already ≥20% and a purchase would deepen it.
 - Exposure is only as good as the source category. CEFConnect files ASGI (abrdn
   Global Infrastructure Income) under `Fixed Income - Taxable-Global Income`,
-  so it resolves to Credit / loans — wrong, and fixable only by override.
+  which resolved it to Credit / loans. Overridden to Energy infrastructure —
+  the source data is wrong, and an override is the only fix.
+- `Healthcare equity` was added to the taxonomy rather than filing BMEZ under
+  US equity, which would have repeated the exact NXG/BSTZ merge this column
+  exists to prevent. Add a bucket before forcing a fund into a wrong one.
 
 ## Portfolio Context
 - 19 positions (17 CEF, 2 BDC) — ~$38,596 cost, ~$40,727 market value

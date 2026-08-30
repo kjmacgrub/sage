@@ -25,6 +25,7 @@ EXPOSURES = [
     "US equity",
     "Global equity",
     "Tech equity",
+    "Healthcare equity",
     "Energy infrastructure",
     "Real estate",
     "Multi-asset",
