@@ -142,6 +142,13 @@ is why the concentration stayed invisible with a category column on screen.
   concentration total stops being readable.
 - The portfolio breakdown flags any bucket at ≥20% — roughly 4× equal weight
   across the current book.
+- On the **watchlist** the cell carries the weight already committed to that
+  bucket, because the question there is not "what is this fund" but "what would
+  buying it do to me". `new` means nothing held there yet; a yellow figure means
+  the bucket is already ≥20% and a purchase would deepen it.
+- Exposure is only as good as the source category. CEFConnect files ASGI (abrdn
+  Global Infrastructure Income) under `Fixed Income - Taxable-Global Income`,
+  so it resolves to Credit / loans — wrong, and fixable only by override.
 
 ## Portfolio Context
 - 19 positions (17 CEF, 2 BDC) — ~$38,596 cost, ~$40,727 market value

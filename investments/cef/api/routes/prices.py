@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import date, timedelta
 from ...database import get_db
+from ...services.exposure import resolve as resolve_exposure
 from ...services.scraper import fetch_fund_data, fetch_quick_prices
 
 router = APIRouter()
@@ -17,14 +18,22 @@ def latest_prices():
     """Return the most recent price row for each active fund."""
     with get_db() as conn:
         rows = conn.execute("""
-            SELECT p.*, f.name, f.type
+            SELECT p.*, f.name, f.type, f.exposure AS exposure_set,
+                   sc.category AS category
             FROM prices p
             JOIN funds f ON f.ticker = p.ticker
+            LEFT JOIN screener_cache sc ON sc.ticker = p.ticker
             WHERE f.active = 1
               AND p.date = (SELECT MAX(p2.date) FROM prices p2 WHERE p2.ticker = p.ticker)
             ORDER BY p.premium_discount ASC
         """).fetchall()
-        return [dict(r) for r in rows]
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["exposure"] = resolve_exposure(
+                d.pop("exposure_set", None), d.pop("category", None), d.get("type"))
+            out.append(d)
+        return out
 
 
 @router.get("/history/{ticker}")

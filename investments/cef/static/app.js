@@ -506,6 +506,40 @@ function lifetimeSummaryBar() {
 }
 
 // === WATCHLIST TAB ===
+// Current portfolio weight per exposure bucket. Computed on demand rather than
+// cached: holdings and prices both move, and this is a 19-row loop.
+function portfolioExposureWeights() {
+  const held = _holdings.filter(h => h.shares > 0);
+  const total = held.reduce((a, h) => a + (h.market_value || 0), 0);
+  const by = {};
+  if (!total) return by;
+  held.forEach(h => {
+    const k = h.exposure || 'Unclassified';
+    by[k] = (by[k] || 0) + (h.market_value || 0);
+  });
+  Object.keys(by).forEach(k => { by[k] = by[k] / total * 100; });
+  return by;
+}
+
+// On the watchlist the question isn't "what is this fund" but "what would
+// buying it do to me". So the cell carries the weight already committed to
+// that bucket: adding to a 24% position is a different decision from opening
+// a new one, and that's the fact the label alone hides.
+function watchlistExposureCell(p, weights) {
+  if (!p.exposure) {
+    return `<td class="left" style="color:var(--text-muted);font-size:12px;white-space:nowrap"
+      title="Not yet classified — set it from the portfolio's Exposure column">unset</td>`;
+  }
+  const w = weights[p.exposure];
+  const heavy = w != null && w >= 20;
+  const badge = w == null
+    ? `<span style="color:var(--green);font-size:11px" title="You hold nothing in this bucket — this would diversify">new</span>`
+    : `<span style="color:${heavy ? 'var(--yellow)' : 'var(--text-muted)'};font-size:11px"
+         title="${heavy ? 'Already a concentrated bucket — adding here deepens it' : 'Current portfolio weight in this bucket'}">${w.toFixed(0)}%</span>`;
+  return `<td class="left" style="font-size:12px;white-space:nowrap">
+    <span style="color:var(--text-2)">${p.exposure}</span> ${badge}</td>`;
+}
+
 function renderWatchlist() {
   if (!_prices.length) {
     return `
@@ -542,6 +576,7 @@ function renderWatchlist() {
             ${th('ticker', 'Ticker', true, 1)}
             ${th('name', 'Name', true, 2)}
             ${th('type', 'Type', true, 3)}
+            ${th('exposure', 'Exposure', true, false, 'What the fund holds, and beside it the share of your portfolio already committed to that bucket. \'new\' means you hold nothing there yet; a yellow figure means the bucket is already 20%+ of the sleeve, so adding deepens an existing concentration.')}
             ${th('disc_vs_avg', 'δ vs Avg', false, false, 'Current disc/premium relative to its 1-year average. Negative = trading cheaper than usual.')}
             ${th('price', 'Price')}
             ${th('nav', 'NAV')}
@@ -553,16 +588,16 @@ function renderWatchlist() {
           </tr>
         </thead>
         <tbody>
-          ${watchlistBody(sorted, held)}
+          ${watchlistBody(sorted, held, portfolioExposureWeights())}
         </tbody>
       </table>
     </div>
     ${renderInactiveFunds()}`;
 }
 
-function watchlistBody(sorted, held) {
+function watchlistBody(sorted, held, weights) {
   if (!setting('display.group_by_type', true)) {
-    return sorted.map(p => watchlistRow(p, held.has(p.ticker))).join('');
+    return sorted.map(p => watchlistRow(p, held.has(p.ticker), weights)).join('');
   }
   const groups = {};
   sorted.forEach(p => { (groups[p.type || '—'] ||= []).push(p); });
@@ -573,13 +608,13 @@ function watchlistBody(sorted, held) {
     const rows = groups[type];
     return `
       <tr class="group-header">
-        <td colspan="11">${type}<span class="group-meta">${rows.length} fund${rows.length > 1 ? 's' : ''}</span>${
+        <td colspan="12">${type}<span class="group-meta">${rows.length} fund${rows.length > 1 ? 's' : ''}</span>${
           type === 'BDC' ? bdcDataStatus(rows.map(p => p.ticker)) : ''}</td>
-      </tr>` + rows.map(p => watchlistRow(p, held.has(p.ticker))).join('');
+      </tr>` + rows.map(p => watchlistRow(p, held.has(p.ticker), weights)).join('');
   }).join('');
 }
 
-function watchlistRow(p, isHeld = false) {
+function watchlistRow(p, isHeld = false, weights = {}) {
   return `
     <tr onclick="openHoldingModal('${p.ticker}')">
       <td class="left col-sticky">
@@ -587,6 +622,7 @@ function watchlistRow(p, isHeld = false) {
       </td>
       <td class="left col-sticky-2" style="color:var(--text-2)">${p.name || ''}</td>
       <td class="left col-sticky-3"><span class="badge-type ${(p.type||'').toLowerCase()}">${p.type || ''}</span></td>
+      ${watchlistExposureCell(p, weights)}
       <td>${fmtDiscCell(p.premium_discount, p.avg_discount_1y)}</td>
       <td>${fmt$(p.price)}</td>
       <td>${fmt$(p.nav)}</td>
