@@ -1,0 +1,529 @@
+<title>Backtest Autopsy</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+:root{
+  --ink:#161d26;
+  --paper:#f2f2ef;
+  --surface:#fbfbfa;
+  --rule:#d7d8d4;
+  --rule-soft:#e6e6e3;
+  --text:#1d242d;
+  --text-2:#525c67;
+  --text-3:#7d8792;
+  --flag:#a83d2c;
+  --flag-soft:#f2e2de;
+  --keep:#2f6b57;
+  --keep-soft:#dfeae5;
+  --band:#ececeA;
+  --shadow:0 1px 2px rgba(22,29,38,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#e8e9e6;
+    --paper:#12171d;
+    --surface:#181f27;
+    --rule:#2c353f;
+    --rule-soft:#232b34;
+    --text:#dfe2e0;
+    --text-2:#9aa5b0;
+    --text-3:#727d88;
+    --flag:#e0705a;
+    --flag-soft:#33211d;
+    --keep:#6cbba0;
+    --keep-soft:#182a25;
+    --band:#1a212a;
+    --shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#e8e9e6;
+  --paper:#12171d;
+  --surface:#181f27;
+  --rule:#2c353f;
+  --rule-soft:#232b34;
+  --text:#dfe2e0;
+  --text-2:#9aa5b0;
+  --text-3:#727d88;
+  --flag:#e0705a;
+  --flag-soft:#33211d;
+  --keep:#6cbba0;
+  --keep-soft:#182a25;
+  --band:#1a212a;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--paper);
+  color:var(--text);
+  font-family:"IBM Plex Serif",Georgia,serif;
+  font-size:16px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1000px;margin:0 auto;padding:0 28px 96px}
+.col{max-width:68ch}
+
+/* ---------- masthead ---------- */
+header.mast{
+  border-bottom:2px solid var(--ink);
+  padding:56px 0 20px;
+  margin-bottom:44px;
+}
+.eyebrow{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--flag);font-weight:500;margin:0 0 18px;
+}
+h1{
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+  font-size:clamp(38px,6vw,60px);
+  line-height:1.02;letter-spacing:-.028em;font-weight:700;
+  margin:0 0 18px;color:var(--ink);text-wrap:balance;
+}
+.standfirst{
+  font-size:19px;line-height:1.55;color:var(--text-2);
+  max-width:60ch;margin:0 0 26px;
+}
+.meta{
+  display:flex;flex-wrap:wrap;gap:0 32px;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:11.5px;color:var(--text-3);
+  letter-spacing:.03em;
+}
+.meta b{color:var(--text-2);font-weight:500}
+
+/* ---------- sections ---------- */
+section{margin:0 0 60px}
+h2{
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+  font-size:13px;letter-spacing:.13em;text-transform:uppercase;
+  font-weight:600;color:var(--text-3);
+  margin:0 0 6px;padding-bottom:10px;border-bottom:1px solid var(--rule);
+}
+h3{
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+  font-size:26px;line-height:1.2;letter-spacing:-.018em;font-weight:600;
+  color:var(--ink);margin:20px 0 14px;text-wrap:balance;
+}
+h4{
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+  font-size:16px;font-weight:600;letter-spacing:-.005em;
+  color:var(--ink);margin:32px 0 10px;
+}
+p{margin:0 0 16px}
+p.lede{font-size:18px;color:var(--text-2);line-height:1.6}
+strong{font-weight:600;color:var(--ink)}
+em{font-style:italic}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.88em}
+code{
+  background:var(--band);padding:.12em .38em;border-radius:2px;
+  color:var(--text);letter-spacing:-.01em;
+}
+a{color:var(--flag)}
+
+/* ---------- verdict ---------- */
+.verdict{
+  background:var(--surface);
+  border:1px solid var(--rule);
+  border-left:3px solid var(--flag);
+  padding:26px 30px;
+  margin:0 0 56px;
+}
+.verdict p{margin:0 0 14px;font-size:17px}
+.verdict p:last-child{margin-bottom:0}
+
+/* ---------- flag list ---------- */
+.flags{display:flex;flex-direction:column;gap:0;margin:22px 0 8px;
+  border-top:1px solid var(--rule);}
+.flag{
+  display:grid;
+  grid-template-columns:minmax(0,300px) 92px minmax(0,1fr);
+  gap:0 24px;
+  padding:18px 0;
+  border-bottom:1px solid var(--rule-soft);
+  align-items:start;
+}
+.flag-name{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:13px;line-height:1.45;font-weight:500;
+  color:var(--ink);letter-spacing:-.015em;
+}
+.warned{color:var(--flag);font-weight:600}
+.flag-state{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:11px;letter-spacing:.06em;white-space:nowrap;
+  padding-top:2px;
+}
+.was{color:var(--flag)}
+.arrow{color:var(--text-3);padding:0 3px}
+.now{color:var(--keep)}
+.flag-what{font-size:15px;color:var(--text-2);line-height:1.55}
+.flag-what b{color:var(--text);font-weight:600}
+
+/* ---------- tables ---------- */
+.tw{overflow-x:auto;margin:22px 0 8px;-webkit-overflow-scrolling:touch}
+table{
+  border-collapse:collapse;width:100%;min-width:520px;
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+  font-size:14px;
+}
+caption{
+  text-align:left;caption-side:top;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--text-3);padding-bottom:10px;
+}
+th{
+  text-align:right;font-weight:600;font-size:11.5px;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);
+  padding:0 0 9px;border-bottom:1px solid var(--ink);white-space:nowrap;
+}
+th:first-child{text-align:left}
+td{
+  text-align:right;padding:9px 0;
+  border-bottom:1px solid var(--rule-soft);
+  font-variant-numeric:tabular-nums;color:var(--text);
+}
+td:first-child{
+  text-align:left;color:var(--text-2);
+  font-family:"IBM Plex Serif",Georgia,serif;font-size:14.5px;
+}
+th+th,td+td{padding-left:22px}
+tr.hi td{background:var(--flag-soft);font-weight:600;color:var(--text)}
+tr.hi td:first-child{color:var(--text)}
+tr.good td{background:var(--keep-soft);font-weight:600}
+tr.good td:first-child{color:var(--text)}
+tr.total td{border-top:1px solid var(--ink);border-bottom:none;font-weight:600;color:var(--ink)}
+.neg{color:var(--flag)}
+.pos{color:var(--keep)}
+td.num,th.num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
+
+/* ---------- stat strip ---------- */
+.stats{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
+  gap:1px;background:var(--rule);border:1px solid var(--rule);
+  margin:24px 0 8px;
+}
+.stat{background:var(--surface);padding:16px 18px}
+.stat dt{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text-3);margin:0 0 7px;
+}
+.stat dd{
+  margin:0;font-family:"IBM Plex Sans",system-ui,sans-serif;
+  font-size:25px;font-weight:600;letter-spacing:-.02em;
+  color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1;
+}
+.stat dd .sub{
+  display:block;font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:11px;font-weight:400;color:var(--text-3);
+  letter-spacing:.02em;margin-top:5px;
+}
+
+/* ---------- pull ---------- */
+.pull{
+  border-left:2px solid var(--flag);
+  padding:2px 0 2px 22px;margin:26px 0;
+  font-size:18px;line-height:1.5;color:var(--text);
+  max-width:56ch;
+}
+.pull .attrib{
+  display:block;margin-top:10px;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:11.5px;color:var(--text-3);letter-spacing:.03em;
+}
+
+/* ---------- open items ---------- */
+.items{list-style:none;padding:0;margin:22px 0 0;border-top:1px solid var(--rule)}
+.items li{
+  padding:16px 0;border-bottom:1px solid var(--rule-soft);
+  display:grid;grid-template-columns:auto 1fr;gap:0 18px;align-items:baseline;
+}
+.tag{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+  padding:3px 8px;border:1px solid var(--rule);color:var(--text-3);
+  white-space:nowrap;
+}
+.tag.act{color:var(--flag);border-color:var(--flag)}
+.tag.watch{color:var(--keep);border-color:var(--keep)}
+.tag.done{color:var(--keep);border-color:var(--keep);background:var(--keep-soft)}
+.items p{margin:0;font-size:15.5px;color:var(--text-2);line-height:1.55}
+.items p b{color:var(--ink);font-weight:600;font-family:"IBM Plex Sans",system-ui,sans-serif}
+
+footer{
+  border-top:2px solid var(--ink);margin-top:20px;padding-top:18px;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:11.5px;color:var(--text-3);letter-spacing:.02em;
+  display:flex;flex-wrap:wrap;gap:8px 28px;
+}
+
+@media (max-width:680px){
+  .flag{grid-template-columns:1fr;gap:8px 0}
+  .flag-state{padding-top:0}
+  .wrap{padding:0 20px 64px}
+  header.mast{padding-top:36px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+:focus-visible{outline:2px solid var(--flag);outline-offset:2px}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Option Omega · SPX / QQQ · Sept 2026</p>
+  <h1>Backtest Autopsy</h1>
+  <p class="standfirst">Four checkboxes were inflating every backtest in the book. Finding them cost the iron condors their place in the portfolio — and turned up a sizing bug worth $90,964.</p>
+  <div class="meta">
+    <span><b>Scope</b> 2020-05-18 → 2026-09-04</span>
+    <span><b>Live reference</b> 2026 YTD, 1,879 legs</span>
+    <span><b>Backtests reviewed</b> 11</span>
+  </div>
+</header>
+
+<div class="verdict">
+  <p>A live account returned <strong>$22,015</strong> over a period the backtest said was worth <strong>$89,666</strong>. The gap was not execution, not margin, and not bad luck — it was four Option Omega settings that let the model skip stop-outs the market would have enforced.</p>
+  <p>Correcting them turned the iron condor book from <strong>+$281,047</strong> to <strong>−$31,987</strong> across 4.3 years, with a 53% drawdown and an early termination. The ICs came out. What replaced them is a four-strategy book that has now been positive in every calendar year since 2020.</p>
+</div>
+
+<section>
+  <h2>The settings</h2>
+  <h3>Four flags that were paying you in fictional dollars</h3>
+  <p class="col">Two of these carry Option Omega's own warning triangle. Check them first on any strategy that uses a stop — they are worth more than any parameter you can tune.</p>
+
+  <div class="flags">
+    <div class="flag">
+      <div class="flag-name warned">⚠ Ignore Single Bar Stop Loss Breach</div>
+      <div class="flag-state"><span class="was">ON</span><span class="arrow">→</span><span class="now">OFF</span></div>
+      <div class="flag-what">Disregards a stop breach that reverts inside one bar. <b>92 short legs — 10% of all expired short legs — traded past −85% MAE and still logged as “Expired.”</b> Median excursion on them: −103%. Your broker extends no such courtesy.</div>
+    </div>
+    <div class="flag">
+      <div class="flag-name warned">⚠ Cap Non-Opening Stop Outs at User-Defined Stop Amount</div>
+      <div class="flag-state"><span class="was">ON</span><span class="arrow">→</span><span class="now">OFF</span></div>
+      <div class="flag-what">Caps the loss at exactly the stop amount even when price blew straight through it. Real stop-outs slip: average stop loss went from <b>−$302 to −$396</b> once this was off.</div>
+    </div>
+    <div class="flag">
+      <div class="flag-name">Use 0-DTE Intra-Minute Stops</div>
+      <div class="flag-state"><span class="was">OFF</span><span class="arrow">→</span><span class="now">ON</span></div>
+      <div class="flag-what">Off means stops are evaluated only on minute boundaries. <b>All 2,440 timestamps in the export ended in <code>:00</code></b> — the live log had sub-second fills. A spike that blows through your stop and reverts within 60 seconds is invisible to the model and fatal to you.</div>
+    </div>
+    <div class="flag">
+      <div class="flag-name">Ignore Trades with Wide Bid-Ask Spread</div>
+      <div class="flag-state"><span class="was">ON</span><span class="arrow">→</span><span class="now">OFF</span></div>
+      <div class="flag-what">Silently declines to enter the hardest-to-fill trades — precisely the population where live fills came in <b>16% under model on $4+ credit entries</b>. Selection bias in the backtest's favor.</div>
+    </div>
+    <div class="flag">
+      <div class="flag-name">Exit Slippage</div>
+      <div class="flag-state"><span class="was">blank</span><span class="arrow">→</span><span class="now">0.2</span></div>
+      <div class="flag-what">Entry slippage and stop-loss slippage were both set to 0.2. Exit slippage was left empty.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>The evidence</h2>
+  <h3>526 identical trades, two very different outcomes</h3>
+  <p class="col">Matching live trades to backtest trades on the same day, same strategy, same strikes, one contract. The backtest made <strong>$38,471</strong> on them. The live account made <strong>$4,386</strong>. Splitting by how each side closed shows exactly where it went.</p>
+
+  <div class="tw">
+    <table>
+      <caption>Matched trades by close reason — backtest vs live</caption>
+      <thead>
+        <tr><th>Backtest → Live</th><th class="num">Trades</th><th class="num">Backtest</th><th class="num">Live</th><th class="num">Swing</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Expired → Expired</td><td class="num">256</td><td class="num">+42,915</td><td class="num">+43,844</td><td class="num pos">+929</td></tr>
+        <tr><td>Stop Loss → Stop Loss</td><td class="num">121</td><td class="num">−34,338</td><td class="num">−31,820</td><td class="num pos">+2,518</td></tr>
+        <tr class="hi"><td>Expired → Stop Loss</td><td class="num">75</td><td class="num">+15,372</td><td class="num">−17,460</td><td class="num">−32,832</td></tr>
+        <tr><td>Expired → Manual Exit</td><td class="num">20</td><td class="num">+15,378</td><td class="num">+12,254</td><td class="num neg">−3,124</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="col">Where both systems agreed, the live account did <em>better</em> — smaller losses on the shared stop-outs, slightly more on the shared expirations. The entire gap sits in one row: 75 trades the model rode to a worthless expiration and the live stop closed at a loss. Realized stop rates were <strong>22.1% modeled against 30.3% live</strong>.</p>
+
+  <div class="pull">
+    Entry slippage across all 526 matched pairs totalled $5,462. Peak margin requirement was $33,096 against an $80,000 account. Neither theory survived contact with the data.
+    <span class="attrib">The original hypothesis was insufficient margin on high-volatility days</span>
+  </div>
+
+  <h4>What the live account actually did well</h4>
+  <p class="col">On VIX 22–30 days the live book captured <strong>97%</strong> of the backtest ($11,492 against $11,841). Discretionary exits — 88 legs, +$25,517, averaging <strong>+$290 per leg</strong> — were the single best-performing close reason in the entire book. The damage was concentrated in the quiet-to-mid regime, where the model's forgiveness flags did the most work.</p>
+</section>
+
+<section>
+  <h2>The iron condors</h2>
+  <h3>Three runs, one verdict</h3>
+
+  <div class="tw">
+    <table>
+      <caption>Same IC strategy, progressively honest settings — 4.3 years</caption>
+      <thead>
+        <tr><th>Configuration</th><th class="num">2022</th><th class="num">2023</th><th class="num">2024</th><th class="num">2025</th><th class="num">2026</th><th class="num">Total</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>As originally built</td><td class="num">+62,328</td><td class="num">+41,711</td><td class="num">+91,642</td><td class="num">+45,576</td><td class="num">+39,789</td><td class="num">+281,047</td></tr>
+        <tr><td>Single-bar breach off</td><td class="num">+45,098</td><td class="num">+12,260</td><td class="num">+61,594</td><td class="num">+23,876</td><td class="num">+16,214</td><td class="num">+159,042</td></tr>
+        <tr class="hi"><td>Loss cap also off</td><td class="num">+18,355</td><td class="num">−27,201</td><td class="num">+23,632</td><td class="num">−30,452</td><td class="num">−16,321</td><td class="num">−31,987</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="col">The fully-corrected run carried a <strong>53% max drawdown</strong> and terminated early on 2026-07-29 — it ran the account from a $100,798 peak to $50,235 and could not continue. Reality sat between runs two and three: live CIC strategies returned <strong>+$7,847</strong> in 2026 against +$16,214 and −$16,321 modeled.</p>
+
+  <h4>The filter that looked like a rescue</h4>
+  <p class="col">Screening for entries above $9 credit produced <strong>+$42,118</strong> across 4.3 years. Of which 2024 alone contributed <strong>+$42,103</strong>. Every other year netted about fifteen dollars, and 2025 swung from −$30,435 to +$7,506 to −$5,520 as the threshold rose — noise, not signal.</p>
+
+  <h4>What the long wings were really doing</h4>
+  <p class="col">The wings did explode, exactly as remembered — 38 entries, one of them worth $12,650 on a single leg, netting <strong>+$86,412</strong>. Carrying them on the other <strong>2,384</strong> entries cost <strong>−$185,242</strong>. Forty-seven cents back per dollar of insurance. And in the one IC configuration that was actually profitable, the wings paid off <strong>zero times out of 1,072</strong>.</p>
+
+  <div class="pull">
+    An iron condor makes you buy wings on both sides, every day, unconditionally. The Long Put Hedge is the same convexity bet placed only when conditions warrant it — 316 conditional entries netting +$43,668 against 2,422 unconditional ones netting −$98,830.
+    <span class="attrib">Why the structure was wrong for the job</span>
+  </div>
+</section>
+
+<section>
+  <h2>The sizing bug</h2>
+  <h3>A denominator that could collapse</h3>
+  <p class="col">Percentage-of-portfolio sizing divides an allocation by margin-per-contract. When a calendar's two legs price nearly identically, that denominator falls toward zero and the contract count explodes.</p>
+
+  <div class="tw">
+    <table>
+      <caption>Daily Calendar 14/16 by margin per contract</caption>
+      <thead>
+        <tr><th>Margin / contract</th><th class="num">Trades</th><th class="num">Avg contracts</th><th class="num">Total P/L</th><th class="num">P/L per contract</th></tr>
+      </thead>
+      <tbody>
+        <tr class="hi"><td>Under $25</td><td class="num">7</td><td class="num">628</td><td class="num">−90,964</td><td class="num">−20.68</td></tr>
+        <tr><td>$150 – 300</td><td class="num">91</td><td class="num">9.9</td><td class="num">+18,707</td><td class="num">+20.83</td></tr>
+        <tr><td>$300 and up</td><td class="num">955</td><td class="num">7.6</td><td class="num">+138,510</td><td class="num">+19.07</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="col">Seven trades — 0.66% of the strategy — cost <strong>$90,964</strong>. The largest single position was <strong>1,402 contracts</strong> at $10 of margin each, losing $29,162. It was not a real trade at any price.</p>
+
+  <h4>Minimum premium beats a contract cap</h4>
+  <p class="col">A <code>$0.25</code> minimum debit removes those seven trades and nothing else. The strategy goes from <strong>+$70,719 to +$161,684</strong>, and maximum contracts drop from <strong>1,402 to 56</strong> as a side effect — the giant sizes only ever occurred on the degenerate trades, so the cap comes free.</p>
+  <p class="col">Results are identical from <code>$0.25</code> through <code>$1.00</code> and within 3% out to <code>$2.00</code>. That flat plateau with a sharp cliff at the structural break is what a real effect looks like, as against the IC credit filter that wobbled at every threshold. Set it at <code>$1.00</code> — same result, more buffer, free.</p>
+</section>
+
+<section>
+  <h2>Position sizing</h2>
+  <h3>The LEAP question, settled</h3>
+  <p class="col">A two-contract cap on QQQ 360 was set when two contracts meant 6.00% of equity. By 2026 it meant <strong>0.14%</strong> — the governor had quietly become an eliminator. Uncapping it entirely went too far the other way.</p>
+
+  <div class="tw">
+    <table>
+      <caption>QQQ 360 sizing — 6.29 years, 2020-05-18 → 2026-09-04</caption>
+      <thead>
+        <tr><th>Metric</th><th class="num">2 contracts</th><th class="num">5% of equity</th><th class="num">Uncapped</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>CAGR</td><td class="num">95.0%</td><td class="num">99.7%</td><td class="num">135.6%</td></tr>
+        <tr class="good"><td>Max drawdown</td><td class="num">−26.4%</td><td class="num">−22.4%</td><td class="num">−49.2%</td></tr>
+        <tr><td>Sharpe</td><td class="num">2.05</td><td class="num">2.19</td><td class="num">1.74</td></tr>
+        <tr><td>Sortino</td><td class="num">3.98</td><td class="num">4.60</td><td class="num">2.68</td></tr>
+        <tr><td>Worst day</td><td class="num">−8.16%</td><td class="num">−6.43%</td><td class="num">−17.29%</td></tr>
+        <tr class="hi"><td>2022 return</td><td class="num">+36.9%</td><td class="num">+33.7%</td><td class="num">−4.7%</td></tr>
+        <tr><td>Days below −30%</td><td class="num">0</td><td class="num">0</td><td class="num">66</td></tr>
+        <tr class="total"><td>Ending equity</td><td class="num">$5.34M</td><td class="num">$6.20M</td><td class="num">$17.49M</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="col">Five percent <strong>strictly dominates</strong> the two-contract version — higher return and better risk on every single measure. That almost never happens, and it means the original cap was simply mis-set rather than conservative.</p>
+
+  <h4>Seven percent was tested and rejected</h4>
+  <p class="col">On a matched 2022–2026 window, 7% returned <strong>48.77x against 5%'s 45.22x</strong> — roughly 8% more terminal equity — for 2.5 more points of drawdown and a worst day of −8.71% against −6.43%. Sharpe went <strong>2.55 → 2.54</strong> and Sortino <strong>5.46 → 5.49</strong>: flat. No efficiency gain, just a slide along the risk axis.</p>
+  <p class="col">The year-by-year split settles it. At 7% the bear year weakens (<strong>+27.6% against +33.9%</strong>) while the trend years strengthen and 2025's drawdown deepens to −19.6%. That is the long-beta drift from the uncapped run reappearing in milder form — the wrong trade for a 4-point CAGR pickup when 2022 resilience is the whole point.</p>
+  <p class="col">Uncapping breaks the property that makes this book unusual. QQQ LEAPs are the only long-delta component in an otherwise vol-neutral or short-delta portfolio; scaled up, they turn the whole thing long-beta and <strong>2022 goes from +36.9% to −4.7%</strong>. Realized P/L that year was still +$263,738 — the loss was entirely unrealized marks on LEAPs held through the bear market. The economics survived. The equity curve did not.</p>
+</section>
+
+<section>
+  <h2>Where it landed</h2>
+  <h3>Four strategies, positive every year since 2020</h3>
+
+  <dl class="stats">
+    <div class="stat"><dt>CAGR</dt><dd>99.7%<span class="sub">6.29 years</span></dd></div>
+    <div class="stat"><dt>Max drawdown</dt><dd>22.4%<span class="sub">0 days below −30%</span></dd></div>
+    <div class="stat"><dt>Sortino</dt><dd>4.60<span class="sub">Sharpe 2.19</span></dd></div>
+    <div class="stat"><dt>Worst day</dt><dd>−6.43%<span class="sub">best +28.87%</span></dd></div>
+    <div class="stat"><dt>Underwater</dt><dd>160d<span class="sub">Sep 21 → Apr 22</span></dd></div>
+  </dl>
+
+  <div class="tw">
+    <table>
+      <caption>Annual returns and drawdowns — final configuration</caption>
+      <thead>
+        <tr><th>Year</th><th class="num">Return</th><th class="num">Max DD</th><th>Character of the year</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>2020</td><td class="num">+38.2%</td><td class="num">−8.2%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Recovery, partial year</td></tr>
+        <tr class="hi"><td>2021</td><td class="num">+23.4%</td><td class="num">−11.3%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Calm grind — weakest regime</td></tr>
+        <tr class="good"><td>2022</td><td class="num">+33.7%</td><td class="num">−22.4%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Bear market, all four positive</td></tr>
+        <tr><td>2023</td><td class="num">+157.1%</td><td class="num">−14.9%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Recovery</td></tr>
+        <tr><td>2024</td><td class="num">+150.5%</td><td class="num">−7.0%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Trend</td></tr>
+        <tr><td>2025</td><td class="num">+268.6%</td><td class="num">−14.0%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Two large hedge payoffs</td></tr>
+        <tr><td>2026</td><td class="num">+48.2%</td><td class="num">−8.7%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Partial year, 170 days</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Strategy mix — internal correlations all between −0.04 and +0.06</caption>
+      <thead>
+        <tr><th>Strategy</th><th class="num">Legs</th><th class="num">P/L</th><th class="num">Share</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Long Put Hedge with Spread</td><td class="num">639</td><td class="num">+2,855,714</td><td class="num">46.2%</td></tr>
+        <tr><td>Daily Calendar 14/16</td><td class="num">1,449</td><td class="num">+1,252,460</td><td class="num">20.3%</td></tr>
+        <tr><td>QQQ 360</td><td class="num">62</td><td class="num">+1,096,666</td><td class="num">17.8%</td></tr>
+        <tr><td>Daily Double Calendar 2/7</td><td class="num">779</td><td class="num">+973,118</td><td class="num">15.8%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="col">Four genuinely independent return streams — the highest cross-correlation between any pair is <strong>0.06</strong>. They take turns: the Double Calendar led in 2022, the hedge led in 2025–26. That rotation is why the equity curve is smooth despite violent individual components.</p>
+</section>
+
+<section>
+  <h2>Still open</h2>
+  <h3>What to decide, and what to simply know</h3>
+
+  <ul class="items">
+    <li>
+      <span class="tag done">Settled</span>
+      <p><b>The flags are off — breach rate is 0.0%.</b> Daily Calendar 14/16 is the only strategy using stops, and zero of its 738 non-stopped legs went past the −30% trigger. Earlier readings of 4.3% and 6.3% were artifacts of pooling all four strategies against one inferred trigger; the other three carry no stop at all. Re-check any future export with <code>mae_check.py</code>, which groups by strategy and isolates short legs.</p>
+    </li>
+    <li>
+      <span class="tag done">Settled</span>
+      <p><b>QQQ sizing is fixed at 5%.</b> Seven percent was run and rejected: flat Sharpe and Sortino, 2.5 more points of drawdown, and a weaker 2022. The frontier between 5% and 7% is flat, so the conservative point wins. No further tuning — chasing the third decimal is how the IC credit filter turned into 2024 in disguise.</p>
+    </li>
+    <li>
+      <span class="tag watch">Know</span>
+      <p><b>Concentration is permanent.</b> The top 10 legs carry 67% of P/L. Strip the five biggest hedge days and 4.3 years returns 43% of the backtest figure. A stretch with no violent sessions produces roughly a third of what the model shows — that is convexity, not a defect.</p>
+    </li>
+    <li>
+      <span class="tag watch">Know</span>
+      <p><b>2021 is the preview to brace for, not 2022.</b> Calm grinding markets are this book's worst environment: the hedge bled $52,430 that year and the calendars had nothing to work with. The crash years are when it earns.</p>
+    </li>
+    <li>
+      <span class="tag watch">Know</span>
+      <p><b>A liquidity ceiling exists ahead.</b> At 2026 sizing rates the book calls for roughly 29 Daily Calendar and 31 hedge contracts per $1M of equity. Somewhere past $10M, fill depth rather than risk becomes the binding constraint — better to pick that ceiling deliberately than discover it in a bad fill.</p>
+    </li>
+  </ul>
+</section>
+
+<footer>
+  <span>Backtest Autopsy</span>
+  <span>Option Omega · 11 runs reviewed</span>
+  <span>Live reference: 1,879 legs, 2026 YTD</span>
+  <span>Final config: QQQ 360 at 5% of equity</span>
+</footer>
+
+</div>

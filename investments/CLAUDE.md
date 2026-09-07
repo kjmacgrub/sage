@@ -31,6 +31,11 @@
 - `docs/bdc-audit-runbook.md` — quarterly BDC procedure (also published as a shareable page)
 - `docs/decisions.md` — why calls were made (what to sell, what to track, rubric
   design). Read before reversing anything that looks arbitrary.
+- `docs/backtest-autopsy.html` — options sleeve: the four Option Omega settings that
+  inflated every backtest, why the iron condors came out, and where the rebuilt
+  portfolio landed. Snapshot — the live copy is a published Artifact.
+- `mae_check.py` — audits an Option Omega trade-log export for stop-outs the backtest
+  skipped. Run on any new strategy before trusting its P/L.
 - `cef.db` — production database (never commit, never modify directly during dev)
 - `cef_demo.db` — simulation/demo copy (safe to use for testing)
 - `simulate.py` — 3-year portfolio simulation
@@ -163,6 +168,31 @@ is why the concentration stayed invisible with a category column on screen.
   distributions — realized trading is slightly negative. See `docs/decisions.md`.
 - Three-sleeve plan (income / options / managed index) is in `docs/decisions.md`;
   judge this sleeve on income, not capital gains.
+
+### Options sleeve (backtested in Option Omega, not tracked in `cef.db`)
+Full writeup in `docs/backtest-autopsy.html`. The parts worth not rediscovering:
+
+- **Four Option Omega settings must be checked on every new strategy.** Correct
+  states: `Ignore Single Bar Stop Loss Breach` OFF, `Cap Non-Opening Stop Outs at
+  User-Defined Stop Amount` OFF, `Use 0-DTE Intra-Minute Stops` ON, `Ignore Trades
+  with Wide Bid-Ask Spread` OFF, and set `Exit Slippage`. With these wrong, a live
+  year that made $22k backtested at $90k. Verify with `mae_check.py`.
+- **Iron condors were removed (Sept 2026).** With honest settings the same book went
+  from +$281k to −$32k over 4.3 years, 53% drawdown, test terminated early. The long
+  wings do explode occasionally (+$86k across 38 entries) but cost $185k to carry on
+  the other 2,384. Don't re-add without clearing the bar: positive in every calendar
+  year with the flags set.
+- **Never size by contract cap alone.** Percentage sizing divides an allocation by
+  margin-per-contract, which collapses toward zero on degenerate calendars and
+  produced a 1,402-contract position. Pair percentage sizing with a **minimum premium
+  filter** (`$1.00` debit) — it excludes the bad trade instead of shrinking it, and
+  caps contract count as a side effect.
+- **QQQ LEAPs sized at 5% of equity, deliberately.** A fixed 2-contract cap decayed to
+  0.14% of equity and made the strategy vestigial; uncapping turned 2022 from +34% to
+  −5% by making the whole book long-beta. 7% was tested and rejected — flat Sharpe and
+  Sortino for more drawdown.
+- Current book: Long Put Hedge with Spread, Daily Calendar 14/16, Daily Double
+  Calendar 2/7, QQQ 360. Cross-correlations all between −0.04 and +0.06.
 
 ## Design
 - Dark theme throughout
