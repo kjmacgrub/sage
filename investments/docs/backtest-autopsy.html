@@ -275,17 +275,18 @@ footer{
 <header class="mast">
   <p class="eyebrow">Option Omega · SPX / QQQ · Sept 2026</p>
   <h1>Backtest Autopsy</h1>
-  <p class="standfirst">Four checkboxes were inflating every backtest in the book. Finding them cost the iron condors their place in the portfolio — and turned up a sizing bug worth $90,964.</p>
+  <p class="standfirst">Four checkboxes were inflating every backtest in the book. Finding them cost the iron condors their place in the portfolio and turned up a sizing bug worth $90,964. The book has since been rebuilt around the findings — different strategies, different exits, different measurement.</p>
   <div class="meta">
-    <span><b>Scope</b> 2020-05-18 → 2026-09-04</span>
-    <span><b>Live reference</b> 2026 YTD, 1,879 legs</span>
-    <span><b>Backtests reviewed</b> 11</span>
+    <span><b>Audit</b> Sept 2026</span>
+    <span><b>Book rebuilt</b> Sept 2026</span>
+    <span><b>Backtests reviewed</b> 40+</span>
   </div>
 </header>
 
 <div class="verdict">
   <p>A live account returned <strong>$22,015</strong> over a period the backtest said was worth <strong>$89,666</strong>. The gap was not execution, not margin, and not bad luck — it was four Option Omega settings that let the model skip stop-outs the market would have enforced.</p>
-  <p>Correcting them turned the iron condor book from <strong>+$281,047</strong> to <strong>−$31,987</strong> across 4.3 years, with a 53% drawdown and an early termination. The ICs came out. What replaced them is a four-strategy book that has now been positive in every calendar year since 2020.</p>
+  <p>Correcting them turned the iron condor book from <strong>+$281,047</strong> to <strong>−$31,987</strong> across 4.3 years, with a 53% drawdown and an early termination. The ICs came out.</p>
+  <p><strong>The sections through <em>Reading a backtest</em> are the audit as it happened and remain accurate.</strong> Everything after describes the book as it stands now — the original launch configuration did not survive the work that followed. See <em>Where it landed</em>.</p>
 </div>
 
 <section>
@@ -412,8 +413,25 @@ footer{
 </section>
 
 <section>
+  <h2>Reading a backtest</h2>
+  <h3>Two ways the tester will mislead you</h3>
+
+  <h4>The pre-2022 SPX data is real — but one strategy wasn't</h4>
+  <p class="col">SPX added Tuesday expirations on 18 April 2022 and Thursday on 11 May 2022; before that it listed Monday, Wednesday and Friday only. Every Tuesday/Thursday expiration in the pre-2022 logs checks out: 18 are month-end series, and the rest are holiday shifts — Labor Day, MLK, Presidents Day, Good Friday, Christmas. Option Omega's expiration calendar is accurate.</p>
+  <p class="col">But nearest-leg DTE at entry tells a different story per strategy. Both calendars target 14 and 2 DTE and are <strong>100% unaffected</strong> across the transition. The Long Put Hedge was <strong>62% 0DTE / 38% 1DTE before May 2022, and 100% 0DTE after</strong> — nearly two-fifths of its early history is a different instrument, with overnight gap risk and none of the terminal convexity that is the reason to own it. Judge the hedge on post-2022-05-11 data only.</p>
+
+  <h4>A standalone backtest of one strategy can starve itself</h4>
+  <p class="col">Run alone, QQQ 360's only growth engine is QQQ 360. Equity sits at $82–104k, so a 5% allocation stays near $4,100 while the call costs $3,500–6,800 — and <strong>the run skipped 24 of its own 34 signals</strong> because it couldn't afford a single contract. Worse, option cost rises with implied volatility, so the entries it declined were the high-IV ones: the deep-bear trades that are the strategy's best.</p>
+  <p class="col">In the portfolio the other three strategies grow the base to millions, so the same 5% scales from 1 contract to 14. A standalone run is fine for confirming entry and exit logic and close to worthless for judging returns, sizing, or concurrency.</p>
+</section>
+
+<section>
   <h2>Position sizing</h2>
-  <h3>The LEAP question, settled</h3>
+  <h3>The mechanic behind every sizing decision</h3>
+  <p class="col">Option Omega buys <code>floor(allocation ÷ cost per contract)</code>. When that rounds to zero, <strong>the trade is skipped entirely</strong> — there is no partial fill and no warning in the log. Margin equals premium for a long call; <code>Margin Req.</code> is the total across contracts while <code>Premium</code> is per contract, which is worth remembering before reading a ratio between them as a multiplier.</p>
+  <p class="col">A 360-DTE 60-delta QQQ call costs a remarkably stable <strong>11–12% of spot notional</strong> — median 12.3% across six years. That single ratio is what lets you project forward: at QQQ <strong>$718.96</strong> the call runs roughly <strong>$7,800–8,600</strong>, and a volatility spike pushes it past $10,000. Recheck it before each sizing decision — it tracks spot, not the calendar.</p>
+
+  <h4>The LEAP allocation, over a full account cycle</h4>
   <p class="col">A two-contract cap on QQQ 360 was set when two contracts meant 6.00% of equity. By 2026 it meant <strong>0.14%</strong> — the governor had quietly become an eliminator. Uncapping it entirely went too far the other way.</p>
 
   <div class="tw">
@@ -441,89 +459,203 @@ footer{
   <p class="col">On a matched 2022–2026 window, 7% returned <strong>48.77x against 5%'s 45.22x</strong> — roughly 8% more terminal equity — for 2.5 more points of drawdown and a worst day of −8.71% against −6.43%. Sharpe went <strong>2.55 → 2.54</strong> and Sortino <strong>5.46 → 5.49</strong>: flat. No efficiency gain, just a slide along the risk axis.</p>
   <p class="col">The year-by-year split settles it. At 7% the bear year weakens (<strong>+27.6% against +33.9%</strong>) while the trend years strengthen and 2025's drawdown deepens to −19.6%. That is the long-beta drift from the uncapped run reappearing in milder form — the wrong trade for a 4-point CAGR pickup when 2022 resilience is the whole point.</p>
   <p class="col">Uncapping breaks the property that makes this book unusual. QQQ LEAPs are the only long-delta component in an otherwise vol-neutral or short-delta portfolio; scaled up, they turn the whole thing long-beta and <strong>2022 goes from +36.9% to −4.7%</strong>. Realized P/L that year was still +$263,738 — the loss was entirely unrealized marks on LEAPs held through the bear market. The economics survived. The equity curve did not.</p>
+
+  <h4>Then QQQ kept going, and the threshold moved again</h4>
+  <p class="col">All of the above was settled when QQQ traded near $280 and a call cost $4,100 — comfortably inside 5% of an $80,000 account. QQQ closed at <strong>$718.96</strong> and the call now costs about <strong>$7,800</strong>. The strategy buys whole contracts, so the allocation is binary: one or none.</p>
+
+  <div class="tw">
+    <table>
+      <caption>Sleeve required to take a single QQQ Leap contract at ~$7,800</caption>
+      <thead><tr><th>Allocation</th><th class="num">Sleeve required</th><th class="num">On $200,000</th><th class="num">Switches off below</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td>5%</td><td class="num">$156,000</td><td class="num">1</td><td class="num">−22% drawdown</td></tr>
+        <tr class="good"><td>7%</td><td class="num">$111,400</td><td class="num">1</td><td class="num">−44% drawdown</td></tr>
+        <tr><td>10%</td><td class="num">$78,000</td><td class="num">2</td><td class="num">−61% drawdown</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="col"><strong>The cliff is the constraint, not the cost.</strong> At $200k both 5% and 7% buy exactly one contract today — identical positions. What differs is how far the sleeve can fall before the allocation drops under the contract price and the strategy switches itself off. At 5% that is a 22% drawdown; at 7% it is 44%. Since the backtest's own max drawdown is 11%, 5% leaves you switching off the stabiliser during precisely the event it exists for.</p>
+
+  <h4>And every allocation that fires carries a 30% drawdown</h4>
+  <p class="col">At 12% the strategy trades from day one — and reaches <strong>132% of equity across 8 positions</strong> during the April 2025 selloff, producing a −37.0% portfolio drawdown. Adding <code>Max Allocation $25,000</code> pins position size at a $24,970 maximum and rescues the later years (2025 goes −37.0% → −14.1%), but the cap does not bind until equity passes ~$208,000. <strong>2022 and 2023 come out identical to uncapped: −29.9% and −28.8%.</strong></p>
+
+  <div class="tw">
+    <table>
+      <caption>Portfolio risk by QQQ allocation — 2022-05-16 → 2026-09-04, superseded configuration</caption>
+      <thead><tr><th>Metric</th><th class="num">5%</th><th class="num">12% + $25k cap</th><th class="num">12% uncapped</th></tr></thead>
+      <tbody>
+        <tr><td>CAGR</td><td class="num">126.2%</td><td class="num">147.2%</td><td class="num">192.4%</td></tr>
+        <tr class="hi"><td>Max drawdown</td><td class="num">−13.8%</td><td class="num">−29.9%</td><td class="num">−37.0%</td></tr>
+        <tr><td>Sortino</td><td class="num">6.49</td><td class="num">3.80</td><td class="num">3.85</td></tr>
+        <tr><td>Worst day</td><td class="num">−6.02%</td><td class="num">−9.71%</td><td class="num">−16.51%</td></tr>
+        <tr><td>2022 drawdown</td><td class="num">−11.0%</td><td class="num">−29.9%</td><td class="num">−29.9%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="col">The early-period concentration isn't caused by the allocation percentage — it's that <strong>ten concurrent positions at the minimum possible size is most of a small account</strong>. Concurrency is the mechanism: QQQ Leap stacks to ten because a 78-day median hold against a 14-day entry cadence makes it arithmetically unavoidable, and every one of its six lifetime losses came from a single stack entered January–April 2022 as QQQ fell from $373 to $275.</p>
+
+  <div class="pull">
+    At $80,000 this strategy could not be sized safely. Not at 5%, where it never fires; not at 12%, where it runs a 30% drawdown through the first two years. The account had to grow into it — and at $200,000 it does, at 7%.
+    <span class="attrib">Why the sleeve needed $200k before this book was viable</span>
+  </div>
 </section>
 
 <section>
   <h2>Where it landed</h2>
-  <h3>Four strategies, positive every year since 2020</h3>
+  <h3>The book after the rebuild</h3>
+  <p class="col">The launch configuration above did not survive. Daily Calendar 14/16 was cut — it earned <strong>$13 per contract across 2,143 trades</strong>, half the trade count for a tenth of the profit. Stop losses came out entirely in favour of Greek- and volatility-based exits. A credit put spread on a rising SMA was added. Backtested 2017-05-16 → 2026-09-08 on $200,000.</p>
 
   <dl class="stats">
-    <div class="stat"><dt>CAGR</dt><dd>99.7%<span class="sub">6.29 years</span></dd></div>
-    <div class="stat"><dt>Max drawdown</dt><dd>22.4%<span class="sub">0 days below −30%</span></dd></div>
-    <div class="stat"><dt>Sortino</dt><dd>4.60<span class="sub">Sharpe 2.19</span></dd></div>
-    <div class="stat"><dt>Worst day</dt><dd>−6.43%<span class="sub">best +28.87%</span></dd></div>
-    <div class="stat"><dt>Underwater</dt><dd>160d<span class="sub">Sep 21 → Apr 22</span></dd></div>
+    <div class="stat"><dt>CAGR</dt><dd>74.3%<span class="sub">9.3 years, backtest</span></dd></div>
+    <div class="stat"><dt>Max drawdown</dt><dd>11.01%<span class="sub">107 days to trough</span></dd></div>
+    <div class="stat"><dt>Underwater</dt><dd>71%<span class="sub">of all days</span></dd></div>
+    <div class="stat"><dt>Peak margin</dt><dd>35.7%<span class="sub">2022, worst year</span></dd></div>
+    <div class="stat"><dt>Planning</dt><dd>30% / 20%<span class="sub">CAGR / drawdown</span></dd></div>
   </dl>
 
   <div class="tw">
     <table>
-      <caption>Annual returns and drawdowns — final configuration</caption>
+      <caption>Strategy mix — current book</caption>
       <thead>
-        <tr><th>Year</th><th class="num">Return</th><th class="num">Max DD</th><th>Character of the year</th></tr>
+        <tr><th>Strategy</th><th class="num">Cap</th><th class="num">Share</th><th class="num">Max contracts</th><th>Role</th></tr>
       </thead>
       <tbody>
-        <tr><td>2020</td><td class="num">+38.2%</td><td class="num">−8.2%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Recovery, partial year</td></tr>
-        <tr class="hi"><td>2021</td><td class="num">+23.4%</td><td class="num">−11.3%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Calm grind — weakest regime</td></tr>
-        <tr class="good"><td>2022</td><td class="num">+33.7%</td><td class="num">−22.4%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Bear market, all four positive</td></tr>
-        <tr><td>2023</td><td class="num">+157.1%</td><td class="num">−14.9%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Recovery</td></tr>
-        <tr><td>2024</td><td class="num">+150.5%</td><td class="num">−7.0%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Trend</td></tr>
-        <tr><td>2025</td><td class="num">+268.6%</td><td class="num">−14.0%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Two large hedge payoffs</td></tr>
-        <tr><td>2026</td><td class="num">+48.2%</td><td class="num">−8.7%</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Partial year, 170 days</td></tr>
+        <tr><td>Long Put Hedge</td><td class="num">none, 2%</td><td class="num">41.9%</td><td class="num">833</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Crash convexity — 0 DTE, deepest book there is</td></tr>
+        <tr class="hi"><td>QQQ Leap</td><td class="num">none</td><td class="num">20.9%</td><td class="num">133</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">74 trades, 6 losses — thinnest evidence in the book</td></tr>
+        <tr><td>Sell puts on rising SMA</td><td class="num">100</td><td class="num">20.6%</td><td class="num">100</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Daily income; goes flat before dislocations</td></tr>
+        <tr><td>Double Calendar (MTW)</td><td class="num">50</td><td class="num">16.6%</td><td class="num">50</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Mon/Tue/Wed only — a 2/7 DTE structural limit</td></tr>
       </tbody>
     </table>
   </div>
 
+  <h4>Two measurement corrections that changed the numbers</h4>
+  <p class="col"><strong>The trade log understates drawdown by 2–3×.</strong> <code>Funds at Close</code> only updates when a trade closes, so unrealized losses on open positions never appear. Measured from the daily Net Liquidity export instead, max drawdown is <strong>11.01%, not 3.6%</strong>, and time underwater is 71% rather than ~50%. Always export the portfolio CSV alongside the trade log.</p>
+  <p class="col"><strong>Contribution percentage is circular in a compounding book.</strong> QQQ Leap showed 3.6% of P/L, which reads like something you could drop. Re-running without it — sizing re-derived, not P/L subtracted — ended at <strong>$5.5M instead of $19.8M</strong>. Percentage sizing feeds every dollar a strategy earns into every other strategy's position size, permanently. Never judge a strategy by its share; re-run without it.</p>
+
+  <h4>Slippage is the real uncertainty, and it is not evenly distributed</h4>
+  <p class="col">Breakeven slippage — cents per option per side before the edge is gone:</p>
   <div class="tw">
     <table>
-      <caption>Strategy mix — internal correlations all between −0.04 and +0.06</caption>
-      <thead>
-        <tr><th>Strategy</th><th class="num">Legs</th><th class="num">P/L</th><th class="num">Share</th></tr>
-      </thead>
+      <caption>What each strategy can absorb</caption>
+      <thead><tr><th>Strategy</th><th class="num">Legs</th><th class="num">Edge/contract</th><th class="num">Breakeven</th></tr></thead>
       <tbody>
-        <tr><td>Long Put Hedge with Spread</td><td class="num">639</td><td class="num">+2,855,714</td><td class="num">46.2%</td></tr>
-        <tr><td>Daily Calendar 14/16</td><td class="num">1,449</td><td class="num">+1,252,460</td><td class="num">20.3%</td></tr>
-        <tr><td>QQQ 360</td><td class="num">62</td><td class="num">+1,096,666</td><td class="num">17.8%</td></tr>
-        <tr><td>Daily Double Calendar 2/7</td><td class="num">779</td><td class="num">+973,118</td><td class="num">15.8%</td></tr>
+        <tr><td>Double Calendar (MTW)</td><td class="num">4</td><td class="num">$130.51</td><td class="num">16¢</td></tr>
+        <tr><td>Long Put Hedge</td><td class="num">3</td><td class="num">$101.83</td><td class="num">19¢</td></tr>
+        <tr><td>Sell puts on rising SMA</td><td class="num">2</td><td class="num">$76.76</td><td class="num">19¢</td></tr>
+        <tr class="good"><td>QQQ Leap</td><td class="num">1</td><td class="num">$2,655.51</td><td class="num">$13.28</td></tr>
       </tbody>
     </table>
   </div>
-
-  <p class="col">Four genuinely independent return streams — the highest cross-correlation between any pair is <strong>0.06</strong>. They take turns: the Double Calendar led in 2022, the hedge led in 2025–26. That rotation is why the equity curve is smooth despite violent individual components.</p>
+  <p class="col">Portfolio P/L surviving: <strong>5¢ → 78%, 10¢ → 57%, 15¢ → 35%, 25¢ → negative.</strong> And that is a linear subtraction, so it understates — losses compound down through sizing.</p>
+  <p class="col"><strong>Under realistic friction the book converges to QQQ Leap plus noise.</strong> At 15¢ it is 58% of all P/L; at 25¢ it is the only strategy still positive. The three strategies with thousands of trades are the fragile ones; the robust one has 74 trades and 6 losses.</p>
+  <p class="col">Measured against 583 matched live-versus-backtest leg-groups, entry slippage runs <strong>4.5–10¢ per leg</strong> — comfortably inside the band, at one contract. The median leg fills at or better than the model; the cost sits entirely in an upper quartile giving up $47+ per contract. At 100 contracts it will be worse.</p>
 </section>
 
 <section>
-  <h2>Still open</h2>
-  <h3>What to decide, and what to simply know</h3>
+  <h2>Three sleeves and a ratchet</h2>
+  <h3>Why most of the capacity analysis stopped applying</h3>
+  <p class="col">The options book is roughly one third of a whole: <strong>options (taxable) · CEFs (Roth) · managed index (taxable)</strong>, rebalanced about annually. That single fact removes most of the liquidity problem, because <strong>the sleeve then grows at the total portfolio's rate, not its own</strong> — at a 30% options return that is 15.7%/yr, so $200k reaches about <strong>$857,000 at year 10</strong> rather than $35M.</p>
+  <p class="col">At an $857k sleeve the hedge runs ~30 contracts and QQQ Leap ~14. The 833-contract and 1,850-contract figures that drove the whole liquidity investigation were artifacts of a backtest compounding unchecked.</p>
+
+  <div class="tw">
+    <table>
+      <caption>When each cap actually binds, under rebalancing at a 30% options return</caption>
+      <thead><tr><th>Cap</th><th class="num">Binds at</th><th class="num">Years</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Sell puts, 100 contracts</td><td class="num">$3,141,360</td><td class="num">18.9</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Unreachable in any planning horizon</td></tr>
+        <tr class="hi"><td>Double Calendar (MTW), 50</td><td class="num">$624,453</td><td class="num">7.8</td><td style="text-align:left;color:var(--text-3);font-size:13.5px">Real — 5.6 years at 50% returns, 4.3 at 74%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>The rebalance is a ratchet</h4>
+  <p class="col"><strong>Profits out on gains, never added back on losses.</strong> Classical rebalancing buys the loser on an assumption of mean reversion — the asset is cheap, its long-run return intact. That assumption does not hold for a strategy. An options book underperforming is evidence the edge may have stopped working, not a discount.</p>
+  <p class="col">It costs about <strong>4 points of portfolio CAGR</strong> at a 30% options return — 15.7% against 19.9% un-rebalanced, or $2.57M against $3.67M over ten years. That is the premium for not being concentrated in something unproven, and Section 1256 mark-to-market makes it free at the margin: gains are taxed annually whether the money moves or not.</p>
+
+  <h4>QQQ Leap still needs rechecking on a schedule</h4>
+  <p class="col">Its minimum position is fixed in dollars while everything else scales by percentage. At QQQ <strong>$718.96</strong> a contract runs about <strong>$7,800</strong>, so 5% needs roughly <strong>$150,000</strong> of sleeve and 7% about $111,000. The figure tracks 11–12% of QQQ spot, so it moves with the underlying rather than the calendar — recheck before each step.</p>
+  <p class="col">The open item: QQQ Leap went from 1–4% of P/L to <strong>20.9%</strong> while uncapped, and it is long-dated QQQ rather than 0 DTE SPX. The depth argument that justifies leaving the hedge uncapped does not transfer. Pull open interest on a ~1-year call before leaving it that way.</p>
+</section>
+
+<section>
+  <h2>Tripwires</h2>
+  <h3>Decided before the money was at stake</h3>
+  <p class="col">The ratchet is a <em>policy</em> and needs no diagnosis — below target weight, don't top up. These are a <em>diagnosis</em>, and they trigger something more serious: stop adding entirely, or reduce. All are measured against the options sleeve's own backtested behaviour, <strong>never against the other two sleeves</strong> — relative comparison conflates "the strategies broke" with "equities had a great year," which is the entire point of holding something uncorrelated.</p>
+
+  <div class="tw">
+    <table>
+      <caption>One signal = investigate. Two together = stop adding, probably reduce.</caption>
+      <thead><tr><th>Tripwire</th><th>Measured against</th><th class="num">Fires in</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td>Fill slippage &gt; 15¢/leg</td><td style="text-align:left;color:var(--text-2)">measured 4.5–10¢ entry; 16¢ is calendar breakeven</td><td class="num">weeks</td></tr>
+        <tr class="hi"><td>Per-contract edge &lt; 50% of backtest</td><td style="text-align:left;color:var(--text-2)">Hedge $101.83 · Calendar $130.51 · Puts $76.76 · QQQ $2,655.51</td><td class="num">months</td></tr>
+        <tr><td>Drawdown &gt; 20%</td><td style="text-align:left;color:var(--text-2)">sleeve NAV, absolute — backtest max 11.01%</td><td class="num">immediately</td></tr>
+        <tr><td>MTW win rate ~52% in 2027</td><td style="text-align:left;color:var(--text-2)">its own 58–71% history; 2025–26 ran 54.6% / 51.6%</td><td class="num">a year</td></tr>
+        <tr><td>Two consecutive losing years</td><td style="text-align:left;color:var(--text-2)">zero losing years across 9 backtest years</td><td class="num">two years</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="col">The top two are the real detectors — slippage converges in weeks because every trade is a data point, and per-contract edge converges in months against numbers already in hand. The rest are confirmations that arrive later. <strong>Track fill-versus-mid and per-contract edge by strategy from day one.</strong></p>
+</section>
+
+<section>
+  <h2>Carry these</h2>
+  <h3>Settled questions, and things that are shape rather than defect</h3>
 
   <ul class="items">
     <li>
-      <span class="tag done">Settled</span>
-      <p><b>The flags are off — breach rate is 0.0%.</b> Daily Calendar 14/16 is the only strategy using stops, and zero of its 738 non-stopped legs went past the −30% trigger. Earlier readings of 4.3% and 6.3% were artifacts of pooling all four strategies against one inferred trigger; the other three carry no stop at all. Re-check any future export with <code>mae_check.py</code>, which groups by strategy and isolates short legs.</p>
+      <span class="tag act">Gap</span>
+      <p><b><code>mae_check.py</code> no longer covers this book.</b> Exits are now Greek- and volatility-based — Below Delta, Above Delta, Below Short/Long Ratio, VIX Move Down, Expired, Profit Target. <b>No strategy uses a stop loss</b>, so the checker reports "no stops in use" for all four and cannot run. That is <em>not</em> a clean bill of health; it is an unverified backtest. Risk is still structurally bounded — every strategy is a defined-risk multi-leg structure — but the tool that caught the $22k-live/$89k-backtest gap has no purchase here. Needs a replacement check.</p>
     </li>
     <li>
       <span class="tag done">Settled</span>
-      <p><b>QQQ sizing is fixed at 5%.</b> Seven percent was run and rejected: flat Sharpe and Sortino, 2.5 more points of drawdown, and a weaker 2022. The frontier between 5% and 7% is flat, so the conservative point wins. No further tuning — chasing the third decimal is how the IC credit filter turned into 2024 in disguise.</p>
+      <p><b>Don't tune the QQQ entry filter.</b> Every 2022 loser was bought within 7.2% of the prior high and every winner more than 13% below it — the pattern is real, but the cheapest filter that removes those six losses gives up <b>$723,000</b> of winners to save <b>$23,931</b>. Max RSI 69 also doesn't do what it looks like: RSI is <em>low</em> in a bear market, so the cap only blocks overbought entries.</p>
+    </li>
+    <li>
+      <span class="tag done">Corrected</span>
+      <p><b><code>Max Open Positions</code> does survive the portfolio tester.</b> Earlier finding — 5 versus 10 producing byte-identical output — no longer reproduces. The put seller's 5-position cap held in a portfolio run with a time-at-cap distribution nearly identical to standalone (9.4% against 9.2%). Either OO fixed it or the original test hit a different setting. <b>Designs were being built around a constraint that may not exist</b>; worth re-testing deliberately rather than trusting either result.</p>
     </li>
     <li>
       <span class="tag watch">Know</span>
-      <p><b>Concentration is permanent.</b> The top 10 legs carry 67% of P/L. Strip the five biggest hedge days and 4.3 years returns 43% of the backtest figure. A stretch with no violent sessions produces roughly a third of what the model shows — that is convexity, not a defect.</p>
+      <p><b>Concurrency is emergent unless something caps it.</b> The SPX strategies peak at 2 concurrent, but that is not a setting — it falls out of 0–2 day holds against a 2–3 day entry cadence. QQQ Leap peaks at 10 for the same reason in reverse: a 78-day median hold against a 14-day cadence makes stacking unavoidable. <b>Anything that lengthens holds removes the accidental protection</b> — widening the calendar profit target, which tests well in isolation, does exactly that.</p>
     </li>
     <li>
       <span class="tag watch">Know</span>
-      <p><b>2021 is the preview to brace for, not 2022.</b> Calm grinding markets are this book's worst environment: the hedge bled $52,430 that year and the calendars had nothing to work with. The crash years are when it earns.</p>
+      <p><b>Don't pause QQQ when positions stack.</b> The stacking signal <em>is</em> the entry-quality signal. In 2022 every loser came from the first five entries taken with nothing stacked; the best trade of the year was bought on 2 December with fourteen already open. Pausing at three open costs <b>42%</b> of the strategy.</p>
     </li>
     <li>
       <span class="tag watch">Know</span>
-      <p><b>A liquidity ceiling exists ahead.</b> At 2026 sizing rates the book calls for roughly 29 Daily Calendar and 31 hedge contracts per $1M of equity. Somewhere past $10M, fill depth rather than risk becomes the binding constraint — better to pick that ceiling deliberately than discover it in a bad fill.</p>
+      <p><b>Concentration is permanent.</b> Nineteen legs carry 60% of P/L. A stretch with no violent sessions produces a fraction of what the model shows — that is convexity, not a defect.</p>
+    </li>
+    <li>
+      <span class="tag watch">Know</span>
+      <p><b>A calm grind is the weak regime, not a crash.</b> 2021 was the worst year in the long run: the hedge bled $52,430 and the calendars had nothing to work with. The bear years are when this book earns.</p>
+    </li>
+    <li>
+      <span class="tag watch">Know</span>
+      <p><b>Liquidity is per-order and per-tenor, not per-strategy.</b> A real chain at SPX ~7,700 showed the 57-DTE weekly Friday carrying <b>0–8 contracts of put open interest</b> while the 70-DTE monthly carried 77–450, and 8,778 at the round strike. Two consequences: a vertical is limited by its <em>thinner</em> leg, so selling the 7600 and buying the 7595 caps you at 125 regardless of the 8,778; and <b>width buys size</b> — the same dollar risk needs 1,850 contracts of a 5-wide or 370 of a 25-wide, landing on a leg with 8× the depth.</p>
+    </li>
+    <li>
+      <span class="tag watch">Know</span>
+      <p><b>The exposure is premium richness, not 0 DTE depth.</b> Exchanges don't delist revenue and the direction has only gone one way — monthlies, weeklies, Mon/Wed in 2016, Tue/Thu in 2022. What can change is <em>flow</em>, and <b>three of four strategies are net short premium</b> (the hedge is a net credit structure; 197 of its winners keep it by expiring). If the seller population thins, skew reprices and three strategies earn less with nothing visibly breaking. Tested for it: only the MTW calendar shows decay — win rate 58–71% through 2024, then <b>54.6% and 51.6%</b>. Two years, not a nine-year slope. Watch the 2027 number.</p>
+    </li>
+    <li>
+      <span class="tag act">Trap</span>
+      <p><b>A conditional distribution cannot tell you what changing the condition does.</b> Hit three times: <code>Max Profit</code> is censored by the exit being assessed, so it can't evaluate a wider profit target; exit-reason P/L is negative <em>because</em> that bucket collects the losers, so tightening the put stop from 90 to 70/80 tested worse, not better; and subtracting a strategy's P/L leaves the other trades at their inflated contract counts, understating QQQ's value fivefold. <b>Only a re-run with the condition changed answers the question.</b></p>
+    </li>
+    <li>
+      <span class="tag watch">Know</span>
+      <p><b>This book wants room.</b> A wider profit target beat a narrower one; the deep put stop (90) beat the shallow ones; and the hedge's every dollar comes from letting positions expire while its two management exits lose <b>$4.66M</b> combined. Defined-risk structures recover — cutting early converts recoveries into realized losses.</p>
     </li>
   </ul>
 </section>
 
 <footer>
   <span>Backtest Autopsy</span>
-  <span>Option Omega · 11 runs reviewed</span>
-  <span>Live reference: 1,879 legs, 2026 YTD</span>
-  <span>Final config: QQQ 360 at 5% of equity</span>
+  <span>Option Omega · audit Sept 2026, book rebuilt Sept 2026</span>
+  <span>Planning: 30% CAGR · 20% drawdown</span>
+  <span>QQQ Leap needs ~$150,000 at 5%</span>
 </footer>
 
 </div>
