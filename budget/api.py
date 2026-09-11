@@ -306,37 +306,58 @@ def annual_summary():
     return jsonify(db.annual_summary(year))
 
 
-# ── Scheduled income (B2) ─────────────────────────────────────────────────
+# ── Scheduled items (recurring income + expenses) ─────────────────────────
 
-@app.route("/api/scheduled-income", methods=["GET"])
-def list_scheduled_income():
-    return jsonify(db.list_scheduled_income())
+@app.route("/api/scheduled-items", methods=["GET"])
+def list_scheduled_items():
+    return jsonify(db.list_scheduled_items())
 
-@app.route("/api/scheduled-income", methods=["POST"])
-def add_scheduled_income():
+@app.route("/api/scheduled-items", methods=["POST"])
+def add_scheduled_item():
     data = request.get_json() or {}
-    item = db.add_scheduled_income(
+    item_type = data.get("item_type", "income")
+    if item_type not in ("income", "expense"):
+        item_type = "income"
+    item = db.add_scheduled_item(
         source    = data.get("source", ""),
         amount    = float(data.get("amount", 0)),
         start_date= data.get("start_date", ""),
         end_date  = data.get("end_date") or None,
         frequency = data.get("frequency", "monthly"),
-        notes     = data.get("notes", "")
+        notes     = data.get("notes", ""),
+        item_type = item_type
     )
     return jsonify(item), 201
 
-@app.route("/api/scheduled-income/<int:item_id>", methods=["DELETE"])
-def del_scheduled_income(item_id):
-    db.delete_scheduled_income(item_id)
+@app.route("/api/scheduled-items/<int:item_id>", methods=["DELETE"])
+def del_scheduled_item(item_id):
+    db.delete_scheduled_item(item_id)
     return jsonify({"ok": True})
 
-@app.route("/api/scheduled-income/for-month")
-def scheduled_income_for_month():
-    year  = int(request.args.get("year",  0))
-    month = int(request.args.get("month", 0))
-    if not year or not month:
-        return jsonify([])
-    return jsonify(db.get_scheduled_income_for_month(year, month))
+
+# ── Per-plan suggestions (accept / reject) ────────────────────────────────
+
+@app.route("/api/plans/<int:plan_id>/suggestions", methods=["GET"])
+def plan_suggestions(plan_id):
+    return jsonify(db.get_suggestions_for_plan(plan_id))
+
+@app.route("/api/plans/<int:plan_id>/suggestions/<int:sched_id>/accept", methods=["POST"])
+def accept_suggestion(plan_id, sched_id):
+    item = db.accept_suggestion(plan_id, sched_id)
+    if item is None:
+        return jsonify({"error": "not found or already accepted"}), 409
+    return jsonify(item), 201
+
+@app.route("/api/plans/<int:plan_id>/suggestions/<int:sched_id>/dismiss", methods=["POST"])
+def dismiss_suggestion(plan_id, sched_id):
+    db.dismiss_suggestion(plan_id, sched_id)
+    return jsonify({"ok": True})
+
+@app.route("/api/plans/<int:plan_id>/suggestions/restore", methods=["POST"])
+def restore_suggestions(plan_id):
+    data = request.get_json(silent=True) or {}
+    db.restore_suggestions(plan_id, data.get("item_type"))
+    return jsonify({"ok": True})
 
 
 # ── All transactions for current filter ───────────────────────────────────

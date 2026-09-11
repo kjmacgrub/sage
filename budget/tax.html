@@ -314,7 +314,15 @@
                     </div>
                     <div class="rp-field">
                         <label>IRA Balance</label>
-                        <input type="number" id="rp_ira_balance" value="742000" step="5000" oninput="rpOnInput()">
+                        <input type="number" id="rp_ira_balance" value="742000" step="5000" oninput="rpOnInput()" title="Main IRA — the conversion target">
+                    </div>
+                    <div class="rp-field">
+                        <label>Other Deferred</label>
+                        <input type="number" id="rp_other_deferred" value="400000" step="5000" oninput="rpOnInput()" title="Other tax-deferred accounts (401k, other IRAs) that grow but are NOT being converted. They still get taxed on withdrawal in both scenarios and add to bracket pressure.">
+                    </div>
+                    <div class="rp-field">
+                        <label>Taxable Account</label>
+                        <input type="number" id="rp_taxable_balance" value="600000" step="5000" oninput="rpOnInput()" title="Brokerage / taxable account. Grows untouched in 'Don't Convert'. In 'Convert', conversion taxes are paid from this account each year.">
                     </div>
                     <div class="rp-field">
                         <label>IRA Growth</label>
@@ -347,6 +355,34 @@
                         <tfoot id="rpProjFoot"></tfoot>
                     </table>
                 </div>
+
+                <!-- Convert vs Don't Convert comparison -->
+                <div class="rp-compare-controls">
+                    <div class="rp-field">
+                        <label>Withdraw IRA over</label>
+                        <input type="number" id="rp_withdraw_years" value="10" step="1" min="1" max="40" oninput="rpOnInput()" style="width:70px" title="Number of years over which the remaining IRA is assumed to be withdrawn (or, for an inherited IRA, the heir's drawdown window — typically 10)">
+                        <span class="rp-pct-label">years</span>
+                    </div>
+                    <div class="rp-field">
+                        <label style="width:auto;white-space:nowrap">
+                            <input type="checkbox" id="rp_gift_on" onchange="rpOnInput()" style="margin-right:0.4rem;vertical-align:middle">
+                            Annual gifting
+                        </label>
+                    </div>
+                    <div class="rp-field rp-gift-field" style="display:none">
+                        <label>Gift priority</label>
+                        <select id="rp_gift_priority" class="char-select" onchange="rpOnInput()" style="width:auto">
+                            <option value="on_top">On top of conversions</option>
+                            <option value="fill_first">Fill bracket first</option>
+                        </select>
+                    </div>
+                    <div class="rp-field rp-gift-field" style="display:none">
+                        <label>Heir tax rate</label>
+                        <input type="number" id="rp_heir_rate" value="25" step="1" min="0" max="50" oninput="rpOnInput()" style="width:70px" title="Assumed marginal tax rate when heirs draw down an inherited IRA">
+                        <span class="rp-pct-label">%</span>
+                    </div>
+                </div>
+                <div id="rpCompare" class="rp-compare"></div>
             </div>
 
         </div><!-- /plannerView -->

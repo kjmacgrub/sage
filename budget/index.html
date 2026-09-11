@@ -123,10 +123,14 @@
     <!-- Scheduled Income Modal (B2) -->
     <div class="modal" id="scheduledModal">
         <div class="modal-content modal-wide">
-            <h3 class="modal-title">Scheduled Income</h3>
-            <p style="font-size:0.85rem;color:#6e6e73;margin-bottom:1rem;">Recurring income sources (Social Security, pensions, etc.). Active events appear as suggestions when viewing a budget plan.</p>
+            <h3 class="modal-title">Scheduled Income &amp; Expenses</h3>
+            <p style="font-size:0.85rem;color:#6e6e73;margin-bottom:1rem;">Recurring income (Social Security, pensions) and recurring expenses (premiums, subscriptions). Active entries appear as suggestions inside the Income and Expenses panels, where you can accept or skip them for each period.</p>
             <div class="sched-add-row">
                 <input type="text"   id="schedSource"    class="modal-input sched-input" placeholder="Source (e.g. Social Security)">
+                <select id="schedType" class="modal-input sched-input" style="font-size:0.9rem;">
+                    <option value="income">Income</option>
+                    <option value="expense">Expense</option>
+                </select>
                 <input type="number" id="schedAmount"    class="modal-input sched-input" placeholder="Monthly amount" min="0" step="1">
                 <input type="date"   id="schedStartDate" class="modal-input sched-input" placeholder="Start date">
                 <input type="date"   id="schedEndDate"   class="modal-input sched-input" placeholder="End date (optional)">

@@ -592,6 +592,34 @@ h1 {
     font-weight: 500;
 }
 
+.budget-panel-total-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.15;
+}
+
+.budget-panel-subtotal {
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+}
+
+.budget-panel-subtotal .cents {
+    font-size: 0.75em;
+    font-weight: 500;
+}
+
+.budget-panel-subtotal .subtotal-label {
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.75;
+    margin-right: 0.25em;
+}
+
 /* ============================================================
    Section cards (non-budget use — kept)
    ============================================================ */
@@ -685,10 +713,42 @@ h1 {
 
 .item-budget { text-align: right; }
 .item-actual { text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
-.item-diff   { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
 .item-del    { text-align: center; width: 28px; }
 
 .freeform-item { font-style: italic; color: var(--text-secondary); }
+
+/* Derived roll-up row (e.g. Utilities inside Other) — no input, not editable here */
+.budget-rollup-row td {
+    padding: 0.45rem 0.75rem;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--background);
+}
+
+.budget-rollup-row td.item-name {
+    padding-left: 1.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.budget-rollup-row td.item-name::before {
+    content: "\21B3";          /* ↳ — signals this total comes from elsewhere */
+    margin-right: 0.35em;
+    opacity: 0.6;
+}
+
+.rollup-amount {
+    display: inline-block;
+    width: 120px;
+    padding: 0.4rem 0.6rem;
+    border: 1.5px solid transparent;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-align: right;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    box-sizing: border-box;
+}
 
 /* ============================================================
    Eye toggle (show/hide zeros)
@@ -820,6 +880,24 @@ h1 {
 
 .expense-subpanel .bh-cat {
     width: 100%;
+}
+
+/* Drag a category name to reorder within its subpanel (session-only) */
+.expense-subpanel td.item-name.drag-handle {
+    cursor: grab;
+}
+
+.expense-subpanel td.item-name.drag-handle:active {
+    cursor: grabbing;
+}
+
+.expense-subpanel tr.budget-item-row.dragging {
+    opacity: 0.4;
+}
+
+.expense-subpanel tr.budget-item-row:hover td.item-name.drag-handle {
+    background: var(--primary-light);
+    border-radius: 4px;
 }
 
 .subpanel-header {
@@ -1389,8 +1467,8 @@ h1 {
         padding: 1.25rem 1rem;
     }
 
-    /* Budget table — hide actual/diff columns on mobile */
-    .item-actual, .item-diff { display: none; }
+    /* Budget table — hide actual column on mobile */
+    .item-actual { display: none; }
 
     .expense-input {
         width: 100px;
@@ -1476,41 +1554,111 @@ h1 {
     }
 }
 
-/* ── Scheduled income suggestions (B2) ───────────────────── */
+/* ── Scheduled suggestions, shown inline in the real panels ─────────────
+   Deliberately quiet: these are proposals, not committed budget lines.
+   Dashed rule + hatched tint + italic name says "pending"; the ✓/✕ commit
+   or skip it for this period only.                                      */
 
-.sched-suggestions {
-    background: rgba(52, 199, 89, 0.08);
-    border: 1px solid rgba(52, 199, 89, 0.3);
-    border-radius: var(--radius-sm);
-    padding: 0.6rem 0.9rem;
-    margin-bottom: 0.75rem;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-}
-.sched-sugg-label {
-    font-size: 0.82rem;
+.sched-group-row td {
     color: var(--text-secondary);
-}
-.sched-sugg-label strong {
-    color: var(--income-accent);
-}
-.sched-sugg-items {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-}
-.sched-sugg-tag {
-    background: rgba(52, 199, 89, 0.12);
-    border: 1px solid rgba(52, 199, 89, 0.25);
-    border-radius: 12px;
-    padding: 2px 10px;
-    font-size: 0.78rem;
-    color: var(--text-primary);
+    opacity: 0.8;
 }
 
-/* ── Scheduled income modal form (B2) ────────────────────── */
+.sched-sugg-row td {
+    padding: 0.4rem 0.75rem;
+    vertical-align: middle;
+    border-bottom: 1px dashed var(--border);
+    background: repeating-linear-gradient(
+        45deg,
+        transparent, transparent 6px,
+        rgba(128, 128, 128, 0.05) 6px, rgba(128, 128, 128, 0.05) 12px
+    );
+}
+
+.sched-sugg-row td.item-name {
+    padding-left: 1.75rem;
+    font-style: italic;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.sched-amount {
+    display: inline-block;
+    width: 120px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-align: right;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    box-sizing: border-box;
+}
+
+.sched-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.sched-btn {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    width: 26px;
+    height: 24px;
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+    margin-left: 4px;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.sched-accept { color: var(--income-accent); }
+.sched-reject { color: var(--text-secondary); }
+
+.sched-accept:hover {
+    background: var(--income-accent);
+    border-color: var(--income-accent);
+    color: #fff;
+}
+
+.sched-reject:hover {
+    background: var(--expense-accent);
+    border-color: var(--expense-accent);
+    color: #fff;
+}
+
+.sched-restore-row td {
+    padding: 0.35rem 0.75rem 0.5rem 1.75rem;
+    border-bottom: none;
+}
+
+.sched-restore {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.75rem;
+    font-family: var(--font);
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-decoration: underline dotted;
+    opacity: 0.8;
+}
+
+.sched-restore:hover { opacity: 1; color: var(--primary); }
+
+.sched-subpanel { border-style: dashed; }
+
+.sched-type-pill {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+.sched-type-pill.is-income  { background: rgba(52, 199, 89, 0.14); color: #248a3d; }
+.sched-type-pill.is-expense { background: rgba(255, 149, 0, 0.16); color: #e65100; }
+
+/* ── Scheduled items modal form ──────────────────────────── */
 
 .sched-add-row {
     display: flex;

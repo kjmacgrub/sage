@@ -14,6 +14,10 @@ let showZeroIncome = false;
 let showZeroExpense= false;
 let expenseViewMode = 'grouped';  // 'grouped' or 'subpanels'
 
+// Scheduled items active for the current plan that are neither accepted nor rejected
+let suggestions = {income: [], expense: [], dismissed: {income: 0, expense: 0}};
+let expenseManualOrder = [];      // [itemId] — drag order in subpanel view, session-only
+
 // ── Init ───────────────────────────────────────────────────
 
 async function initApp() {
@@ -52,6 +56,7 @@ async function loadPlan(id) {
     // Derive month/year from plan_date e.g. "2026-01-08"
     const [year, month] = currentPlan.plan_date.split('-').map(Number);
     currentActuals = await apiFetch(`/api/actuals?month=${month}&year=${year}`);
+    await loadSuggestions();
 
     renderDropdownSelection();
     renderBudget();
@@ -139,7 +144,11 @@ function renderBudget() {
             <div class="budget-panel income-panel">
                 <div class="budget-panel-header">
                     <span class="budget-panel-title income-title">Income</span>
-                    <span class="budget-panel-total" id="totalIncome">$0</span>
+                    <span class="budget-panel-total-stack">
+                        <span class="budget-panel-total" id="totalIncome">$0</span>
+                        <span class="budget-panel-subtotal" id="totalAvailable"
+                              title="Future income plus current balance — all money available this period"></span>
+                    </span>
                     <button class="add-category-plus" onclick="openAddItem('income')" title="Add income category">+</button>
                 </div>
                 ${renderTable(incomeItems, 'income')}
@@ -147,7 +156,10 @@ function renderBudget() {
             <div class="budget-panel expense-panel">
                 <div class="budget-panel-header">
                     <span class="budget-panel-title expense-title">Expenses</span>
-                    <span class="budget-panel-total" id="totalExpenses">$0</span>
+                    <span class="budget-panel-total-stack">
+                        <span class="budget-panel-total" id="totalExpenses">$0</span>
+                        <span class="budget-panel-subtotal" aria-hidden="true">&nbsp;</span>
+                    </span>
                     <button class="view-toggle-btn" onclick="toggleExpenseView()" title="Toggle subpanel view">${expenseViewMode === 'grouped' ? '▦' : '▤'}</button>
                     <button class="add-category-plus" onclick="openAddItem('expense')" title="Add expense category">+</button>
                 </div>
@@ -156,16 +168,17 @@ function renderBudget() {
         </div>`;
 
     document.getElementById('budgetContent').innerHTML = content;
+    if (expenseViewMode === 'subpanels') enableExpenseDragReorder();
 
     const balInput = document.getElementById('startingBalanceInput');
     if (balInput) balInput.value = formatCurrencyWhole(currentPlan.starting_balance || 0);
 
     calculateTotals();
-    renderScheduledSuggestions();
 }
 
 function renderTable(items, type) {
-    if (!items.length) {
+    const suggRows = renderSuggestionRows(type);
+    if (!items.length && !suggRows) {
         return `<p class="empty-section">No ${type} items — click + to add.</p>`;
     }
 
@@ -207,7 +220,7 @@ function renderTable(items, type) {
                     <th class="bh-del"></th>
                 </tr>
             </thead>
-            <tbody>${rows}</tbody>
+            <tbody>${rows}${suggRows}</tbody>
         </table>`;
 }
 
@@ -266,17 +279,92 @@ function renderExpenseSubpanels(items) {
     });
 
     const displayName = item => item.label || (item.category.includes(':') ? item.category.split(':').slice(1).join(':') : item.category);
-    const sortAlpha = (a, b) => displayName(a).localeCompare(displayName(b));
-    utilities.sort(sortAlpha);
-    custom.sort(sortAlpha);
-    other.sort(sortAlpha);
+    // Dragged items keep their manual position; everything else stays alphabetical below them.
+    const orderIdx = item => {
+        const i = expenseManualOrder.indexOf(item.id);
+        return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    const sortItems = (a, b) => (orderIdx(a) - orderIdx(b)) || displayName(a).localeCompare(displayName(b));
+    utilities.sort(sortItems);
+    custom.sort(sortItems);
+    other.sort(sortItems);
+
+    // Utilities also appear inside Other as a single derived roll-up row, so
+    // Other's subtotal reads as "everything but Custom". The row carries no
+    // input, so the Expenses grand total still counts each utility only once.
+    const utilitiesRollup = utilities.length ? {
+        label:  'Utilities',
+        amount: utilities.reduce((s, i) => s + (parseFloat(i.budget_amount) || 0), 0),
+        actual: utilities.reduce((s, i) => s + Math.abs(currentActuals[i.category] || 0), 0),
+    } : null;
 
     return renderSubpanel('Utilities', utilities, 'expense')
          + renderSubpanel('Custom', custom, 'expense')
-         + renderSubpanel('Other', other, 'expense');
+         + renderSubpanel('Other', other, 'expense', utilitiesRollup)
+         + renderSuggestionSubpanel();
 }
 
-function renderSubpanel(title, items, type) {
+// Scheduled expenses get their own block in subpanel view — they belong to no
+// subpanel until accepted, and this keeps them clear of the drag-reorder rows.
+function renderSuggestionSubpanel() {
+    const suggRows = renderSuggestionRows('expense', false);
+    if (!suggRows) return '';
+    return `
+        <div class="expense-subpanel sched-subpanel">
+            <div class="subpanel-header">
+                <span class="subpanel-title">Scheduled &middot; not added</span>
+                <span class="subpanel-total">${fmtS((suggestions.expense || []).reduce((s, x) => s + x.amount, 0))}</span>
+            </div>
+            <table class="budget-table">
+                <colgroup><col><col style="width:88px"><col style="width:88px"><col style="width:28px"></colgroup>
+                <tbody>${suggRows}</tbody>
+            </table>
+        </div>`;
+}
+
+// Drag a row by its category name to reorder within its own subpanel.
+// The result lives in expenseManualOrder (memory only) so it survives
+// re-renders — add/remove item, view toggle — but resets on reload.
+function enableExpenseDragReorder() {
+    let dragRow = null;
+
+    document.querySelectorAll('.expense-subpanel tbody').forEach(tbody => {
+        tbody.querySelectorAll('tr.budget-item-row').forEach(row => {
+            const handle = row.querySelector('td.item-name');
+            if (!handle) return;
+            handle.draggable = true;
+            handle.classList.add('drag-handle');
+
+            handle.addEventListener('dragstart', e => {
+                dragRow = row;
+                row.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', row.dataset.itemId);
+            });
+            handle.addEventListener('dragend', () => {
+                row.classList.remove('dragging');
+                dragRow = null;
+                // Rebuild from the DOM so every panel's order is captured at once.
+                expenseManualOrder = [...document.querySelectorAll('.expense-subpanel tr.budget-item-row')]
+                    .map(r => parseInt(r.dataset.itemId));
+            });
+        });
+
+        tbody.addEventListener('dragover', e => {
+            if (!dragRow || dragRow.parentElement !== tbody) return;  // same subpanel only
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const target = e.target.closest('tr.budget-item-row');
+            if (!target || target === dragRow || target.parentElement !== tbody) return;
+            const rect  = target.getBoundingClientRect();
+            const after = e.clientY > rect.top + rect.height / 2;
+            tbody.insertBefore(dragRow, after ? target.nextSibling : target);
+        });
+        tbody.addEventListener('drop', e => e.preventDefault());
+    });
+}
+
+function renderSubpanel(title, items, type, rollup) {
     const rows = items.map(item => {
         const group = !item.category ? '__freeform__'
             : item.category.includes(':') ? item.category.split(':')[0]
@@ -284,13 +372,21 @@ function renderSubpanel(title, items, type) {
         return renderItem(item, type, group);
     }).join('');
 
+    const rollupRow = rollup ? `
+        <tr class="budget-rollup-row" title="Total of the ${rollup.label} panel above — edit those items to change it">
+            <td class="item-name">${rollup.label}</td>
+            <td class="item-budget"><span class="rollup-amount" id="rollup_${rollup.label.toLowerCase()}">${formatNumberWithCommas(rollup.amount)}</span></td>
+            <td class="item-actual">${rollup.actual > 0.01 ? formatCurrencyWhole(rollup.actual) : '—'}</td>
+            <td class="item-del"></td>
+        </tr>` : '';
+
     return `
         <div class="expense-subpanel">
             <div class="subpanel-header">
                 <span class="subpanel-title">${title}</span>
                 <span class="subpanel-total" id="subpanel_${title.toLowerCase()}"></span>
             </div>
-            ${!items.length ? `<p class="empty-section">No ${title.toLowerCase()} items.</p>` : `
+            ${!items.length && !rollup ? `<p class="empty-section">No ${title.toLowerCase()} items.</p>` : `
             <table class="budget-table">
                 <thead>
                     <tr class="budget-col-heads">
@@ -300,7 +396,7 @@ function renderSubpanel(title, items, type) {
                         <th class="bh-del"></th>
                     </tr>
                 </thead>
-                <tbody>${rows}</tbody>
+                <tbody>${rollupRow}${rows}</tbody>
             </table>`}
         </div>`;
 }
@@ -469,6 +565,13 @@ function calculateTotals() {
                 else subTotals.other += live;
             }
         });
+        // Utilities roll up into Other: the derived row and Other's subtotal both
+        // pick up the live utilities figure. The grand total above is unaffected —
+        // it sums .expense-input only, and the roll-up row has none.
+        subTotals.other += subTotals.utilities;
+        const rollupEl = document.getElementById('rollup_utilities');
+        if (rollupEl) rollupEl.textContent = formatNumberWithCommas(subTotals.utilities);
+
         for (const [key, total] of Object.entries(subTotals)) {
             const el = document.getElementById(`subpanel_${key}`);
             if (el) el.innerHTML = formatCurrencyWithSuperscriptCents(total);
@@ -481,6 +584,10 @@ function calculateTotals() {
     const end = document.getElementById('endingBalanceDisplay');
     if (inc) inc.innerHTML = formatCurrencyWithSuperscriptCents(totalIncome);
     if (exp) exp.innerHTML = formatCurrencyWithSuperscriptCents(totalExpenses);
+
+    const avail = document.getElementById('totalAvailable');
+    if (avail) avail.innerHTML =
+        `<span class="subtotal-label">Available</span> ${formatCurrencyWithSuperscriptCents(bal + totalIncome)}`;
     if (end) {
         end.innerHTML = formatCurrencyWithSuperscriptCents(ending);
         end.classList.toggle('negative', ending < 0);
@@ -717,7 +824,7 @@ function fmtS(v) {
 let _scheduledIncome = [];
 
 async function loadScheduledIncome() {
-    _scheduledIncome = await apiFetch('/api/scheduled-income');
+    _scheduledIncome = await apiFetch('/api/scheduled-items');
 }
 
 async function showScheduledIncomeModal() {
@@ -733,25 +840,30 @@ function hideScheduledModal() {
 function renderScheduledList() {
     const el = document.getElementById('scheduledList');
     if (!_scheduledIncome.length) {
-        el.innerHTML = '<p style="color:#999;font-size:0.85rem">No scheduled income yet.</p>';
+        el.innerHTML = '<p style="color:#999;font-size:0.85rem">Nothing scheduled yet.</p>';
         return;
     }
     el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.875rem">
         <thead><tr style="border-bottom:1px solid #e5e5e7;color:#6e6e73;font-size:0.78rem">
             <th style="text-align:left;padding:5px 8px">Source</th>
+            <th style="text-align:left;padding:5px 8px">Type</th>
             <th style="text-align:right;padding:5px 8px">Amount/mo</th>
             <th style="text-align:left;padding:5px 8px">Starts</th>
             <th style="text-align:left;padding:5px 8px">Ends</th>
             <th></th>
         </tr></thead>
-        <tbody>${_scheduledIncome.map(s => `
+        <tbody>${_scheduledIncome.map(s => {
+            const isExpense = s.item_type === 'expense';
+            return `
             <tr style="border-bottom:1px solid #f0f0f0">
                 <td style="padding:6px 8px">${escHtmlBP(s.source)}</td>
-                <td style="text-align:right;padding:6px 8px;color:#34c759;font-weight:600">${fmtS(s.amount)}</td>
+                <td style="padding:6px 8px"><span class="sched-type-pill ${isExpense ? 'is-expense' : 'is-income'}">${isExpense ? 'Expense' : 'Income'}</span></td>
+                <td style="text-align:right;padding:6px 8px;color:${isExpense ? '#e65100' : '#34c759'};font-weight:600">${fmtS(s.amount)}</td>
                 <td style="padding:6px 8px;color:#6e6e73">${s.start_date}</td>
                 <td style="padding:6px 8px;color:#6e6e73">${s.end_date || '—'}</td>
                 <td style="padding:6px 8px"><button class="delete-item-btn" onclick="deleteScheduledIncome(${s.id})">×</button></td>
-            </tr>`).join('')}
+            </tr>`;
+        }).join('')}
         </tbody>
     </table>`;
 }
@@ -761,50 +873,92 @@ async function addScheduledIncome() {
     const amount    = parseFloat(document.getElementById('schedAmount').value) || 0;
     const startDate = document.getElementById('schedStartDate').value;
     const endDate   = document.getElementById('schedEndDate').value || null;
+    const itemType  = document.getElementById('schedType').value;
     if (!source || !amount || !startDate) { showToast('Source, amount, and start date required'); return; }
-    await apiPost('/api/scheduled-income', {source, amount, start_date: startDate, end_date: endDate});
+    await apiPost('/api/scheduled-items',
+        {source, amount, start_date: startDate, end_date: endDate, item_type: itemType});
     document.getElementById('schedSource').value    = '';
     document.getElementById('schedAmount').value    = '';
     document.getElementById('schedStartDate').value = '';
     document.getElementById('schedEndDate').value   = '';
     await loadScheduledIncome();
     renderScheduledList();
+    if (currentPlanId) { await loadSuggestions(); renderBudget(); }
 }
 
 async function deleteScheduledIncome(id) {
-    await apiDelete(`/api/scheduled-income/${id}`);
+    await apiDelete(`/api/scheduled-items/${id}`);
     await loadScheduledIncome();
     renderScheduledList();
+    if (currentPlanId) { await loadSuggestions(); renderBudget(); }
 }
 
-// Load scheduled income for current plan month and show as suggestions
-async function renderScheduledSuggestions() {
-    if (!currentPlan) return;
-    const [year, month] = currentPlan.plan_date.split('-').map(Number);
-    let active = [];
+// ── Suggestions: accept / reject scheduled items per period ─────────────
+
+async function loadSuggestions() {
     try {
-        active = await apiFetch(`/api/scheduled-income/for-month?year=${year}&month=${month}`);
-    } catch(e) { return; }
-    if (!active.length) return;
+        suggestions = await apiFetch(`/api/plans/${currentPlanId}/suggestions`);
+    } catch(e) {
+        suggestions = {income: [], expense: [], dismissed: {income: 0, expense: 0}};
+    }
+}
 
-    // Only show items that aren't already in the plan
-    const usedCats = new Set((currentPlan.items || []).map(i => i.category));
-    const total    = active.reduce((s, a) => s + a.amount, 0);
+// Rows appended inside the real panel, styled as not-yet-committed.
+function renderSuggestionRows(type, showHeader = true) {
+    const list      = suggestions[type] || [];
+    const dismissed = (suggestions.dismissed || {})[type] || 0;
+    if (!list.length && !dismissed) return '';
 
-    const existing = document.getElementById('schedSuggestions');
-    if (existing) existing.remove();
+    const rows = list.map(s => `
+        <tr class="sched-sugg-row" data-sched-id="${s.id}">
+            <td class="item-name" title="Scheduled ${type}, starts ${s.start_date}${s.end_date ? ' — ends ' + s.end_date : ''}">${escHtmlBP(s.source)}</td>
+            <td class="item-budget"><span class="sched-amount">${formatNumberWithCommas(s.amount)}</span></td>
+            <td class="item-actual sched-actions" colspan="2">
+                <button class="sched-btn sched-accept" title="Add to this period"
+                        onclick="acceptSuggestion(${s.id})">&#10003;</button>
+                <button class="sched-btn sched-reject" title="Skip for this period only"
+                        onclick="rejectSuggestion(${s.id})">&#10005;</button>
+            </td>
+        </tr>`).join('');
 
-    const panel = document.createElement('div');
-    panel.id        = 'schedSuggestions';
-    panel.className = 'sched-suggestions';
-    panel.innerHTML = `
-        <div class="sched-sugg-label">&#9654; Scheduled income this month: <strong>${fmtS(total)}/mo</strong></div>
-        <div class="sched-sugg-items">${active.map(a =>
-            `<span class="sched-sugg-tag">${escHtmlBP(a.source)}: ${fmtS(a.amount)}</span>`
-        ).join('')}</div>`;
+    const restoreRow = dismissed ? `
+        <tr class="sched-restore-row">
+            <td colspan="4">
+                <button class="sched-restore" onclick="restoreSuggestions('${type}')">
+                    ${dismissed} skipped this period — restore
+                </button>
+            </td>
+        </tr>` : '';
 
-    const content = document.getElementById('budgetContent');
-    if (content) content.prepend(panel);
+    const header = (list.length && showHeader) ? `
+        <tr class="budget-group-row sched-group-row">
+            <td class="group-name">Scheduled &middot; not added</td>
+            <td></td><td></td>
+            <td class="group-subtotal">${fmtS(list.reduce((s, x) => s + x.amount, 0))}</td>
+        </tr>` : '';
+
+    return header + rows + restoreRow;
+}
+
+async function acceptSuggestion(schedId) {
+    const item = await apiPost(`/api/plans/${currentPlanId}/suggestions/${schedId}/accept`, {});
+    currentPlan.items.push(item);
+    await loadSuggestions();
+    renderBudget();
+    showToast(`Added ${item.label}`);
+}
+
+async function rejectSuggestion(schedId) {
+    await apiPost(`/api/plans/${currentPlanId}/suggestions/${schedId}/dismiss`, {});
+    await loadSuggestions();
+    renderBudget();
+    showToast('Skipped for this period');
+}
+
+async function restoreSuggestions(type) {
+    await apiPost(`/api/plans/${currentPlanId}/suggestions/restore`, {item_type: type});
+    await loadSuggestions();
+    renderBudget();
 }
 
 function escHtmlBP(s) {

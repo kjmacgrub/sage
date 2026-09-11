@@ -572,7 +572,8 @@ const RP_KEYS = [
     'wages','annuity','pension','interest','div_nonqual','div_qual','cg_dist',
     'ss_self','ss_spouse','cap_loss_co','extra_ded','conversion',
     'fed_withheld','state_withheld',
-    'ira_balance','growth_rate','inflation',
+    'ira_balance','other_deferred','taxable_balance','growth_rate','inflation','withdraw_years',
+    'heir_rate',
 ];
 
 const RP_DEFAULTS = {
@@ -580,7 +581,9 @@ const RP_DEFAULTS = {
     div_nonqual: 7475, div_qual: 5353, cg_dist: 4428,
     ss_self: 0, ss_spouse: 0, cap_loss_co: 36355, extra_ded: 0,
     conversion: 0, fed_withheld: 15000, state_withheld: 7000,
-    ira_balance: 742000, growth_rate: 5, inflation: 2.5,
+    ira_balance: 742000, other_deferred: 400000, taxable_balance: 600000,
+    growth_rate: 5, inflation: 2.5, withdraw_years: 10,
+    heir_rate: 25,
 };
 
 function rpInit() {
@@ -595,6 +598,12 @@ function rpInit() {
     // Restore target bracket select
     const tbSel = document.getElementById('rp_target_bracket');
     if (tbSel && saved.target_bracket) tbSel.value = saved.target_bracket;
+    // Restore gift controls
+    const giftOn = document.getElementById('rp_gift_on');
+    if (giftOn && saved.gift_on) giftOn.checked = true;
+    const giftPri = document.getElementById('rp_gift_priority');
+    if (giftPri && saved.gift_priority) giftPri.value = saved.gift_priority;
+    rpToggleGiftFields();
 }
 
 function rpSave() {
@@ -605,6 +614,10 @@ function rpSave() {
     }
     const tbSel = document.getElementById('rp_target_bracket');
     if (tbSel) data.target_bracket = tbSel.value;
+    const giftOn = document.getElementById('rp_gift_on');
+    if (giftOn) data.gift_on = giftOn.checked;
+    const giftPri = document.getElementById('rp_gift_priority');
+    if (giftPri) data.gift_priority = giftPri.value;
     localStorage.setItem('sage-roth-planner', JSON.stringify(data));
 }
 
@@ -612,7 +625,14 @@ function rpVal(id) {
     return parseFloat(document.getElementById(id)?.value) || 0;
 }
 
-function rpOnInput() { rpSave(); rpRender(); }
+function rpOnInput() { rpToggleGiftFields(); rpSave(); rpRender(); }
+
+function rpToggleGiftFields() {
+    const on = document.getElementById('rp_gift_on')?.checked;
+    document.querySelectorAll('.rp-gift-field').forEach(el => {
+        el.style.display = on ? '' : 'none';
+    });
+}
 
 function rpSyncSlider(fromSlider) {
     const slider = document.getElementById('rp_slider');
@@ -951,16 +971,87 @@ function rpCalcLtcgInflated(ordTaxable, prefIncome, inf) {
     return tax;
 }
 
+// Compute total federal + state + city tax for a given (ordinary, preferential)
+// income pair, using brackets inflated to the year captured in `inf`.
+// Used for both the projection loop and the post-horizon IRA withdrawal model.
+function rpTaxEngine(baseOrd, pref, inc, inf, stateMode) {
+    const stdDed     = Math.round(STANDARD_DEDUCTION.mfj * inf);
+    const fedBrackets = BRACKETS.mfj.map(b => ({
+        limit: b.limit === Infinity ? Infinity : Math.round(b.limit * inf),
+        rate: b.rate,
+    }));
+    const fedTaxOrd = Math.max(0, baseOrd - stdDed);
+    const fedTax    = calcBracketTax(fedTaxOrd, fedBrackets)
+                    + rpCalcLtcgInflated(fedTaxOrd, pref, inf);
+    const totalAgi  = baseOrd + pref;
+
+    let nyTax = 0, nycTax = 0;
+    if (stateMode === 'nyc' || stateMode === 'ny') {
+        const nyExcl   = Math.min(NY_PENSION_EXCL, inc.annuity || 0)
+                       + Math.min(NY_PENSION_EXCL, inc.pension || 0);
+        const nyStdDed = Math.round(NY_STD_DEDUCTION * inf);
+        const nyTaxable = Math.max(0, totalAgi - nyExcl - nyStdDed);
+        const nyBr     = NY_BRACKETS.map(b => ({
+            limit: b.limit === Infinity ? Infinity : Math.round(b.limit * inf),
+            rate: b.rate,
+        }));
+        nyTax = calcBracketTax(nyTaxable, nyBr);
+        if (stateMode === 'nyc') {
+            nycTax = calcBracketTax(nyTaxable, NYC_BRACKETS);
+        }
+    } else if (stateMode === 'flat_3' || stateMode === 'flat_5') {
+        const flatRate  = stateMode === 'flat_3' ? 0.03 : 0.05;
+        const stTaxable = Math.max(0, totalAgi - stdDed);
+        nyTax = stTaxable * flatRate;
+    }
+    return fedTax + nyTax + nycTax;
+}
+
+// Incremental tax cost of withdrawing `ira` over `years` years on top of the
+// frozen final-year baseline. Walks brackets correctly: a larger IRA → more
+// brackets crossed each year → higher effective rate.
+function rpTaxOnWithdrawal(ira, years, ctx) {
+    if (!ctx || ira <= 0 || years <= 0) return 0;
+    const slice   = ira / years;
+    const baseTax = rpTaxEngine(ctx.baseOrd, ctx.pref, ctx.inc, ctx.inf, ctx.stateMode);
+    const withTax = rpTaxEngine(ctx.baseOrd + slice, ctx.pref, ctx.inc, ctx.inf, ctx.stateMode);
+    return (withTax - baseTax) * years;
+}
+
 function rpComputeMultiYear() {
     const targetRate = parseFloat(document.getElementById('rp_target_bracket')?.value || '0.22');
     const growth     = (rpVal('rp_growth_rate') || 5) / 100;
     const inflRate   = (rpVal('rp_inflation') || 2.5) / 100;
     const stateMode  = document.getElementById('rp_state')?.value || 'nyc';
 
+    // Gifting parameters
+    const giftOn       = document.getElementById('rp_gift_on')?.checked || false;
+    const giftPriority = document.getElementById('rp_gift_priority')?.value || 'on_top';
+    const heirRate     = (rpVal('rp_heir_rate') || 25) / 100;
+    // 2025 annual exclusion: $19K per donor per recipient, 2 donors × 2 kids = $76K base
+    const giftBaseAmt  = 19000 * 2 * 2;
+
+    // Convert path balances
     let iraBalance   = rpVal('rp_ira_balance');
     let rothBalance  = 0;
+    let taxableA     = rpVal('rp_taxable_balance'); // taxable account, pays conv taxes each year
+
+    // Don't-convert path balances (parallel universe — same starting state, no conversions)
+    let noConvIRA    = rpVal('rp_ira_balance');
+    let taxableB     = rpVal('rp_taxable_balance'); // taxable account, grows untouched
+
+    // Other tax-deferred account — grows in both paths, never converted
+    let otherDeferred = rpVal('rp_other_deferred');
+
+    // Gift tracking — children's accumulated wealth (both paths track independently)
+    let giftPoolA = 0;  // Convert + Gift path: children's pile
+    let giftPoolB = 0;  // Don't-Convert + Gift path: children's pile
+    let totalGiftedA = 0, totalGiftedB = 0;
+    let totalGiftTaxA = 0, totalGiftTaxB = 0;
+
     const rows       = [];
     let totalConv = 0, totalConvCost = 0;
+    let lastCtx = null;
 
     for (let yr = 2026; yr <= 2035; yr++) {
         const y   = yr - 2026;
@@ -989,13 +1080,36 @@ function rpComputeMultiYear() {
             if (b.rate > targetRate) break;
         }
 
-        // Conversion = room to fill bracket, limited by IRA
-        const room       = Math.max(0, targetTop - baseTaxOrd);
-        const conversion = Math.min(room, Math.max(0, iraBalance));
+        // Annual gift amount (inflation-adjusted), limited by available IRA
+        const giftAmt = giftOn ? Math.round(giftBaseAmt * inf) : 0;
 
-        // Tax WITH conversion
-        const fedTaxOrd_i = baseTaxOrd + conversion;
-        const totalAgi    = baseOrd + conversion + pref;
+        // Determine conversion + gift withdrawal amounts based on priority
+        let conversion, giftWithdrawal;
+        const totalRoom = Math.max(0, targetTop - baseTaxOrd);
+
+        if (!giftOn) {
+            // No gifting — same as before
+            conversion     = Math.min(totalRoom, Math.max(0, iraBalance));
+            giftWithdrawal = 0;
+        } else if (giftPriority === 'fill_first') {
+            // Gift fills bracket first, conversion gets remaining room
+            giftWithdrawal = Math.min(giftAmt, Math.max(0, iraBalance));
+            const roomAfterGift = Math.max(0, totalRoom - giftWithdrawal);
+            const iraAfterGift  = Math.max(0, iraBalance - giftWithdrawal);
+            conversion = Math.min(roomAfterGift, iraAfterGift);
+        } else {
+            // 'on_top' — conversion fills bracket, gift is additional withdrawal
+            conversion     = Math.min(totalRoom, Math.max(0, iraBalance));
+            const iraAfterConv = Math.max(0, iraBalance - conversion);
+            giftWithdrawal = Math.min(giftAmt, iraAfterConv);
+        }
+
+        // Total IRA withdrawal (conversion + gift)
+        const totalWithdrawal = conversion + giftWithdrawal;
+
+        // Tax WITH conversion + gift withdrawal
+        const fedTaxOrd_i = baseTaxOrd + totalWithdrawal;
+        const totalAgi    = baseOrd + totalWithdrawal + pref;
         const fedTax      = calcBracketTax(fedTaxOrd_i, brackets)
                           + rpCalcLtcgInflated(fedTaxOrd_i, pref, inf);
 
@@ -1025,7 +1139,6 @@ function rpComputeMultiYear() {
             }
         } else if (stateMode === 'flat_3' || stateMode === 'flat_5') {
             const flatRate = stateMode === 'flat_3' ? 0.03 : 0.05;
-            // Simple flat tax on AGI minus standard deduction
             const stStdDed = Math.round(STANDARD_DEDUCTION.mfj * inf);
             nyTaxable      = Math.max(0, totalAgi - stStdDed);
             nyTax          = nyTaxable * flatRate;
@@ -1033,23 +1146,21 @@ function rpComputeMultiYear() {
             const baseTaxable = Math.max(0, baseAgi - stStdDed);
             baseNyTax      = baseTaxable * flatRate;
         }
-        // stateMode === 'none': all stay 0
 
         const totalTax     = fedTax + nyTax + nycTax;
 
-        // Tax WITHOUT conversion (base)
+        // Tax WITHOUT conversion or gift (base)
         const baseFedTax    = calcBracketTax(baseTaxOrd, brackets)
                             + rpCalcLtcgInflated(baseTaxOrd, pref, inf);
         const baseTotalTax  = baseFedTax + baseNyTax + baseNycTax;
 
         const convCost = totalTax - baseTotalTax;
 
-        // Marginal rates at conversion level
+        // Marginal rates at total withdrawal level
         const margFed = findMarginalRate(fedTaxOrd_i, brackets);
 
         const iraStart  = iraBalance;
-        const rothStart = rothBalance;
-        iraBalance      = Math.max(0, iraBalance - conversion);
+        iraBalance      = Math.max(0, iraBalance - totalWithdrawal);
         rothBalance    += conversion;
 
         totalConv     += conversion;
@@ -1059,17 +1170,106 @@ function rpComputeMultiYear() {
 
         rows.push({
             year: yr, ageH: 64 + y, ageK: 64 + y,
-            baseTaxOrd, conversion, iraStart, rothEnd: rothBalance, agi: totalAgi,
+            baseTaxOrd, conversion, giftWithdrawal, iraStart, rothEnd: rothBalance, agi: totalAgi,
             totalTax, baseTotalTax, convCost,
             margAll: margFed + margNy + margNyc, effRate,
         });
 
-        // Grow balances
-        iraBalance  *= (1 + growth);
-        rothBalance *= (1 + growth);
+        if (yr === 2035) {
+            lastCtx = {
+                baseOrd, pref,
+                inc: { annuity: inc.annuity, pension: inc.pension },
+                inf, stateMode,
+            };
+        }
+
+        // Convert path: pay conversion + gift tax from taxable account
+        taxableA -= convCost;
+        // Gift goes to children
+        if (giftWithdrawal > 0) {
+            giftPoolA    += giftWithdrawal;
+            totalGiftedA += giftWithdrawal;
+        }
+
+        // Don't-convert path gifting: also withdraw from IRA for gifts (same amount)
+        let noConvGiftWD = 0;
+        if (giftOn) {
+            noConvGiftWD = Math.min(Math.round(giftAmt), Math.max(0, noConvIRA));
+            noConvIRA    = Math.max(0, noConvIRA - noConvGiftWD);
+            // Tax on the gift withdrawal in the don't-convert path
+            // Use rpTaxEngine to compute incremental tax
+            const noConvBaseOrdTax = Math.max(0, baseOrd - stdDed);
+            const noConvWithGiftTax = Math.max(0, baseOrd + noConvGiftWD - stdDed);
+            const noConvGiftFedTax = calcBracketTax(noConvWithGiftTax, brackets)
+                                   + rpCalcLtcgInflated(noConvWithGiftTax, pref, inf)
+                                   - calcBracketTax(noConvBaseOrdTax, brackets)
+                                   - rpCalcLtcgInflated(noConvBaseOrdTax, pref, inf);
+            // State tax on gift withdrawal in don't-convert path
+            let noConvGiftStateTax = 0;
+            if (stateMode === 'nyc' || stateMode === 'ny') {
+                const nyExcl   = Math.min(NY_PENSION_EXCL, inc.annuity)
+                               + Math.min(NY_PENSION_EXCL, inc.pension);
+                const nyStdDed = Math.round(NY_STD_DEDUCTION * inf);
+                const nyBr     = NY_BRACKETS.map(b => ({
+                    limit: b.limit === Infinity ? Infinity : Math.round(b.limit * inf),
+                    rate: b.rate,
+                }));
+                const ncBaseNy = Math.max(0, baseAgi - nyExcl - nyStdDed);
+                const ncWithNy = Math.max(0, baseAgi + noConvGiftWD - nyExcl - nyStdDed);
+                noConvGiftStateTax = calcBracketTax(ncWithNy, nyBr) - calcBracketTax(ncBaseNy, nyBr);
+                if (stateMode === 'nyc') {
+                    noConvGiftStateTax += calcBracketTax(ncWithNy, NYC_BRACKETS) - calcBracketTax(ncBaseNy, NYC_BRACKETS);
+                }
+            } else if (stateMode === 'flat_3' || stateMode === 'flat_5') {
+                const flatRate = stateMode === 'flat_3' ? 0.03 : 0.05;
+                noConvGiftStateTax = noConvGiftWD * flatRate;
+            }
+            const noConvGiftTax = noConvGiftFedTax + noConvGiftStateTax;
+            taxableB     -= noConvGiftTax;
+            totalGiftTaxB += noConvGiftTax;
+            giftPoolB    += noConvGiftWD;
+            totalGiftedB += noConvGiftWD;
+        }
+
+        // Grow balances (end of year)
+        iraBalance    *= (1 + growth);
+        rothBalance   *= (1 + growth);
+        taxableA      *= (1 + growth);
+        noConvIRA     *= (1 + growth);
+        taxableB      *= (1 + growth);
+        otherDeferred *= (1 + growth);
+        giftPoolA     *= (1 + growth);
+        giftPoolB     *= (1 + growth);
     }
 
-    return { rows, totalConv, totalConvCost, finalIRA: iraBalance, finalRoth: rothBalance };
+    const withdrawYears = Math.max(1, Math.round(rpVal('rp_withdraw_years') || 10));
+
+    const deferredA = iraBalance + otherDeferred;
+    const deferredB = noConvIRA  + otherDeferred;
+
+    const taxOnA = rpTaxOnWithdrawal(deferredA, withdrawYears, lastCtx);
+    const taxOnB = rpTaxOnWithdrawal(deferredB, withdrawYears, lastCtx);
+
+    const effRateA = deferredA > 0 ? taxOnA / deferredA : 0;
+    const effRateB = deferredB > 0 ? taxOnB / deferredB : 0;
+
+    const convertNet   = rothBalance + (deferredA - taxOnA) + taxableA;
+    const noConvertNet = 0           + (deferredB - taxOnB) + taxableB;
+
+    return {
+        rows, totalConv, totalConvCost,
+        finalIRA: iraBalance, finalRoth: rothBalance,
+        finalOtherDeferred: otherDeferred,
+        finalTaxableA: taxableA, finalTaxableB: taxableB,
+        noConvIRA, deferredA, deferredB,
+        withdrawYears, taxOnA, taxOnB, effRateA, effRateB,
+        convertNet, noConvertNet,
+        // Gift data
+        giftOn, heirRate,
+        giftPoolA, giftPoolB, totalGiftedA, totalGiftedB,
+        totalGiftTaxA: totalConvCost, // gift tax is embedded in convCost for path A
+        totalGiftTaxB,
+    };
 }
 
 function rpRenderMultiYear() {
@@ -1079,12 +1279,13 @@ function rpRenderMultiYear() {
     if (!body) return;
 
     body.innerHTML = data.rows.map(r => {
-        const has = r.conversion > 0;
+        const has = r.conversion > 0 || r.giftWithdrawal > 0;
+        const gw = r.giftWithdrawal > 0;
         return `<tr${has ? '' : ' style="color:var(--text-secondary)"'}>
             <td>${r.year}</td>
             <td>${r.ageH} / ${r.ageK}</td>
             <td style="text-align:right">${fmt(r.baseTaxOrd)}</td>
-            <td style="text-align:right;${has ? 'color:var(--warning);font-weight:600' : ''}">${has ? fmt(r.conversion) : '\u2014'}</td>
+            <td style="text-align:right;${r.conversion > 0 ? 'color:var(--warning);font-weight:600' : ''}">${r.conversion > 0 ? fmt(r.conversion) : '\u2014'}${gw ? '<br><span style="font-size:0.78rem;color:var(--text-secondary)">+' + fmt(r.giftWithdrawal) + ' gift</span>' : ''}</td>
             <td style="text-align:right">${fmt(Math.round(r.iraStart))}</td>
             <td style="text-align:right;color:var(--income-accent)">${fmt(Math.round(r.rothEnd))}</td>
             <td style="text-align:right">${fmt(r.totalTax)}</td>
@@ -1104,6 +1305,125 @@ function rpRenderMultiYear() {
         <td></td>
         <td></td>
     </tr>`;
+
+    rpRenderCompare(data);
+}
+
+function rpRenderCompare(d) {
+    const wrap = document.getElementById('rpCompare');
+    if (!wrap) return;
+
+    const lastYear = d.rows.length ? d.rows[d.rows.length - 1].year : '';
+    const yrs      = d.withdrawYears;
+
+    // Convert path
+    const A_roth      = Math.round(d.finalRoth);
+    const A_ira       = Math.round(d.finalIRA);
+    const A_other     = Math.round(d.finalOtherDeferred);
+    const A_deferred  = Math.round(d.deferredA);
+    const A_defTax    = Math.round(d.taxOnA);
+    const A_defNet    = A_deferred - A_defTax;
+    const A_taxable   = Math.round(d.finalTaxableA);
+    const A_giftPool  = Math.round(d.giftPoolA || 0);
+    const A_total     = A_roth + A_defNet + A_taxable + A_giftPool;
+    const A_ratePct   = (d.effRateA * 100).toFixed(1) + '%';
+    const A_taxableShortfall = A_taxable < 0;
+
+    // Don't-convert path
+    const B_ira       = Math.round(d.noConvIRA);
+    const B_other     = Math.round(d.finalOtherDeferred);
+    const B_deferred  = Math.round(d.deferredB);
+    const B_defTax    = Math.round(d.taxOnB);
+    const B_defNet    = B_deferred - B_defTax;
+    const B_taxable   = Math.round(d.finalTaxableB);
+    const B_giftPool  = Math.round(d.giftPoolB || 0);
+    const B_total     = B_defNet + B_taxable + B_giftPool;
+    const B_ratePct   = (d.effRateB * 100).toFixed(1) + '%';
+
+    // If no gifting, in bequest the heirs inherit the IRA and pay tax at heir rate
+    // For fair comparison when gifting is off, we don't add anything extra
+    // When gifting is on, the gift pool is already tax-free to the children (tax was paid at withdrawal)
+    // In the no-gift bequest, the IRA passes to heirs who pay heir rate on it
+
+    const diff     = A_total - B_total;
+    const winner   = diff >= 0 ? 'Convert' : 'Don\u2019t Convert';
+    const winColor = diff >= 0 ? 'var(--income-accent)' : 'var(--warning)';
+    const absDiff  = fmt(Math.abs(diff));
+    const pctDiff  = B_total > 0 ? ((Math.abs(diff) / B_total) * 100).toFixed(1) + '%' : '';
+
+    const targetPct = (parseFloat(document.getElementById('rp_target_bracket')?.value || '0.22') * 100).toFixed(0);
+
+    const shortfallNote = A_taxableShortfall
+        ? `<p class="tax-hint" style="color:var(--warning)"><strong>Note:</strong> the Convert path's taxable account ran negative
+           (${fmt(A_taxable)}) &mdash; conversion taxes exceeded its growth. You'd need to source the shortfall from elsewhere,
+           or convert less aggressively.</p>`
+        : '';
+
+    const giftNote = d.giftOn
+        ? `Annual gifts of ~$76K (inflation-adjusted) are withdrawn from the IRA each year.
+           Tax on the withdrawal is paid from the taxable account. The gifted amount grows at the same rate
+           in the children\u2019s hands (tax-free to them \u2014 income tax was already paid at withdrawal).`
+        : '';
+
+    // Gift rows for each column
+    const giftRowsA = d.giftOn
+        ? `<tr style="border-top:1px solid var(--border)"><td style="color:var(--text-secondary)">Gifted to children (grown)</td><td style="color:var(--income-accent)">${fmt(A_giftPool)}</td></tr>
+           <tr><td class="rp-compare-meta">${fmt(Math.round(d.totalGiftedA))} gifted over ${d.rows.length}y</td><td></td></tr>`
+        : '';
+    const giftRowsB = d.giftOn
+        ? `<tr style="border-top:1px solid var(--border)"><td style="color:var(--text-secondary)">Gifted to children (grown)</td><td style="color:var(--income-accent)">${fmt(B_giftPool)}</td></tr>
+           <tr><td class="rp-compare-meta">${fmt(Math.round(d.totalGiftedB))} gifted over ${d.rows.length}y</td><td></td></tr>`
+        : '';
+
+    const totalLabel = d.giftOn ? 'Family net wealth' : 'Net after-tax wealth';
+
+    wrap.innerHTML = `
+        <h4 class="rp-compare-title">Convert vs. Don\u2019t Convert &mdash; Net Wealth at End of ${lastYear}</h4>
+        <p class="tax-hint">
+            All deferred-tax accounts (main IRA + other deferred) are withdrawn together over <strong>${yrs}</strong>
+            year${yrs === 1 ? '' : 's'}, stacked on top of year-${lastYear} baseline income (SS, pension, annuity, etc.).
+            Tax uses actual federal &amp; state brackets &mdash; so the bigger combined pile crosses more brackets and pays
+            a higher effective rate, which is exactly what makes early conversions worthwhile.
+            In the Convert path, conversion taxes are paid out of the taxable account each year (so it shrinks);
+            in Don\u2019t Convert it grows untouched. The taxable account is counted at face value (embedded LTCG ignored
+            in both paths equally).
+            ${giftNote}
+        </p>
+        ${shortfallNote}
+        <div class="rp-compare-grid">
+            <div class="rp-compare-col">
+                <div class="rp-compare-head">Convert (fill ${targetPct}% bracket)${d.giftOn ? ' + Gift' : ''}</div>
+                <table class="rp-compare-table">
+                    <tr><td>Roth (tax-free)</td><td>${fmt(A_roth)}</td></tr>
+                    <tr><td>Main IRA</td><td>${fmt(A_ira)}</td></tr>
+                    <tr><td>Other tax-deferred</td><td>${fmt(A_other)}</td></tr>
+                    <tr><td>&nbsp;&nbsp;&minus; tax to withdraw over ${yrs}y</td><td>(${fmt(A_defTax)})</td></tr>
+                    <tr><td>Taxable account</td><td style="${A_taxableShortfall ? 'color:var(--warning)' : ''}">${fmt(A_taxable)}</td></tr>
+                    ${giftRowsA}
+                    <tr class="rp-compare-total"><td>${totalLabel}</td><td>${fmt(A_total)}</td></tr>
+                    <tr><td class="rp-compare-meta" colspan="2">Effective withdrawal rate: ${A_ratePct} &middot; conversion taxes paid: ${fmt(Math.round(d.totalConvCost))}</td></tr>
+                </table>
+            </div>
+            <div class="rp-compare-col">
+                <div class="rp-compare-head">Don\u2019t Convert${d.giftOn ? ' + Gift' : ' (let IRA grow)'}</div>
+                <table class="rp-compare-table">
+                    <tr><td>Roth (tax-free)</td><td>${fmt(0)}</td></tr>
+                    <tr><td>Main IRA</td><td>${fmt(B_ira)}</td></tr>
+                    <tr><td>Other tax-deferred</td><td>${fmt(B_other)}</td></tr>
+                    <tr><td>&nbsp;&nbsp;&minus; tax to withdraw over ${yrs}y</td><td>(${fmt(B_defTax)})</td></tr>
+                    <tr><td>Taxable account</td><td>${fmt(B_taxable)}</td></tr>
+                    ${giftRowsB}
+                    <tr class="rp-compare-total"><td>${totalLabel}</td><td>${fmt(B_total)}</td></tr>
+                    <tr><td class="rp-compare-meta" colspan="2">Effective withdrawal rate: ${B_ratePct} &middot; no conversion taxes paid</td></tr>
+                </table>
+            </div>
+        </div>
+        <div class="rp-compare-verdict" style="border-color:${winColor}">
+            <span class="rp-compare-verdict-label">Better strategy:</span>
+            <span class="rp-compare-verdict-winner" style="color:${winColor}">${winner}</span>
+            <span class="rp-compare-verdict-diff">by ${absDiff}${pctDiff ? ' (' + pctDiff + ')' : ''}</span>
+        </div>
+    `;
 }
 
 // ── Boot ─────────────────────────────────────────────────────

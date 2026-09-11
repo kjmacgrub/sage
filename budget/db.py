@@ -15,6 +15,7 @@ def get_conn():
 
 def init_db(df=None):
     conn = get_conn()
+    _rename_legacy_tables(conn)   # must precede CREATE TABLE IF NOT EXISTS below
     conn.executescript("""
     CREATE TABLE IF NOT EXISTS transactions (
         id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,21 +50,58 @@ def init_db(df=None):
     );
 
 
-    CREATE TABLE IF NOT EXISTS scheduled_income (
+    CREATE TABLE IF NOT EXISTS scheduled_items (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         source     TEXT NOT NULL,
         amount     REAL DEFAULT 0,
         start_date TEXT NOT NULL,
         end_date   TEXT,
         frequency  TEXT DEFAULT 'monthly',
-        notes      TEXT
+        notes      TEXT,
+        item_type  TEXT DEFAULT 'income'      -- 'income' | 'expense'
+    );
+
+    -- A rejected suggestion is remembered per plan, so it stays hidden for that
+    -- period only; the schedule itself is untouched.
+    CREATE TABLE IF NOT EXISTS scheduled_dismissals (
+        plan_id      INTEGER NOT NULL REFERENCES budget_plans(id) ON DELETE CASCADE,
+        scheduled_id INTEGER NOT NULL REFERENCES scheduled_items(id) ON DELETE CASCADE,
+        PRIMARY KEY (plan_id, scheduled_id)
     );
     """)
     conn.commit()
-    _migrate_budget_items(conn)
+    _migrate_budget_items(conn)   # may rebuild budget_items, so run before adding columns
+    _migrate_scheduled(conn)
     if df is not None:
         _import_df(conn, df)
     conn.close()
+
+
+def _table_exists(conn, name):
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
+    ).fetchone() is not None
+
+
+def _rename_legacy_tables(conn):
+    """scheduled_income → scheduled_items, now that schedules cover expenses too."""
+    if _table_exists(conn, "scheduled_income") and not _table_exists(conn, "scheduled_items"):
+        conn.execute("ALTER TABLE scheduled_income RENAME TO scheduled_items")
+        conn.commit()
+
+
+def _migrate_scheduled(conn):
+    """Add item_type to scheduled_items and scheduled_id to budget_items (idempotent)."""
+    sched_cols = [r[1] for r in conn.execute("PRAGMA table_info(scheduled_items)").fetchall()]
+    if "item_type" not in sched_cols:
+        conn.execute("ALTER TABLE scheduled_items ADD COLUMN item_type TEXT DEFAULT 'income'")
+        conn.execute("UPDATE scheduled_items SET item_type='income' WHERE item_type IS NULL")
+
+    item_cols = [r[1] for r in conn.execute("PRAGMA table_info(budget_items)").fetchall()]
+    if "scheduled_id" not in item_cols:
+        # Links an accepted suggestion back to its schedule so it stops being suggested.
+        conn.execute("ALTER TABLE budget_items ADD COLUMN scheduled_id INTEGER")
+    conn.commit()
 
 
 def _migrate_budget_items(conn):
@@ -155,7 +193,7 @@ def get_plan(plan_id):
         conn.close()
         return None
     items = conn.execute(
-        "SELECT id,category,label,budget_amount,item_type FROM budget_items "
+        "SELECT id,category,label,budget_amount,item_type,scheduled_id FROM budget_items "
         "WHERE plan_id=? ORDER BY item_type, COALESCE(category, label)",
         (plan_id,)
     ).fetchall()
@@ -253,28 +291,149 @@ def get_categories_flat():
 
 # ── Scheduled Income (B2) ───────────────────────────────────────────────────
 
-def list_scheduled_income():
+def list_scheduled_items():
     conn = get_conn()
-    rows = conn.execute("SELECT * FROM scheduled_income ORDER BY start_date").fetchall()
+    rows = conn.execute("SELECT * FROM scheduled_items ORDER BY item_type, start_date").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def add_scheduled_income(source, amount, start_date, end_date=None, frequency="monthly", notes=""):
+def add_scheduled_item(source, amount, start_date, end_date=None, frequency="monthly",
+                       notes="", item_type="income"):
     conn = get_conn()
     conn.execute(
-        "INSERT INTO scheduled_income(source, amount, start_date, end_date, frequency, notes) VALUES(?,?,?,?,?,?)",
-        (source, amount, start_date, end_date, frequency, notes)
+        "INSERT INTO scheduled_items(source, amount, start_date, end_date, frequency, notes, item_type) "
+        "VALUES(?,?,?,?,?,?,?)",
+        (source, amount, start_date, end_date, frequency, notes, item_type)
     )
     conn.commit()
-    row = conn.execute("SELECT * FROM scheduled_income WHERE rowid=last_insert_rowid()").fetchone()
+    row = conn.execute("SELECT * FROM scheduled_items WHERE rowid=last_insert_rowid()").fetchone()
     conn.close()
     return dict(row)
 
 
-def delete_scheduled_income(item_id):
+def delete_scheduled_item(item_id):
     conn = get_conn()
-    conn.execute("DELETE FROM scheduled_income WHERE id=?", (item_id,))
+    conn.execute("DELETE FROM scheduled_dismissals WHERE scheduled_id=?", (item_id,))
+    conn.execute("UPDATE budget_items SET scheduled_id=NULL WHERE scheduled_id=?", (item_id,))
+    conn.execute("DELETE FROM scheduled_items WHERE id=?", (item_id,))
+    conn.commit()
+    conn.close()
+
+
+# ── Per-plan suggestions ────────────────────────────────────────────────────
+
+def get_suggestions_for_plan(plan_id):
+    """Scheduled items active in this plan's month that are neither already
+    accepted into the plan nor rejected for it.
+
+    Returns {"income": [...], "expense": [...], "dismissed": <count>}.
+    """
+    conn = get_conn()
+    plan = conn.execute(
+        "SELECT plan_date FROM budget_plans WHERE id=?", (plan_id,)
+    ).fetchone()
+    if not plan:
+        conn.close()
+        return {"income": [], "expense": [], "dismissed": {"income": 0, "expense": 0}}
+
+    year, month = plan["plan_date"].split("-")[:2]
+    month_first = f"{year}-{month}-01"
+    month_last  = f"{year}-{month}-31"
+
+    rows = conn.execute(
+        """
+        SELECT s.* FROM scheduled_items s
+        WHERE s.start_date <= ?
+          AND (s.end_date IS NULL OR s.end_date >= ?)
+          AND NOT EXISTS (SELECT 1 FROM budget_items b
+                          WHERE b.plan_id=? AND b.scheduled_id=s.id)
+          AND NOT EXISTS (SELECT 1 FROM scheduled_dismissals d
+                          WHERE d.plan_id=? AND d.scheduled_id=s.id)
+        ORDER BY s.source
+        """,
+        (month_last, month_first, plan_id, plan_id)
+    ).fetchall()
+
+    dismissed_rows = conn.execute(
+        """
+        SELECT COALESCE(s.item_type,'income') AS t, COUNT(*) AS n
+        FROM scheduled_dismissals d
+        JOIN scheduled_items s ON s.id = d.scheduled_id
+        WHERE d.plan_id=? AND s.start_date <= ? AND (s.end_date IS NULL OR s.end_date >= ?)
+        GROUP BY t
+        """,
+        (plan_id, month_last, month_first)
+    ).fetchall()
+    conn.close()
+
+    dismissed = {"income": 0, "expense": 0}
+    for r in dismissed_rows:
+        dismissed[r["t"] if r["t"] in dismissed else "income"] = r["n"]
+
+    out = {"income": [], "expense": [], "dismissed": dismissed}
+    for r in rows:
+        d = dict(r)
+        out["expense" if d.get("item_type") == "expense" else "income"].append(d)
+    return out
+
+
+def accept_suggestion(plan_id, scheduled_id):
+    """Commit a scheduled item into this plan as a real budget item."""
+    conn = get_conn()
+    s = conn.execute("SELECT * FROM scheduled_items WHERE id=?", (scheduled_id,)).fetchone()
+    if not s:
+        conn.close()
+        return None
+    existing = conn.execute(
+        "SELECT id FROM budget_items WHERE plan_id=? AND scheduled_id=?", (plan_id, scheduled_id)
+    ).fetchone()
+    if existing:
+        conn.close()
+        return None
+    # Stored as a freeform item (label, no category) so it never collides with a
+    # Quicken category row via UNIQUE(plan_id, category).
+    conn.execute(
+        "INSERT INTO budget_items(plan_id,category,label,budget_amount,item_type,scheduled_id) "
+        "VALUES(?,NULL,?,?,?,?)",
+        (plan_id, s["source"], s["amount"], s["item_type"] or "income", scheduled_id)
+    )
+    conn.execute("DELETE FROM scheduled_dismissals WHERE plan_id=? AND scheduled_id=?",
+                 (plan_id, scheduled_id))
+    conn.commit()
+    row = conn.execute(
+        "SELECT id,category,label,budget_amount,item_type,scheduled_id "
+        "FROM budget_items WHERE rowid=last_insert_rowid()"
+    ).fetchone()
+    conn.close()
+    return dict(row)
+
+
+def dismiss_suggestion(plan_id, scheduled_id):
+    conn = get_conn()
+    conn.execute(
+        "INSERT OR IGNORE INTO scheduled_dismissals(plan_id, scheduled_id) VALUES(?,?)",
+        (plan_id, scheduled_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def restore_suggestions(plan_id, item_type=None):
+    """Un-reject dismissed suggestions for this plan, optionally just one type."""
+    conn = get_conn()
+    if item_type in ("income", "expense"):
+        conn.execute(
+            """
+            DELETE FROM scheduled_dismissals
+            WHERE plan_id=? AND scheduled_id IN (
+                SELECT id FROM scheduled_items WHERE COALESCE(item_type,'income')=?
+            )
+            """,
+            (plan_id, item_type)
+        )
+    else:
+        conn.execute("DELETE FROM scheduled_dismissals WHERE plan_id=?", (plan_id,))
     conn.commit()
     conn.close()
 
@@ -318,19 +477,6 @@ def get_income_by_category(year: int):
         "SELECT category, SUM(amount) as total FROM transactions "
         "WHERE year=? AND amount>0 GROUP BY category ORDER BY total DESC",
         (year,)
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-def get_scheduled_income_for_month(year, month):
-    """Return scheduled income events active in the given year/month."""
-    month_first = f"{year}-{month:02d}-01"
-    month_last  = f"{year}-{month:02d}-31"
-    conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM scheduled_income WHERE start_date <= ? AND (end_date IS NULL OR end_date >= ?)",
-        (month_last, month_first)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
