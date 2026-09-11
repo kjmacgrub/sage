@@ -245,11 +245,32 @@ were removed entirely in favour of Greek/VIX exits.
 - **This book wants room.** A wider profit target beat a narrower one; the deep put
   stop (90) beat 70/80; the hedge's every dollar comes from letting positions expire
   while its two management exits lose $4.66M. Defined-risk structures recover.
-- **QQQ Leap sizing tracks spot, not the calendar.** A 360-DTE 60-delta call is
-  11–12% of QQQ spot — about **$7,800–8,600 at QQQ $718.96**. It buys whole
-  contracts, so the allocation is binary. At $200k both 5% and 7% buy one, but 5%
-  switches off after a 22% drawdown and 7% after 44%. **Use 7%.** Recheck the
-  contract price before each sizing decision.
+- **QQQ Leap sizing — use 7%, and price it at the strike you actually buy.**
+  The strategy enters at **362–448 DTE, strike ≈ 0.974 × spot**, which is ~66
+  delta, not 60. At QQQ $716.66 (2026-09-11) that strike costs **~$9,264**, not
+  the ~$7,800 a true 60-delta implies — an 18% difference that moves every
+  threshold. It buys whole contracts, so the allocation is binary:
+
+  | Allocation | Sleeve needed | On $200k | Switches off after |
+  |---|---|---|---|
+  | 5% | $185,000 | 1 contract | **−8% drawdown** |
+  | 7% | $132,000 | 1 contract | −34% drawdown |
+
+  **The 5% cliff sits inside the backtest's own 11% max drawdown** — an ordinary
+  drawdown would switch off the second-largest contributor and keep it off until
+  recovery. Recheck the contract price before each sizing decision; it tracks spot.
+- **QQQ Leap's constraint is volume, not open interest.** Chain checked
+  2026-09-11: only two expirations exist in its window (2027-09-17 at 371 DTE,
+  2027-12-17 at 462). OI in the 60-delta region is adequate at **10,658**, but
+  **total volume across those nine strikes was 12 contracts**. Open interest there
+  is stale inventory, not daily liquidity — every order is effectively the day's
+  whole trade in that strike. The backtest's **133 contracts is 39% of OI at the
+  705 strike against 3 contracts of daily volume — not a fill.** At the sizes
+  rebalancing produces (~14 contracts at year 10, ~30 at $2M) it works, but as a
+  worked limit over days, not a market order. Bid-ask runs $2.85–4.08 on options
+  priced $65–131. Pull the chain from
+  `https://cdn.cboe.com/api/global/delayed_quotes/options/QQQ.json` — it carries
+  OI, volume and greeks; Yahoo's options endpoint now 401s.
 - **Corrected:** `Max Open Positions` **does** survive the portfolio tester — a
   5-position cap held with a time-at-cap distribution matching standalone. The
   earlier byte-identical finding no longer reproduces. Re-test before relying on

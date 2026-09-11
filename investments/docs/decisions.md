@@ -293,8 +293,36 @@ Two still compounding: **hedge to 833 contracts** (deliberate — 0 DTE SPX, the
 deepest book there is) and **QQQ Leap to 133**. QQQ Leap is the open item: it
 went from 1–4% of P/L to **20.9%** while attention was elsewhere, it is
 long-dated QQQ rather than 0 DTE SPX so the depth argument does not transfer,
-and it is the thinnest-evidence strategy in the book. **Run the chain check on
-a ~1-year QQQ call before leaving it uncapped.**
+and it is the thinnest-evidence strategy in the book.
+
+**Chain checked 2026-09-11 — the constraint is volume, not open interest.** Only
+two expirations exist in its 362–448 DTE window (2027-09-17 at 371 DTE,
+2027-12-17 at 462). OI in the 60-delta region is adequate at **10,658**, but
+**total volume across those nine strikes was 12 contracts.** That OI is stale
+inventory, not daily liquidity — every order is effectively the day's whole trade
+in that strike. The backtest's **133 contracts is 39% of OI at the 705 strike
+against 3 contracts of daily volume, which is not a fill.** At the sizes
+rebalancing produces (~14 contracts at year 10, ~30 at $2M) it works as a worked
+limit over several days, helped by the 389-day median hold. Bid-ask runs
+$2.85–4.08 on options priced $65–131, so friction is ~2% of a contract against a
+$2,655 per-contract edge — slippage was never this strategy's problem.
+
+**And the contract price was wrong by 18%.** The strategy buys at strike ≈
+**0.974 × spot**, which is ~66 delta, not 60. At QQQ $716.66 that costs
+**~$9,264**, against the ~$7,800 a true 60-delta implies. Every threshold moves:
+
+| Allocation | Sleeve needed | On $200k | Switches off after |
+|---|---|---|---|
+| 5% | $185,000 | 1 contract | **−8% drawdown** |
+| 7% | $132,000 | 1 contract | −34% drawdown |
+
+**The 5% cliff now sits inside the backtest's own 11% max drawdown** — an ordinary
+drawdown would switch off the second-largest contributor and hold it off until
+recovery. That makes 7% necessary rather than merely preferable.
+
+Source for future checks:
+`https://cdn.cboe.com/api/global/delayed_quotes/options/QQQ.json` — carries OI,
+volume and greeks for the full chain. Yahoo's options endpoint now returns 401.
 
 ### Analytical traps hit during this work — all the same mistake
 
