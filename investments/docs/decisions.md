@@ -16,14 +16,15 @@ weak capital gains in the income sleeve are not a failure.
 
 | Sleeve | Job | Account |
 |---|---|---|
-| CEFs and BDCs | Income | Roth |
-| Options (SPX) | Opportunistic growth | Roth today, **moving to taxable** |
+| CEFs and BDCs | Income | Roth — eventually all of it |
+| Options (SPX) | Opportunistic growth | Roth at **1 lot** now → taxable **$200k** later (2026-09-08) |
 | Managed index, direct indexing | Growth + tax-loss harvesting | Must be taxable |
 
 Target shape, multi-year: a $300k lump sum converted to Roth in annual slices
 sized to a reasonable bracket, ending in a **~$400k Roth income bucket**. About
-$1M from selling the current condo funds rent until a future purchase; roughly
-two years of rent to money market, the rest to direct indexing.
+$1M gross from selling the current condo — jointly owned, so **~$500k is the
+share that lands here** — funds rent until a future purchase; roughly two years
+of rent to money market, the rest to direct indexing.
 
 **The record starts January 2026.** Anything earlier was a different portfolio —
 see the 2026-08-22 entry. Don't average across that boundary.
@@ -34,10 +35,483 @@ Two mechanics worth not forgetting:
   taxable for that goal to mean anything.
 - **SPX options are Section 1256 contracts** — 60/40 treatment regardless of
   holding period, marked to market at year end. Losses that are dead weight in
-  the Roth become usable in taxable. That's the reason for the move.
+  the Roth become usable in taxable, and carry back three years. That's the
+  reason for the move — but 60/40 is federal-only (NY State and NYC tax it as
+  ordinary), QQQ 360 isn't 1256 at all, and mark-to-market means tax on paper
+  gains annually. See 2026-09-08; the risk argument carries this decision, not
+  the tax one.
 - **Wash sales cross into the Roth, and there the loss is permanently
   disallowed**, not deferred. Direct indexing sells hundreds of individual
   names; keep individual stocks out of the Roth and tell Fidelity it exists.
+
+---
+
+## 2026-09-11 — Measuring it honestly: drawdown, slippage, liquidity
+
+### Use the portfolio CSV for every risk number. The trade log lies.
+
+`Funds at Close` in a trade-log export only updates **when a trade closes** —
+unrealized losses on open positions never appear. Every drawdown figure derived
+from it in the 2026-09-10 entry and before is understated by **2–3×**.
+
+Measured from the daily Net Liquidity export instead:
+
+| | trade log | **portfolio CSV** |
+|---|---|---|
+| Max drawdown | 3.6% | **11.01%** |
+| Time underwater | ~50% | **71%** |
+
+Worst episodes: **−11.01% over 107 days** (2024-12-18 → 2025-04-04), −9.97%
+(2022-09-12 → 2022-11-04, 53d), −9.50% (2019), −8.52% (2022), −8.10% (2023).
+Note the deepest one is **not** a crisis window.
+
+**Always export the portfolio CSV alongside the trade log.**
+
+### Slippage is the single biggest uncertainty, and it is not uniform
+
+Breakeven slippage — cents per option per side before the edge is entirely gone:
+
+| Strategy | Legs | Edge/contract | Breakeven |
+|---|---|---|---|
+| Double Calendar (MTW) | 4 | $130.51 | **16¢** |
+| Long Put Hedge | 3 | $101.83 | **19¢** |
+| Sell puts on rising SMA | 2 | $76.76 | **19¢** |
+| QQQ Leap | 1 | $2,655.51 | **$13.28** |
+
+Portfolio P/L surviving at various assumptions: **0¢ → 100%, 5¢ → 78%,
+10¢ → 57%, 15¢ → 35%, 25¢ → −8%.** And that is a linear subtraction, so it
+*understates* the damage — losses compound down through position sizing.
+
+**The finding that matters: under realistic friction the book converges to
+QQQ Leap plus noise.** At 10¢ QQQ is the largest contributor; at 15¢ it is 58%
+of all P/L; at 25¢ it is the only strategy still positive. The three strategies
+with thousands of trades are the fragile ones; the robust one is the one with
+**74 trades and 6 losses**.
+
+**Planning numbers: 30% CAGR, 20% max drawdown.** 30% corresponds to roughly
+20–25¢ with compounding drag. The 20% is *not* a haircut — slippage lowers the
+curve without much changing its shape. It reflects that nine years contains no
+tail event (COVID and 2022 both produced ~10% here) and that the delta/VIX exits
+assume acting at the trigger, which live execution will not match.
+
+**The one number worth collecting from day one: your fill versus the mid, per
+leg.** Three of four strategies live or die inside a 16–19¢ band and no
+backtest can locate you within it.
+
+### Liquidity is per-order, per-tenor — and OI accumulates
+
+Real SPX chain, checked 2026-09-10 with SPX ~7,700:
+
+| Series | DTE | Put OI across the strip |
+|---|---|---|
+| 6 NOV 26 (weekly Friday) | 57 | **0–8** |
+| 20 NOV 26 (monthly, AM) | 70 | 77–450, **8,778** at 7600 |
+
+Three lessons:
+
+- **Open interest at 57 DTE is not the OI that strike will ever have** — it
+  accumulates toward expiry. But the put seller *enters* at ~65 DTE and mostly
+  closes within a week, so it trades the window before OI builds. It is the
+  early flow, which is the harder side.
+- **A vertical is limited by its thinner leg.** Sell the 7600 (OI 8,778) and buy
+  the 7595 (OI 125) and your size is capped at 125. Liquidity concentrates at
+  round strikes and the round strike's depth does you no good.
+- **Width buys size.** Same dollar risk: a 5-wide needs 1,850 contracts, a
+  25-wide needs **370**, and lands its long leg on a strike with 8× the OI.
+  Roughly a 40× improvement in size-to-depth. Worth testing; wider spreads
+  generally collect a lower % of width, but "slightly worse and executable"
+  beats "better and imaginary."
+
+Where each strategy actually trades (legs, from the log):
+
+| Strategy | Friday expirations | Third Friday (monthly) | DTE |
+|---|---|---|---|
+| Sell puts on rising SMA | **79%** | **46%** | 60–73 |
+| Long Put Hedge | 31% | 7% | 0–1 |
+| Double Calendar (MTW) | 22% | 5% | 2–7 |
+
+The put seller is already concentrated where the depth is. Restricting it to
+monthlies only is worth testing — it chooses them 46% of the time unprompted.
+
+### The 0DTE regime: the risk is pricing, not depth
+
+Framed wrongly at first as "what if 0DTE reverts to 1–2 DTE." **It won't.**
+Exchanges do not delist revenue and the direction has only ever gone one way —
+monthlies, weeklies (2005), Mon/Wed (2016), Tue/Thu (2022), daily. There is no
+mechanism for reversal.
+
+The real risk is that **flow moves sideways** into whatever is next, and
+**three of four strategies are net short premium** — the calendars sell the near
+leg, the put seller sells the spread, and the Long Put Hedge is *net credit*
+(sample legs: −0.80 + 9.75 − 3.75 = **+5.20**), with 197 of its winners exiting
+as "Expired," i.e. keeping the credit. Only QQQ Leap is net long premium.
+
+So the book depends on premium **richness**, not 0DTE depth. If the seller
+population thins or buyers migrate, skew reprices and three strategies earn less
+with nothing visibly breaking. Harder to see coming than a liquidity event.
+
+**Tested for it. Only one strategy shows decay:**
+
+| | 2017–2024 | 2025 | 2026 |
+|---|---|---|---|
+| MTW Double Calendar win rate | 58–71% | **54.6%** | **51.6%** |
+| MTW median P/L% | 2.4–7.6% | **1.3%** | **0.5%** |
+
+The put seller shows the opposite — median P/L% rose 21.7% (2017) → 44.1%
+(2026), better at every VIX tercile in 2022–26 than 2017–21. The hedge's mean
+P/L% went −36.6% (2017) to consistently positive from 2022 (+14% to +24%).
+
+**Caveat: the MTW decline is two years, not a nine-year slope.** Equally
+consistent with a 2025–26 regime as with crowding. **Watch the MTW win rate and
+median P/L% annually** — near 52% / 0.5% again in 2027 makes it a trend.
+
+### Current configuration — checked, and it holds
+
+Contributions: Long Put Hedge 41.9%, QQQ Leap 20.9%, Sell puts 20.6%,
+Double Calendar 16.6%. Caps: calendar **50**, put seller **100**, hedge and QQQ
+percentage-only.
+
+**Peak margin 35.7% (2022), otherwise 11–33%.** Compare the 107% breach earlier
+in this process. Nothing degenerate; sizes are genuine percentage scaling.
+
+Two still compounding: **hedge to 833 contracts** (deliberate — 0 DTE SPX, the
+deepest book there is) and **QQQ Leap to 133**. QQQ Leap is the open item: it
+went from 1–4% of P/L to **20.9%** while attention was elsewhere, it is
+long-dated QQQ rather than 0 DTE SPX so the depth argument does not transfer,
+and it is the thinnest-evidence strategy in the book. **Run the chain check on
+a ~1-year QQQ call before leaving it uncapped.**
+
+### Analytical traps hit during this work — all the same mistake
+
+Three times, a **conditional distribution was read as if it were causal**:
+
+- **`Max Profit` cannot evaluate a wider profit target.** The column is censored
+  by the exit being assessed — trades that closed at the 10% target have their
+  Max Profit measured only up to that moment. It piles up at the target and
+  looks like there is no headroom.
+- **Exit-reason P/L cannot evaluate a threshold change.** The "Above Delta"
+  bucket is negative *because* it collects the trades that went against you.
+  Tightening the put stop from 90 to 70/80 tested worse, not better — it pulls
+  more trades into the bucket and converts recoveries into realized losses.
+- **Arithmetic removal is not a counterfactual.** Subtracting QQQ's P/L left the
+  other trades at their QQQ-inflated contract counts and understated its value
+  fivefold. Only a re-run with sizing re-derived answers the question.
+
+**Rule: to know what changing a condition does, re-run with the condition
+changed. Nothing else works.**
+
+One related pattern worth remembering: **this book wants room.** Wider profit
+target beat narrower; the deep put stop (90) beat the shallow ones; and the
+hedge's every dollar comes from letting positions expire while its two
+management exits lose $4.66M combined. Defined-risk structures recover; cutting
+early converts recoveries into losses.
+
+### thinkorswim: per-leg Greeks
+
+The **Position Statement does not populate per-leg Greeks** — it rolls them up
+to the position. Use a **watchlist of the option symbols** (`.SPXW260910P7625`
+format, visible in the right-click menu) with a Delta column, or read the option
+chain by strike. OO's leg-delta thresholds are *position* deltas; in ToS watch
+for **absolute 0.90 on the short put, 0.60 on the short call**.
+
+---
+
+## 2026-09-10 — The book rebuilt, and how to size it
+
+The four strategies of 2026-09-08 are not the four strategies now. Composition,
+exits and sizing all changed. This records what was learned rebuilding them.
+
+**Current book:** MTW Double Calendar, Long Put Hedge, QQQ Leap, Sell puts on
+rising SMA. **Daily Calendar 14/16 was cut** — it earned $13/contract across
+2,143 trades, half the trade count for a tenth of the profit.
+
+### mae_check.py no longer applies
+
+Exits are now Greek- and volatility-based — Below Delta, Above Delta, Below
+Short/Long Ratio, VIX Move Down, Expired, Profit Target. **There are no stop
+losses anywhere**, so `mae_check.py` reports "no stops in use" for every
+strategy and can't run. That is **not a clean bill of health, it is an
+unverified backtest.** Risk is still structurally bounded (all defined-risk
+multi-leg debit/credit structures), so removing stops is defensible — but the
+tool that caught the $22k-live/$90k-backtest gap no longer covers this book.
+Needs a replacement check before the numbers are trusted.
+
+### Contribution % is circular in a compounding book
+
+Removing QQQ Leap looked cheap: it showed **3.6% of total P/L**. A proper
+re-run with sizing re-derived ended at **$5.5M instead of $19.8M**, CAGR 42.8%
+vs 63.9%, and drawdown *worse* without it.
+
+The reason: percentage sizing feeds every dollar a strategy earns into the
+position size of every other strategy, forever after. QQQ's own P/L was
+$699,660; it *caused* ~$14.3M of the others' gains, all of it delivered
+2019–2021 while the account was between $176k and $500k. Its share of the total
+is small precisely because it inflated the total.
+
+**Never judge a strategy by contribution % in a compounding portfolio — re-run
+without it.** An earlier arithmetic subtraction of QQQ's P/L (leaving the other
+trades at their QQQ-inflated contract counts) understated its value by a factor
+of five.
+
+### MTW: the Double Calendar can only trade Mon/Tue/Wed
+
+Every entry uses a (2, 7) DTE pair. The short leg needs an expiration two
+calendar days out — from Thursday that's Saturday, from Friday it's Sunday.
+**Those days can never produce a trade.** Renamed to MTW Double Calendar so
+nobody rediscovers this.
+
+Entries also jumped from ~90/yr to ~138/yr in 2022, when SPX added Thursday
+expirations and unlocked Tuesday entries — the same fact already recorded for
+the Long Put Hedge. Ceiling is ~60% of trading days; actual fill is 45%.
+
+A complementary short DTE would cover the rest: short 2 → Mon/Tue/Wed,
+short 3 → Mon/Tue/Fri, short 4 → Mon/Thu/Fri. Running **2/7 alongside 4/9**
+reaches all five weekdays. Untested.
+
+### Concurrency is emergent unless something caps it
+
+The SPX strategies peak at 2 concurrent, but **that is not a setting** — it
+falls out of 0–2 day holds against a 2–3 day entry cadence. QQQ Leap peaks at
+**10** for the same reason in reverse: a 78-day median hold against a 14-day
+entry cadence makes stacking arithmetically unavoidable.
+
+Consequence: **anything that lengthens holds removes the accidental
+protection.** Widening the calendar profit target from 10% toward 50% — which
+tested well in isolation — does exactly that. Pair any such change with an
+explicit concurrency or allocation cap, or peak margin goes from 53% to ~80%
+in a cash account.
+
+### `Max Open Positions` DOES survive the portfolio tester
+
+Contradicts the note in `../CLAUDE.md`. The put seller's 5-position cap held in
+the portfolio run with a time-at-cap distribution nearly identical to
+standalone (9.4% vs 9.2%). Either OO fixed it or the original finding applied
+to a different setting. **Re-test deliberately and correct the note** — the old
+belief has been shaping designs around a constraint that may not exist.
+
+### Sell puts on rising SMA — added
+
+5-wide SPX credit put spread, daily entry, SMA filter, 1% allocation, 5 max
+open. Standalone: 26.5% CAGR, **1.9% max drawdown**, 7 losers in 1,317 trades.
+Went flat through COVID, Aug 2024 and Apr 2025 — zero positions open at the
+midpoint of each. In the portfolio it improved **every** metric at once:
+
+| | Without | With |
+|---|---|---|
+| CAGR | 45.7% | 69.1% |
+| Max drawdown | 5.5% | **3.6%** |
+| Longest drawdown | 88 days | **17 days** |
+| Days underwater | 77% | **50%** |
+
+The protection is the *hold time*, not the filter — median hold is 0–1 days, so
+positions rarely live long enough to be caught. On 2020-02-19, the exact market
+top, it held five positions; they closed for +$225 within days and entries
+stopped 2020-02-26, one day before the crash proper. **Not foresight. A fast
+turn and a day's margin.**
+
+Two standing caveats: **7 losses is not a loss distribution**, six of them in
+2018 — the whipsaw environment an SMA filter is worst in, sampled once. And it
+sells the risk the Long Put Hedge is bought to own.
+
+### Sizing: a uniform contract cap is the wrong instrument
+
+Capping everything at 40 contracts cost CAGR 69.1% → 52.9% and changed
+drawdown **not at all** (3.6% either way). It buys fillability, nothing else.
+But 40 is arbitrary, because margin per contract varies 6×:
+
+| Strategy | Margin/contract | 40 contracts = |
+|---|---|---|
+| Sell puts on rising SMA | $320 | $12,800 |
+| Long Put Hedge | $970 | $38,800 |
+| MTW Double Calendar | $1,961 | **$78,440** |
+| QQQ Leap | $4,001 | $52,000 (at 13) |
+
+**Three controls, each measuring one thing:**
+
+- **`% allocation` = risk.** Scales with the account.
+- **`Max $ allocation` = liquidity.** Set per strategy as *(contracts you
+  believe fill) × (that strategy's own margin per contract)*.
+- **`Max concurrent` = capacity.** The dial to turn as the account grows.
+
+**Liquidity is per-order, not per-strategy.** Ten orders of 40 at different
+strikes and times fill where one order of 400 does not. So when % allocation
+outgrows the fill ceiling, raise concurrency and hold order size fixed — but
+that lever only exists where entry frequency allows. The put seller has it
+(daily entries, cap binding 9.4%). **The MTW calendar and the Long Put Hedge do
+not** — they are entry-frequency constrained at 2 concurrent.
+
+### Capacity is finite, and that is planning information
+
+All three SPX caps engage around **$2.5M** and never release. Contribution as a
+share of account then decays: MTW Double 23% → 35% → 10% → **1.2%** across
+2020/2022/2024/2026. By 2026 the whole sleeve yields roughly **11% annualized
+on $10.4M**.
+
+That is the terminal size these caps imply. Don't engineer around it — decide
+what size the options sleeve should reach, set caps to make that size fillable,
+and route capital beyond it to the managed sleeve. Trying to make this sleeve
+absorb unlimited capital is how the 1,318-contract position happened.
+
+### Still unresolved
+
+- **The exit redesign may be overfit.** 2018 went from −6.3% to +84.5% and max
+  drawdown halved, achieved by adding delta, ratio and VIX conditions. Each is
+  a tuning knob. Hold out 2017–2020, tune on 2021–2026, and see whether the
+  drawdown survives data the exits never saw.
+- **The Long Put Hedge is going vestigial** — 22.5% of P/L down to 5.0% once the
+  put seller was added, capped at 40 contracts while the account compounds. The
+  crash hedge shrinks as the thing it hedges grows.
+- Whether either account permits trading on unsettled proceeds.
+
+---
+
+## 2026-09-08 — Options sleeve: one lot now, $200k in taxable later
+
+Six Option Omega portfolio runs, 2017-09-07 → 2026-09-04, all four strategies
+together, honest settings. Only two things varied: options capital (**O**) and
+the QQQ 360 allocation. Full writeup published as an Artifact; this is the
+decision and the evidence.
+
+**O is not the account.** $40k of the $80k Roth is committed to CEFs, and those
+shares provide **no buying power** against options — checked with the broker.
+Every earlier backtest set OO's starting capital to $80k, so every allocation
+was double its real size and the 52.8% peak margin actually needed $42k of a
+$40k sleeve. Those peaks were unfillable. Set starting capital to the sleeve,
+never the account.
+
+| Run | O | QQQ | CAGR | Max DD | Peak margin | End-2019 | Runs? |
+|---|---|---|---|---|---|---|---|
+| A′ | $40k | 5% | 36.0% | 29.4% | 47% | 0.92× | yes |
+| C′ | $120k | 5% | 71.9% | 20.9% | 78% | **unfunded** |
+| C″ | $120k | 7% | 86.4% | 20.6% | **107%** | 1.28× | **breach** |
+| C‴ | $120k | 7%+cap | 71.6% | 20.6% | 95% | 1.28× | yes |
+| D′ | $200k | 5% | 75.1% | 21.6% | 84% | 1.14× | yes |
+| **D″** | **$200k** | **7%+cap** | **69.0%** | **20.3%** | **70%** | **1.29×** | **yes** |
+
+**Settled: $200k, QQQ 360 at 7%, `Max Allocation $25,000`.** It has the lowest
+headline CAGR of the workable runs and that is the point — best drawdown, lowest
+margin, best performance through every year that happens at plausible account
+size. D′ only overtakes it from 2023, past $2M, where the numbers describe a
+portfolio that will never exist.
+
+**At $40k the book does not function.** Four losing years (−10.2% cumulative at
+end-2021), the deepest drawdown of any run, QQQ 360 with **zero entries in 2020,
+2021, 2022 and 2023**, and the Long Put Hedge pinned at one contract on 100% of
+trades. Rounding delivers 76–85% of each target allocation.
+
+**The whole $40k→$120k gap is QQQ 360 affordability.** In 2020 it was 0 trades
+vs 20 and 56% of that year's P/L; in 2021, 0 vs 11 and 82%; in 2019 it produced
+188% of the year's profit — the other three lost money. Strip it out of C′ and
+CAGR barely moves (71.9% → 68.2%) but drawdown nearly doubles (20.9% → 35.8%).
+**It is the stabiliser, not the return engine.**
+
+**The granularity cliff is what decides the configuration, and no backtest shows
+it.** QQQ 360 buys whole contracts — below the price of one the allocation buys
+nothing. One contract is ~$7,800 at QQQ $718.96, above *every* price in the
+sample ($163–$596). So 5% of $120k ($6,000) cannot fund it going forward even
+though C′ shows it trading 74 times. Drawdown absorbed before the sleeve
+switches itself off: $120k/7% → **−7%**; $200k/5% → −22%; $200k/7% → **−44%**.
+Observed drawdowns run 20.3–29.4%, so only the last clears the range. At $120k
+it would have switched off inside the first three years' −12.4% trough and
+stayed off through the recovery.
+
+**Above $200k adds dollars, not efficiency.** Every gain from $40k up was a
+threshold effect; those resolve at $200k. Allocations are percentages after
+that, so CAGR is flat. Only remaining step is a second QQQ contract near $250k.
+Excess goes to the managed sleeve, not here.
+
+**Placement: taxable, for risk reasons — not the tax reasons.** Asset location
+argues the opposite of what we're doing. The rule is highest *return × rate*,
+not highest rate, and that's the options sleeve by a wide margin: $200k over ten
+years at a conservative 25% is 9.3× sheltered vs 5.0× taxed. Two corrections to
+the 1256 case in Standing context, both narrowing it:
+
+- **NY State (6.85%) and NYC (3.88%) don't recognise 60/40.** The benefit is
+  federal-only; blended lands near 29–33%, not 18.6%.
+- **QQQ 360 is not a 1256 contract** — equity option, short-term rates, wash
+  sale rules apply. Only 3.3% of P/L at D″ sizing, so ~97% of the book qualifies.
+
+It goes in taxable anyway because **the Roth is irreplaceable and this strategy
+has never traded a day.** A 29% drawdown there permanently destroys $58k of
+shelter; the same loss in taxable is deductible and 1256 losses carry back three
+years. Given that three of nine years carry the entire result and QQQ 360's loss
+profile is six trades, putting an unvalidated edge in the account that can never
+be refilled is the aggressive choice, not the neutral one. Staged conversion
+means it's revisable after two or three years of live results.
+
+Also: **1256 marks to market at year end**, so ~30% of each year's gains leave
+for tax whether or not anything closed. The sleeve cannot fully compound and a
+good year produces a bill that must be funded. Already in the 5.0× above, but
+it's a cash-flow event to plan for, not just a rate.
+
+**What survives all six runs, and should temper all of it:**
+
+- 2022–2026 produce the entire result. 2017–2021 range from −10% to +2.8×
+  depending on nothing but whether QQQ 360 could afford to fire.
+- **2018 loses in every configuration** (−6.3% to −2.0%). The "positive in every
+  calendar year" bar that killed the iron condors is not met by the portfolio
+  itself under actual sizing. Normalised to one lot it is — decide which basis
+  the rule is about before applying it again.
+- QQQ 360 is 74 trades with **6 losses**. It's the difference between 36% and
+  75% CAGR. At $40k it shows a 100% win rate across 22 trades because
+  affordability skipping removed every loser — that number is an artifact, not
+  a record.
+- **The Long Put Hedge's ~46% of P/L in every run is a sizing artifact.**
+  Normalised to one lot it's 10.5%, profit factor 1.20, and the largest per-lot
+  drawdown in the book. It earned its dollars by being allocated late, at size.
+- Late-year figures describe a $10M+ account. Read as arithmetic, not forecast.
+
+**Still open:** whether the IRA (and the taxable account) permit trading on
+unsettled proceeds. Daily-entry strategies in a cash account can be starved by
+T+1 settlement even when cash is nominally free, and no backtest models it. It
+would bite hardest at the margin levels D″ runs at.
+
+### Amendment, same day — fixed one-lot sizing, and the sleeve stays running
+
+The conclusion above was nearly "stand the sleeve down until the money arrives."
+That was wrong, and the reason is worth keeping: **every run above sizes by
+percentage of equity, which compounds a losing stretch.** Take that out — one
+contract, at most one open position per strategy — and the same four strategies
+on the same nine years of signals behave completely differently.
+
+| Rule | Signals taken | P/L per yr | Peak margin | Worst DD | Losing years |
+|---|---|---|---|---|---|
+| **1 open per strategy** | 2,754 / 4,092 | **$19,999** | **$13,598** | **$4,849** | **none** |
+| …without QQQ 360 | 2,738 / 3,172 | $16,694 | $8,701 | $4,849 | none |
+| 1 open portfolio-wide | 750 / 4,092 | $7,119 | $6,660 | $6,369 | 2022 |
+
+By year, per-strategy: +$128, +$13,136, +$1,481, +$22,725, +$10,830, +$27,184,
++$17,742, +$31,927, +$45,340, +$9,501.
+
+**Positive in every calendar year, including 2018** — the bar that killed the
+iron condors, cleared here and nowhere else in the study. 2018 was never a
+strategy failure; it was a sizing failure, which is precisely what the
+normalised Analyze view said (+$8.7k) while actual sizing reported −$1.4k.
+**Whenever that rule is invoked again, say which sizing basis it means.**
+
+Peak margin of $13,598 uses historical QQQ contract prices; at today's ~$7,800
+it is nearer **$18,000** — inside the existing $40k Roth with room to spare.
+
+**So the sleeve keeps running now, at one lot, one open per strategy, in the
+Roth**, and converts to percentage sizing in taxable when the condo money
+arrives. That also solves a problem the sizing analysis never addressed: going
+from zero straight to $200k of live size after a year away, with no fills, no
+slippage data and no experience of an 89%-underwater equity curve. A year of
+one-lot trading supplies all three and pays for itself.
+
+What it costs, and both are real:
+
+- **It does not scale.** ~$20k/yr whether the account holds $40k or $400k. The
+  figure tracks the index level, not the account — 2025 pays $45k, 2018 paid
+  $13k, because SPX tripled.
+- **The one-concurrent rule takes the worst entries by our own data.** Win rate
+  runs 73% at one open position and 84% at four; this rule declines every
+  stacked entry, and QQQ 360 fires 16 times out of 74. Treat these figures as
+  the edge's floor, not its middle.
+
+It revalidates nothing. Same nine years, same regime concentration. It shows
+only that the strategies survive being sized safely — a narrower claim than any
+CAGR above, and the only one this study actually establishes.
 
 ---
 
