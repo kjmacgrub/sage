@@ -170,29 +170,113 @@ is why the concentration stayed invisible with a category column on screen.
   judge this sleeve on income, not capital gains.
 
 ### Options sleeve (backtested in Option Omega, not tracked in `cef.db`)
-Full writeup in `docs/backtest-autopsy.html`. The parts worth not rediscovering:
+
+Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
+`docs/decisions.md` (entries 2026-09-08 through 2026-09-12).
+
+**Current book** — rebuilt Sept 2026, backtested 2017-05-16 → 2026-09-08 on $200k:
+
+| Strategy | Cap | Share | Notes |
+|---|---|---|---|
+| Long Put Hedge | none, 2% | 41.9% | 0 DTE, net credit — the crash convexity |
+| QQQ Leap | none | 20.9% | 74 trades, 6 losses — thinnest evidence in the book |
+| Sell puts on rising SMA | 100 | 20.6% | 65 DTE credit put spread, goes flat before dislocations |
+| Double Calendar (MTW) | 50 | 16.6% | 2/7 DTE, Mon/Tue/Wed only |
+
+Backtest CAGR 74.3%, max drawdown 11.01%, peak margin 35.7%.
+**Plan against 30% CAGR and 20% drawdown**, not the backtest figures.
+
+**Daily Calendar 14/16 was cut** — $13/contract across 2,143 trades. Stop losses
+were removed entirely in favour of Greek/VIX exits.
+
+#### Measurement rules — read these before analysing any export
+
+- **Use the portfolio CSV for every risk number.** The trade log's `Funds at
+  Close` only updates when a trade closes, so open-position marks never appear
+  and drawdown is understated **2–3×** (3.6% vs the real 11.01%).
+- **`mae_check.py` no longer applies.** No strategy uses a stop, so it reports
+  "no stops in use" for all four. That is an *unverified* backtest, not a clean
+  one. Risk is still structurally bounded (all defined-risk multi-leg), but the
+  tool that caught the $22k-live/$90k-backtest gap has no purchase here.
+- **Contribution % is circular in a compounding book.** QQQ Leap showed 3.6% of
+  P/L; a proper re-run without it ended at $5.5M instead of $19.8M. Percentage
+  sizing feeds every dollar a strategy earns into every other strategy's size.
+  **Never judge a strategy by its share — re-run without it.**
+- **A conditional distribution cannot tell you what changing the condition does.**
+  `Max Profit` is censored by the exit being assessed; exit-reason P/L is negative
+  *because* that bucket collects the losers. Both misled. Only a re-run answers it.
+
+#### The parts worth not rediscovering
 
 - **Four Option Omega settings must be checked on every new strategy.** Correct
   states: `Ignore Single Bar Stop Loss Breach` OFF, `Cap Non-Opening Stop Outs at
   User-Defined Stop Amount` OFF, `Use 0-DTE Intra-Minute Stops` ON, `Ignore Trades
   with Wide Bid-Ask Spread` OFF, and set `Exit Slippage`. With these wrong, a live
-  year that made $22k backtested at $90k. Verify with `mae_check.py`.
+  year that made $22k backtested at $90k.
+- **Slippage is the biggest open uncertainty and is not evenly distributed.**
+  Breakeven per option per side: Double Calendar **16¢**, Long Put Hedge **19¢**,
+  Sell puts **19¢**, QQQ Leap **$13.28**. Portfolio survival: 10¢ → 57%,
+  15¢ → 35%, 25¢ → negative. **Under friction the book converges to QQQ Leap
+  plus noise.** Measured entry slippage on 583 matched live pairs: **4.5–10¢/leg**
+  at one contract.
 - **Iron condors were removed (Sept 2026).** With honest settings the same book went
-  from +$281k to −$32k over 4.3 years, 53% drawdown, test terminated early. The long
-  wings do explode occasionally (+$86k across 38 entries) but cost $185k to carry on
-  the other 2,384. Don't re-add without clearing the bar: positive in every calendar
-  year with the flags set.
+  from +$281k to −$32k over 4.3 years, 53% drawdown, test terminated early. Don't
+  re-add without clearing the bar: positive in every calendar year with flags set.
 - **Never size by contract cap alone.** Percentage sizing divides an allocation by
   margin-per-contract, which collapses toward zero on degenerate calendars and
-  produced a 1,402-contract position. Pair percentage sizing with a **minimum premium
-  filter** (`$1.00` debit) — it excludes the bad trade instead of shrinking it, and
-  caps contract count as a side effect.
-- **QQQ LEAPs sized at 5% of equity, deliberately.** A fixed 2-contract cap decayed to
-  0.14% of equity and made the strategy vestigial; uncapping turned 2022 from +34% to
-  −5% by making the whole book long-beta. 7% was tested and rejected — flat Sharpe and
-  Sortino for more drawdown.
-- Current book: Long Put Hedge with Spread, Daily Calendar 14/16, Daily Double
-  Calendar 2/7, QQQ 360. Cross-correlations all between −0.04 and +0.06.
+  produced a 1,402-contract position. Pair it with a **minimum premium filter**
+  (`$1.00` debit).
+- **Liquidity is per-order and per-tenor, not per-strategy.** A vertical is limited
+  by its *thinner* leg — at SPX ~7,700 the 7600 put carried 8,778 OI and the 7595
+  carried 125. **Width buys size:** the same dollar risk needs 1,850 contracts of a
+  5-wide or **370 of a 25-wide**. 0 DTE SPX is effectively bottomless; 65 DTE is not.
+- **MTW: the Double Calendar can only trade Mon/Tue/Wed.** Every entry is a (2,7)
+  DTE pair, and the short leg needs an expiration two calendar days out — from
+  Thursday that is Saturday. Ceiling ~60% of trading days; actual fill 45%. A
+  complementary 4/9 would cover Thu/Fri (untested).
+- **Concurrency is emergent unless something caps it.** SPX strategies peak at 2
+  because of 0–2 day holds against a 2–3 day cadence; QQQ Leap peaks at 10 because
+  a 78-day hold against a 14-day cadence makes stacking unavoidable. **Anything
+  that lengthens holds removes the accidental protection.**
+- **Don't pause QQQ when positions stack, and don't tune its entry filter.** The
+  stacking signal is the entry-quality signal — pausing at three open costs 42% of
+  the strategy, and a regime filter that removes the six losers gives up $723k of
+  winners to save $24k. `Max RSI 69` does not screen bear markets.
+- **This book wants room.** A wider profit target beat a narrower one; the deep put
+  stop (90) beat 70/80; the hedge's every dollar comes from letting positions expire
+  while its two management exits lose $4.66M. Defined-risk structures recover.
+- **QQQ Leap sizing tracks spot, not the calendar.** A 360-DTE 60-delta call is
+  11–12% of QQQ spot — about **$7,800–8,600 at QQQ $718.96**. It buys whole
+  contracts, so the allocation is binary. At $200k both 5% and 7% buy one, but 5%
+  switches off after a 22% drawdown and 7% after 44%. **Use 7%.** Recheck the
+  contract price before each sizing decision.
+- **Corrected:** `Max Open Positions` **does** survive the portfolio tester — a
+  5-position cap held with a time-at-cap distribution matching standalone. The
+  earlier byte-identical finding no longer reproduces. Re-test before relying on
+  either result.
+- **Backtest gotcha.** A standalone run of one strategy starves itself and silently
+  skips entries it can't afford — QQQ dropped 24 of 34 signals that way, biased
+  toward the high-IV ones that perform best.
+
+#### Sleeve structure
+
+One third of a whole: **options (taxable) · CEFs (Roth) · managed index (taxable)**,
+rebalanced annually as a **ratchet** — profits out on gains, **never added back on
+losses**. An options book underperforming is evidence the edge stopped working, not
+a discount. Costs ~4 points of portfolio CAGR; Section 1256 mark-to-market makes it
+free at the margin.
+
+Rebalancing means the sleeve grows at the *portfolio's* rate (~15.7%/yr), reaching
+~$857k at year 10 rather than $35M — which is why most of the liquidity analysis
+stopped applying. The one cap that still binds is **Double Calendar's 50 at $624k,
+about 7.8 years out**.
+
+**Tripwires** (options sleeve only, absolute, never relative to the other sleeves):
+fill slippage >15¢/leg · per-contract edge <50% of backtest (Hedge $101.83 ·
+Calendar $130.51 · Puts $76.76 · QQQ $2,655.51) · drawdown >20% · MTW win rate ~52%
+in 2027 · two consecutive losing years. **One = investigate, two = stop adding.**
+The first two are the fast detectors — track fill-versus-mid and per-contract edge
+by strategy from day one.
 
 ## Design
 - Dark theme throughout
