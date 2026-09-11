@@ -12,7 +12,11 @@ live in `../CLAUDE.md`. This file is only for judgment calls.
 ## Standing context
 
 **Three sleeves, each with a different job.** Judge each against its own job —
-weak capital gains in the income sleeve are not a failure.
+weak capital gains in the income sleeve are not a failure. Target is roughly
+equal thirds, rebalanced annually as a **ratchet** — profits out of the options
+sleeve on gains, never added back on losses. Tripwires for when to stop adding
+or reduce are in the 2026-09-12 entry; they are measured against the options
+sleeve's own backtested behaviour, never against the other two.
 
 | Sleeve | Job | Account |
 |---|---|---|
@@ -43,6 +47,117 @@ Two mechanics worth not forgetting:
 - **Wash sales cross into the Roth, and there the loss is permanently
   disallowed**, not deferred. Direct indexing sells hundreds of individual
   names; keep individual stocks out of the Roth and tell Fidelity it exists.
+
+---
+
+## 2026-09-12 — Three sleeves, a ratchet, and the tripwires
+
+### Target shape
+
+Roughly equal thirds: **options (taxable) · CEFs (Roth) · managed index (taxable)**,
+rebalanced about annually. The Roth also receives **$300k of lump-sum
+conversions** over the next few years, which keeps it in step during that window.
+
+Assumed returns: CEF **10%**, managed **7%**, options **30%** (see 2026-09-11 for
+why 30 and not the backtest's 74).
+
+### Rebalancing is a RATCHET, not symmetric
+
+**Take profits out of the options sleeve on gains. Never add back on losses.**
+
+Classical rebalancing buys the loser on an assumption of mean reversion — the
+asset is cheap, its long-run return intact. **That assumption does not hold for a
+strategy.** An options book underperforming is evidence the edge may have stopped
+working, not a discount. Adding to it turns a hypothesis you are losing money on
+into a bigger one.
+
+This sleeve exists as a response to watching a managed account fall through 2022
+with no lever. If it is declining relative to the other two, the premise is in
+question and that is not the moment to increase it.
+
+### What rebalancing costs, and why it's worth it
+
+Ten years, $200k per sleeve:
+
+| Options return | Rebalanced | Un-rebalanced | Give-up |
+|---|---|---|---|
+| 20% | $1.92M | $2.15M | $231k |
+| **30%** | **$2.57M** | **$3.67M** | **$1.10M** |
+| 40% | $3.42M | $6.70M | $3.28M |
+| 50% | $4.50M | $12.4M | $7.94M |
+
+About **4 points of portfolio CAGR** at a 30% options return (15.7% vs 19.9%).
+That is the premium for not being concentrated in an unproven strategy, and it is
+well priced given that 30% is a guess and three of nine backtest years carry the
+whole result.
+
+**Section 1256 makes it free at the margin.** Mark-to-market taxes the options
+sleeve's gains annually whether or not the money moves, so unlike a normal
+appreciated position there is no tax cost to taking profits out. A real synergy
+with the taxable placement.
+
+### Rebalancing solves most of the capacity problem
+
+The sleeve grows at the *total portfolio's* rate, not its own. At 30% options
+return that is 15.7%/yr, so $200k → **$857k at year 10** rather than $35M.
+
+| Cap | Binds at | At 30% options return |
+|---|---|---|
+| Sell puts, 100 contracts | $3,141,360 | **18.9 years** — ignore it |
+| **Double Calendar (MTW), 50** | **$624,453** | **7.8 years** — real |
+
+At an $857k sleeve the hedge runs ~30 contracts and QQQ Leap ~14. The entire
+liquidity analysis — 833 contracts, 1,850 put spreads, chain depth — only ever
+mattered because the backtest compounded unchecked. **The one exception is the
+Double Calendar, whose 50-cap binds inside a decade** (5.6 years at 50%
+returns, 4.3 at 74%).
+
+### The Roth drifts, and that is the plan working
+
+Conversions keep it near a third during the conversion window. Afterwards it grows
+at 10% against a total compounding at ~15.7%, so its share erodes ~5%/yr in
+relative terms — roughly **a third at the end of conversions, ~20% a decade
+later**. That is the known cost of putting the *safest* asset in the tax-free
+account for risk reasons (see 2026-09-08). Recognise it as designed, not drifting.
+
+Also: **you cannot rebalance into the Roth.** Contribution limits mean the flow is
+options → managed, both taxable. The real structure is "options and managed
+rebalanced against each other, Roth on its own track."
+
+### TRIPWIRES — options sleeve only, absolute, not relative
+
+The ratchet is a **policy** and needs no diagnosis: below target weight, don't top
+up. These tripwires are a **diagnosis** and trigger something more serious — stop
+adding entirely, or reduce.
+
+**Measured against the sleeve's own backtested behaviour, never against CEF or the
+managed account.** Relative comparison is a bad detector: it conflates "the
+strategies broke" with "equities had a great year," which is the entire point of
+holding something uncorrelated. It also fires late — options would have to fall
+below CEF's 10% before it registered.
+
+| Tripwire | Measured against | Fires in |
+|---|---|---|
+| **Fill slippage > 15¢/leg** | measured 4.5–10¢ entry; 16¢ is calendar breakeven | **weeks** |
+| **Per-contract edge < 50% of backtest** | Hedge $101.83 · Calendar $130.51 · Puts $76.76 · QQQ $2,655.51 | months |
+| **Drawdown > 20%** | sleeve NAV, absolute — backtest max 11.01% | immediately |
+| **MTW win rate ~52% in 2027** | its own 58–71% history; 2025–26 ran 54.6% / 51.6% | a year |
+| **Two consecutive losing years** | zero losing years across 9 backtest years | two years |
+
+**One signal = investigate. Two together = stop adding, probably reduce.**
+
+The top two are the real detectors — slippage converges in weeks because every
+trade is a data point, and per-contract edge converges in months against numbers
+already in hand. The bottom three are confirmations that arrive later.
+
+**Track fill-versus-mid and per-contract edge by strategy from day one. Compare
+monthly. Treat drawdown depth as the circuit breaker.** The annual measures are
+for the record, not for decisions.
+
+The value here is not the specific thresholds — it is that they were chosen before
+money was at stake. The alternative is discovering during a 15% drawdown that you
+never decided what would change your mind, which is how a thing built in response
+to 2022 becomes a thing being rationalised in 2029.
 
 ---
 
