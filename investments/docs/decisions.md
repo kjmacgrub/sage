@@ -50,6 +50,487 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-09-12 — QQQ Leap: the entry rule was never what we thought, and the fix is a trend gate
+
+Worked from the actual Option Omega exports joined to QQQ daily bars back to
+1999-03-10 (6,918 sessions), not from memory of the settings.
+
+### The rule had two inert legs
+
+The strategy was believed to be *SMA10 > SMA20, gap down 1.5%, RSI ≤ 69*.
+Reconstructed against the 74 real trades:
+
+| Believed leg | Reality |
+|---|---|
+| SMA10 > SMA20 | true on **28 of 74** entries — not in the rule |
+| Gap ≤ −1.5% | matches **all 74** exactly |
+| RSI ≤ 69 | blocked **zero** days, 2017–2026 |
+
+`gap ≤ −1.5%` alone reproduces all 74 entries plus 14; 13 of those 14 are the
+10-position concurrency cap in 2022 and March-2020 affordability. **The
+rising-SMA filter belongs to the put seller, not here.** The RSI cap is
+stronger than the old note said — it has never once bound, because a −1.5%
+gap-down day is never overbought.
+
+### The backtest window is the benign sample
+
+Validated a proxy against the real log — a signal "wins" if QQQ gains ≥12%
+within 252 trading days, calibrated because the 67 profit-target trades needed
+a median +12.8% underlying while all six losers topped out at +7.5%. It
+reproduces the window at **90.9% modeled vs 90.5% actual**, then extends the
+sample from 74 trades to **263 signals**.
+
+| Period | Signals | Win rate |
+|---|---|---|
+| 1999–2017 | 175 | **70.3%** |
+| 2017–2026 (the backtest) | 88 | 90.9% |
+
+2000/2001/2002 ran 47%/54%/65%. **Nine years of testing contains one bear
+market; the strategy's worst regime is outside the data entirely.**
+
+### What actually separates good entries from bad
+
+Tested across 263 signals (AUC 0.50 = noise):
+
+| Feature | AUC |
+|---|---|
+| SMA10/SMA20 spread | **0.49** |
+| 60d / 120d prior return ("extended rise") | 0.49 / 0.52 |
+| RSI, gap size, realized vol | 0.47 / 0.48 / 0.43 |
+| **% below the 252-day high** | **0.61** |
+| SMA50 > SMA200 | 0.58 |
+
+Only long-term trend state carries information, and it holds in **both** eras:
+
+| Filter | n | Win | Exp/trade | Pre-2017 |
+|---|---|---|---|---|
+| Baseline (gap only) | 263 | 77.2% | +26.4 | 70.3% |
+| **SMA200 rising** | 129 | 83.7% | +36.0 | **78.1%** |
+| **<120d since 252d high** | 137 | 84.7% | +37.4 | **80.6%** |
+
+**This reverses the 2022-derived note.** Winners averaged **23% below** the
+252-day high, losers **30% below** — buying deeper drawdowns is worse, not
+better. The old "every loser was bought within 7.2% of the high" pattern was
+one regime's shape. That filter scores 74.8%, below baseline.
+
+Three caveats that matter more than the table:
+
+- The trend filters work by **not trading in busts, not by picking better
+  within them**. In 2000–02 they cut 93 signals to 17 — and those 17 still won
+  only 53%.
+- They block **0 of the 6 actual 2022 losers** and slightly *hurt* 2017–2026.
+  This is insurance against a regime the backtest doesn't contain.
+- "Within 20% of the high" is actively dangerous: in 2000–02 it kept 9 signals
+  at an **11% win rate**. Proximity to the high is not the same lever as trend.
+
+**Rejected: entry spacing.** A 30-day minimum between entries moved the win
+rate 77.2% → 78.5% while cutting volume 60%. Clustered entries are not worse
+per trade — the 2022 stack was the same edge repeated with correlated risk, a
+sizing problem, not a filter problem.
+
+### The affordability cliff, at a new allocation
+
+One 0.974-strike LEAP costs **$9,264** (chain checked 2026-09-11). The first
+backtest contract, 2018-04-04, cost **$1,881** — **4.9× cheaper**.
+
+| Allocation | Per entry on $200k | Contracts | Signals affordable |
+|---|---|---|---|
+| 3% | $6,000 | **0** | **0 / 45** |
+| 5% | $10,000 | 1 | 42 / 45 |
+| 7% | $14,000 | 1 | 45 / 45 |
+
+At 3% the strategy is switched **off** until the sleeve reaches ~$309k. The
+backtest hides this: its first QQQ trade came when net liq was already
+**$301,783**, after the other three strategies compounded **+51% in 6.7 months**
+while the trigger stayed silent.
+
+**A $200k account starting in 2017 is, for QQQ affordability, a ~$41k account
+in today's terms.** Reproducing today's 0.65-contracts-per-signal ratio at 2018
+prices needs a **$40,609** start — and `decisions.md` already records what $40k
+looks like: zero entries in 2020, and a 100% win rate that is an artifact of
+affordability skipping every loser.
+
+**Not one trade in any configuration tested is under 4 contracts.** The
+1-contract, all-or-nothing regime the live account starts in does not appear
+anywhere in this backtest.
+
+### Sizing: settled at 5% with a 3-position cap
+
+All runs identical except QQQ; other three strategies at 1422/1026/913 trades
+throughout.
+
+| | OLD 3% cap10 | QQQ′ 3% nocap | QQQ′ 5% cap5 | **QQQ′ 5% cap3** |
+|---|---|---|---|---|
+| CAGR | 77.0% | 73.4% | 76.7% | **74.4%** |
+| Max drawdown | −10.82% | **−7.88%** | −13.34% | **−9.86%** |
+| Ulcer | 2.06% | **1.44%** | 1.80% | 1.65% |
+| MAR | 7.12 | **9.32** | 5.75 | **7.55** |
+| QQQ trades / losses | 74 / 6 | 45 / 1 | 41 / 1 | **30 / 1** |
+
+All four are positive in every calendar year. **The SMA200 filter is the win;
+raising the allocation is a loss.** At constant 3% the filter cut max DD from
+−10.82% to −7.88% and 2022 from −9.60% to −4.07%. Going 3% → 5% cost 5.5 points
+of drawdown and doubled QQQ peak margin.
+
+**The cap trims the tail; the allocation sets the body.** Cap 3 at 5% nearly
+matches the 3% run's *peak* exposure (15.5% vs 18.1%) but carries **1.7× the
+sustained** exposure (4.3% vs 2.5% median) — and drawdown tracks the body.
+
+3% is the better profile and is **unavailable at $200k**. 5%/cap 3 is the best
+configuration that can actually be executed, and it beats the old rule on
+drawdown, ulcer, Sortino, MAR and loss count for 2.6 points of CAGR.
+
+**Untested and worth knowing before the sleeve clears ~$309k: 3% with a cap of
+5.** Same 15% peak exposure, smaller positions.
+
+### Rejected: partial profit-taking
+
+Per-trade expectancy modelled at +29.8% → +52.0% for taking 50% at +60% and
+running the rest. The mechanism worked exactly as predicted and the portfolio
+still got worse.
+
+| | Control PT60 full | 50%@60 → DTE | 50%@60 → 150% |
+|---|---|---|---|
+| CAGR | **74.4%** | 74.2% | 74.1% |
+| Max drawdown | **−9.86%** | −13.10% | −11.33% |
+| MAR | **7.55** | 5.66 | 6.54 |
+| QQQ trades | 30 | 15 | 22 |
+| QQQ P/L | $4,771,413 | $2,966,106 | **$5,063,961** |
+| Median hold | 102d | 403d | 262d |
+| Median trade P/L% | 60.1% | 127.5% | 105.1% |
+
+**QQQ's own P/L ranges 71% across these runs and ending net liquidity moves
+less than 1.3%.** The portfolio is nearly insensitive to which is chosen.
+
+The reason is **capital velocity**: 0.589%/day for the control against
+0.401% and 0.316%. Sixty percent in 102 days beats 105% in 262 days, because
+freed capital compounds in the other three strategies. Holding longer earns
+more per trade and less per day, and in a compounding book the second one wins.
+Same circularity as the contribution-% trap.
+
+Drawdown was the only thing that really moved, and it moved the wrong way —
+average concurrency 1.28 → 2.03, days flat 31.7% → 8.0%.
+
+**Corollary: don't raise the cap to compensate.** The three runs span average
+concurrency 1.28–2.24 with return flat and risk rising monotonically. More
+concurrency buys drawdown, not portfolio return.
+
+### Intraday triggers: a leverage dial, not a better edge
+
+**Superseded an earlier conclusion in this same entry.** The first test compared
+an intraday *touch* at the same −1.5% threshold, found it flooded the cap, and
+concluded "more exposure, not a better edge." That was an artifact of the
+threshold. At −2.5% to −3.0% the touch trigger beat the gap at *matched*
+exposure, and `GAP OR TOUCH −3.0%` scored the best of anything modelled —
+81.2% win, +32.4 expectancy. Then OO turned out to be unable to express any of
+it. What follows is what survived contact with the tool.
+
+**OO's `Move` is not a daily move.** `Movement = entry price − session open`,
+measured at whatever time you enter. Proved from the log: on 2026-09-09 the
+Double Calendar entered 15:30 with Movement −15.14 at 7645.54, and the Long Put
+Hedge entered 11:10 with Movement −24.26 at 7636.42 — both imply a session open
+of 7660.68. At the QQQ strategy's **9:35 entry that is a five-minute window**,
+which is why `Move Down 0.5%` yields 5 trades and 0.6% yields 1. `Gap` is the
+separate field, `open − prev_close`, and it is the one validated against all 74
+original trades.
+
+Consequence: **a true intraday touch — "fell 3% below yesterday's close at any
+point" — is not expressible in OO at any entry time.** The nearest available
+thing is a late entry, which widens the Move window to most of the session.
+
+Tested at a 15:30 entry, everything else at the settled config:
+
+| Config | End | CAGR | Max DD | MAR | Ulcer | Avg conc |
+|---|---|---|---|---|---|---|
+| **GAP −1.5% @9:35** | $29.8M | 74.4% | **−9.86%** | **7.55** | **1.65%** | **1.28** |
+| MOVE −1.75% @15:30 | $30.7M | 75.0% | −11.43% | 6.56 | 2.37% | 2.14 |
+| MOVE −1.25% @15:30 | **$33.9M** | **76.9%** | −11.91% | 6.46 | 2.60% | 2.49 |
+
+Return rises monotonically with exposure, risk-adjusted return falls
+monotonically, and every intermediate point interpolates. Uncapped win rates
+across thresholds are 78.2% / 77.1% / 79.4% (−1.25% / −1.75% / −2.5%) — flat
+against error bars of 2–4 points. **The threshold is a leverage dial, not an
+edge parameter.** There is no better signal hiding in it.
+
+**Settled on the gap version**, on the same logic as every other exposure
+decision here: it wins on MAR, ulcer, Sortino, loss count, and drawdown in
+*every one of ten years*. And the 2–3× drawdown understatement this book has
+already suffered once puts the control at −19.7% under a 2× miss (inside the
+tripwire) and the −1.25% version at −23.8% (past it). The dial can be turned up
+in an afternoon; drawdown cannot be bought back.
+
+One modelling lesson: a per-trade expectancy model ranked −1.75% above −1.25%,
+and OO disagreed. **Expectancy × count cannot see compounding.** In a
+percentage-sized book more trades compound into larger positions, so the denser
+trigger wins even at flat per-trade quality. Don't rank triggers on summed
+expectancy units.
+
+### Settled configuration
+
+**Gap ≤ −1.5% at 9:35 · price above SMA200 · 5% allocation · max 3 concurrent
+positions · take 100% at +60% · close at 3 DTE.**
+
+### Five Option Omega mechanics worth not rediscovering
+
+- **The byte-identical export is real and reproduces.** A cap-3 run returned
+  files with MD5s identical to the cap-5 run, 79 minutes apart — max concurrent
+  still 5. Cap 5 *had* bound in the prior run, so the setting is unreliable
+  per-run rather than broken. **Verify the effect in the output before reading
+  any result**, and prefer a change that must be unmissable (set the cap to 1).
+- **The top-level Profit Target fires alongside the profit action.** With both
+  at 60%, the action closed 50% and the global target closed the rest in the
+  same second — two fills, one instant, identical price, and it looks like a
+  working scale-out. Clear the top-level field, or set it to the runner's
+  second target.
+- **`Move` and `Gap` are different fields.** `Gap = open − prev_close`.
+  `Movement = entry price − session open`, measured at your entry time — so at a
+  9:35 entry it is a five-minute window, which is why `Move Down 0.5%` returns 5
+  trades. A true intraday touch below the prior close is not expressible at any
+  entry time. Widen the window by entering later.
+- **Conflicting strikes are checked across the WHOLE ACCOUNT, not per trade.**
+  The platform will not open a position that puts the same strike long and short
+  anywhere in the account, across strategies. With `Move Conflicted Strikes`
+  **off** the strategy *stops and notifies*; **on**, it silently shifts the new
+  entry's strike. Keep it **on** — "stops and notifies" is a manual-intervention
+  state on a 0DTE strategy carrying 44% of the book's P/L, reachable at 9:35 on a
+  morning nobody is watching. **The backtest does not model this**: it opened 49
+  cross-strategy collisions in 13 years that live trading would have blocked or
+  moved, ~3.5/yr on each of the hedge and the calendar. Those hedge trades were
+  *bad* ones — 46 of them lost $776k at a 9% win rate, only 3 of 46 reaching
+  expiry — because a conflict requires quiet, tight strikes, and quiet days are
+  when the hedge's long put dies. **Do not turn the setting off to capture that
+  $776k**: it is 46 trades and a coincidental correlation with low volatility,
+  not an edge, and it would make the hedge's entries depend on where an unrelated
+  strategy placed its strikes.
+- **The 3 DTE close is about exercise, not assignment.** These are long calls;
+  nobody can assign you. It exists because an ITM long call auto-exercises into
+  $71,600 of stock per contract. Right rule, wrong reason — probably inherited
+  from the three short-premium strategies. It has fired once in 30 trades, but
+  it becomes the primary exit for the book under any runner variant.
+
+---
+
+## 2026-09-12 — The hedge is four years old, and per-contract edge cannot detect anything
+
+Backtest extended to **2013-09-12** (13.0 years). Two things came out of it that
+matter more than the QQQ work: the hedge's record is far shorter than the window
+suggests, and the tripwire built to watch it does not function.
+
+### Daily drawdown is measured from mark-to-market spikes
+
+The 13-year run reports a **−35.31%** max drawdown, peak 2015-08-25 → trough
+2016-02-08. It is largely an artifact and must not be quoted as a risk number.
+
+Reconciled: cash **rose** $5,062 through that window (realised P/L on 107 closed
+trades, matching to the dollar). The entire decline is open-position marks. The
+peak date is the **August 2015 flash crash**, when open positions marked at
+$105,918 against $38,911 of cost — a 2.7× mark on long puts that eventually
+realised about $62,000. Monthly closes over the same period: $270k peak → $240k
+trough, **−11%**.
+
+| Basis | 2013 run | 2017 run (MOVE −1.75%) | 2017 run (control) |
+|---|---|---|---|
+| Daily | −35.31% | −11.43% | −9.86% |
+| Weekly | −14.15% | −9.60% | −9.75% |
+| Monthly | **−11.30%** | −8.56% | **−6.97%** |
+
+The book's largest one-day net-liq jumps are **+27.5% (2015-08-24)**, +21.8%
+(2022-04-22), +19.6% (2025-10-10) — the hedge marking up. Peaks like those are
+not levels anything could have been exited at.
+
+**The 20% drawdown tripwire needs a stated basis.** It fires on the 2013 run at
+daily (−35%) and does not at monthly (−11%). Same trap as the "positive in every
+calendar year" bar needing a sizing basis: **decide which before it has to be
+applied.** Use weekly or monthly for the tripwire; quote daily conservatively.
+Note the ranking is preserved on every basis, so no configuration decision
+changes.
+
+### The hedge's instrument is four years old
+
+`CLAUDE.md` already says to judge the hedge on post-2022-05-11 data. The reason
+is bigger than leg structure: **2022-05-11 is the day SPX Thursday expirations
+launched.** With the Tuesday listing weeks earlier, that is when SPX 0DTE became
+available *every* trading day. Before it, 0DTE existed only Mon/Wed/Fri — which
+is exactly why the pre-period runs 62% 0DTE / 38% 1DTE.
+
+Size-neutral, the break is unmistakable, and it is not a sizing or index-level
+artifact:
+
+| Long Put Hedge, 0DTE only | n | Win rate | P/L per contract | as % of SPX |
+|---|---|---|---|---|
+| Pre 2022-05-11 | 412 | **22.8%** | **−$51.18** | −1.74% |
+| Post | 422 | **32.5%** | **+$97.86** | +1.65% |
+
+By year: 2013–2017 run −$54 to −$154/contract; 2018 is a lone good year at +$56;
+2019–2022 return to −$15 to −$90; **2023–2026 run +$84 to +$120 at 32–33% win.**
+
+Pre-2022 **0DTE also lost money**, so this is not fixable by excluding the 1DTE
+trades. The whole pre-period is a different market.
+
+**Extending the backtest to 2013 adds no evidence for the hedge.** It adds nine
+years of evidence that the strategy did not work before its instrument existed.
+Reading 13-year figures as "the book, tested longer" is wrong for two-thirds of
+the window. The extension remains valid for the other three strategies and for
+QQQ, whose structure is unchanged throughout.
+
+### Stress test: the 30% plan is the no-hedge outcome
+
+Post-2022 hedge P/L is **$15.79M against ~$35.5M of total gains — about 44% of
+everything the book made.** So the book was re-run without it.
+
+Over 13 years the hedge looks harmful (MAR 4.34 vs 5.27 without it), but that is
+the nine contaminated years talking. Restricted to the period its instrument
+exists, both rebased to $200k at 2022-05-11:
+
+| | WITH hedge | NO hedge |
+|---|---|---|
+| Ending value | $1,382,693 | $613,179 |
+| **CAGR** | **56.2%** | **29.5%** |
+| Max DD (daily) | −11.11% | −10.74% |
+| Max DD (monthly) | −6.53% | −6.27% |
+| Sortino | 6.03 | 3.45 |
+| MAR (monthly) | 8.60 | 4.70 |
+
+**It nearly doubles CAGR for ~0.4 points of extra drawdown.** It earns its place
+— on 4.3 years of evidence.
+
+**And the load-bearing result: without the hedge the book returns 29.5%. The
+plan assumes 30%.** The planning figure already equals the outcome with the
+hedge contributing nothing. Everything the backtest shows above 30% is hedge
+contribution resting on the thinnest record in the book — which is exactly the
+money the ratchet takes out of the sleeve. If the hedge's edge is regime luck
+and evaporates, the result is the number already planned for, with a marginally
+*better* drawdown profile and no losing year in thirteen.
+
+**"Hedge" is a misnomer for what it does here.** Drawdown is near-identical with
+and without it; it is not buying protection, it is generating return while being
+long puts. It did help in the 2022 bear (34.0% vs 17.9%). Hold that distinction
+when judging it live.
+
+### Per-contract edge cannot detect anything — corrected
+
+The tripwire table lists **per-contract edge < 50% of backtest** as firing in
+"months." It does not. On the hedge's post-2022 distribution:
+
+```
+mean $97.16/contract    sd $966.64    median −$232.20    win 32.4%
+```
+
+**The noise is ten times the signal.** The edge lives entirely in the 32% that
+win big, so the mean is dominated by rare large wins.
+
+| After | 95% CI half-width | Can separate $51 from $102? |
+|---|---|---|
+| 100 trades (1 yr) | ±$189 | no |
+| 200 trades (2 yrs) | ±$134 | no |
+| 400 trades (4 yrs) | ±$95 | no |
+
+Separation needs **~1,385 trades ≈ 14 years**. Worse, bootstrapping an *intact*
+strategy: the running mean reads below the $50.91 alarm **34.9% of the time after
+one year** and 16.8% after four. As a decision rule it fires on healthy
+strategies a third of the time. Record it for the eventual long read; **do not
+act on it.**
+
+### Win rate is the detector that works — where it works
+
+On the same pre/post regime change, **win rate scores z = 4.89 against
+per-contract edge's 2.77.**
+
+| Strategy | Trades/yr | Win rate (post-2022) | Alarm below | Trades to confirm |
+|---|---|---|---|---|
+| Long Put Hedge | 98 | 32.4% | 26.4% | 234 (**29 mo**) |
+| Double Calendar | 139 | 60.6% | 54.6% | 255 (**22 mo**) |
+| Sell puts | 152 | 99.8% | — | **useless** |
+| QQQ Leap | 3 | 100% | — | **useless** |
+
+A hedge fall back to its pre-2022 22.8% is confirmable in ~92 trades (**11
+months**), false-alarm 6.7% at 100 trades. But it only works on the two
+strategies that trade often with balanced win rates. The put seller wins 99.8%
+of the time and QQQ Leap trades three times a year — **neither produces enough
+information to detect anything.** QQQ Leap has no statistical detector at all
+and is managed by structure (3-position cap, affordability floor), not by
+measurement.
+
+### What to record from day one, and what to do with it
+
+The point of the first weeks is **not** to judge the edge — no measure can. It is
+to build the record that makes later judgement possible, and to catch the one
+failure that shows up immediately: execution.
+
+**Record per fill (this is the whole job):**
+
+| Field | Why |
+|---|---|
+| Timestamp of order sent | anchors the mid |
+| Strategy | every metric is per-strategy |
+| Leg: right, strike, expiry | tenor and width analysis |
+| **NBBO bid/ask at order send** | the mid is the benchmark; capture it *before* the fill |
+| **Underlying price at order send** | lets the realised strike offset be checked against the rule |
+| Limit price sent | separates "bad fill" from "bad price chosen" |
+| **Fill price** | slippage = fill − mid, signed against direction |
+| Contracts | per-contract normalisation |
+| Order duration to fill | worked-limit behaviour, esp. QQQ Leap |
+
+**Record per trade at close:** entry/exit timestamps, contracts, P/L, exit
+reason. P/L ÷ contracts is derived, not recorded.
+
+The two that cannot be reconstructed later are **NBBO mid at order send** and
+**underlying price at order send**. Neither appears on a broker statement.
+Without the first there is no slippage measurement at all; without the second
+there is no way to tell whether a strike was the one the rule asked for.
+Everything else can be back-filled from the Schwab export.
+
+**Why the underlying price earns its row.** OO checks the *whole account* for
+conflicting strikes — the same strike held long and short across any two
+strategies — and with `Move Conflicted Strikes` on it silently shifts the new
+entry's strike. It happens about **3.5 times a year**, always the 0DTE hedge
+walking into a strike the Double Calendar already holds short (47 of 49 cases
+in 13 years are hedge BTO against calendar STO). With spot and strike recorded,
+the realised offset is computable and a moved strike shows up as ~5 points off
+what the rule implies; cross-referencing the same day's open calendar strikes
+confirms the cause. **OO's own Strategy Activity Log cannot be used for this** —
+it is overwritten within days and cleared when a strategy goes idle. The general
+rule: *any diagnostic that depends on OO retaining state is unreliable, so the
+live record has to be self-sufficient.*
+
+**Weeks 1–4 — execution only.** Roughly 1,000 leg-fills a year across the book
+means slippage resolves in weeks while every P/L measure is still noise.
+
+- Slippage per leg vs mid, by strategy and by tenor. Breakevens: Calendar 16¢,
+  Hedge 19¢, Puts 19¢, QQQ Leap $13.28/contract. Tripwire >15¢/leg.
+- Prior live measurement was **4.5–10¢/leg on 583 matched pairs at one
+  contract** — that is the comparison, and it is already in hand.
+- Fill rate and time-to-fill, especially QQQ Leap: the chain carries ~12
+  contracts/day of volume in its strike region, so a fill is a worked limit over
+  days. A missed entry is data, not a non-event — **log signals not taken.**
+
+**Months 2–6 — add structural conformance, still not edge.** Does the book look
+like the backtest in shape rather than in profit?
+
+- Trade counts per strategy per month vs backtest rate (98 / 139 / 152 / 3 per
+  year).
+- Exit-reason distribution vs backtest. The QQQ 3 DTE exit should fire ~1 in 30.
+- Concurrency distribution vs modelled (QQQ avg 1.28, at cap 22.8%, flat 31.7%).
+- Days at cap and days flat.
+
+A divergence here is a configuration or execution problem and is findable. A
+P/L divergence at this stage is noise.
+
+**Months 6–24 — win rate, hedge and calendar only.** Running count, alarm at
+26.4% and 54.6%, and **do not read either before ~30 trades** — a healthy hedge
+reads below 26% about 19% of the time at that point.
+
+**Never, in the first two years — per-contract edge, QQQ Leap anything, or
+annual return.** Record them; they are not evidence yet.
+
+**The correction that matters:** the tripwire line "track fill-versus-mid and
+per-contract edge by strategy from day one" should read **fill-versus-mid and
+win rate.** Instrumenting per-contract edge as an early warning would have meant
+watching a number that cannot move while the one that can — execution — went
+unrecorded.
+
+---
+
 ## 2026-09-12 — Three sleeves, a ratchet, and the tripwires
 
 ### Target shape
@@ -139,20 +620,31 @@ below CEF's 10% before it registered.
 | Tripwire | Measured against | Fires in |
 |---|---|---|
 | **Fill slippage > 15¢/leg** | measured 4.5–10¢ entry; 16¢ is calendar breakeven | **weeks** |
-| **Per-contract edge < 50% of backtest** | Hedge $101.83 · Calendar $130.51 · Puts $76.76 · QQQ $2,655.51 | months |
+| ~~Per-contract edge < 50% of backtest~~ | Hedge $101.83 · Calendar $130.51 · Puts $76.76 · QQQ $2,655.51 | **never — see below** |
+| **Win rate by strategy** | Hedge 32.4% → alarm 26.4% · Calendar 60.6% → alarm 54.6% | 11–29 months |
 | **Drawdown > 20%** | sleeve NAV, absolute — backtest max 11.01% | immediately |
 | **MTW win rate ~52% in 2027** | its own 58–71% history; 2025–26 ran 54.6% / 51.6% | a year |
 | **Two consecutive losing years** | zero losing years across 9 backtest years | two years |
 
 **One signal = investigate. Two together = stop adding, probably reduce.**
 
-The top two are the real detectors — slippage converges in weeks because every
-trade is a data point, and per-contract edge converges in months against numbers
-already in hand. The bottom three are confirmations that arrive later.
+**Amended 2026-09-12 — per-contract edge does not work as a tripwire.** Its
+noise is ~10× its signal (hedge: mean $97.16/contract, sd $966.64), so
+separating "half the backtest edge" from "full edge" needs ~1,385 trades, about
+14 years, and an *intact* strategy reads below the alarm 34.9% of the time after
+one year. It was replaced above by **win rate**, which scores z = 4.89 against
+its 2.77 on the same regime change — but only on the hedge and the calendar.
+The put seller (99.8% win) and QQQ Leap (3 trades/yr) have no statistical
+detector and are managed structurally. Full working in the 2026-09-12 hedge
+entry.
 
-**Track fill-versus-mid and per-contract edge by strategy from day one. Compare
-monthly. Treat drawdown depth as the circuit breaker.** The annual measures are
-for the record, not for decisions.
+Slippage remains the one fast detector: it converges in weeks because every leg
+of every fill is a data point. The rest are confirmations that arrive later.
+
+**Track fill-versus-mid and win rate by strategy from day one. Compare monthly.
+Treat drawdown depth as the circuit breaker** — and state whether that drawdown
+is daily, weekly or monthly, because the answer differs by 3× on the same data.
+The annual measures are for the record, not for decisions.
 
 The value here is not the specific thresholds — it is that they were chosen before
 money was at stake. The alternative is discovering during a 15% drawdown that you
