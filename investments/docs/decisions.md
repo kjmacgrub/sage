@@ -50,6 +50,90 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-09-18 — Iron condors, second attempt: the number, and why sweeps can't move it
+
+Reopened the 0DTE SPX iron condor to add back for diversification. It reaches the
+same conclusion as September, but this time with the mechanism, which is what
+should stop a third attempt.
+
+**Config tested:** SPX 0DTE, sell 35Δ put / 30Δ call, 50-wide wings, 2:00 PM
+entry, daily, 4% allocation, 2022-05-16 → 2026-09-17. All four honest-settings
+flags correctly set, intra-minute stops on, re-entry off.
+
+### The number
+
+Measured empirically from 2,550 matched legs across two runs that differed only
+in slippage — ground truth, not a leg-count model:
+
+```
+slippage 0.20 -> 0.15 changes P/L by +$21,134
+=> dP/L per unit of slippage = $422,680
+```
+
+| Slippage/leg | Net P/L over 4.3 yrs | $/contract |
+|---|---|---|
+| 0.00 (gross edge) | $72,932 | $42 |
+| 0.05 | $51,798 | $30 |
+| 0.10 | $30,664 | $18 |
+| 0.15 | $9,530 | $5 |
+| **0.173** | **breakeven** | |
+
+**The gross edge is $72,932 over 4.3 years and breakeven slippage is 17¢/leg.**
+At the measured live range of 4.5–10¢ it earns **$18–30/contract**, against
+Puts $76.76, Hedge $101.83, Calendar $130.51. Three to four times weaker than
+the weakest strategy already in the book, on the same underlying and tenor where
+two others already trade.
+
+Best configuration found across every sweep: **4 of 5 positive calendar years**,
+never 5. Max drawdown −23.6% at the tested settings, past the 20% tripwire on its
+own. It does not clear the bar.
+
+### Why delta and stop sweeps cannot fix it
+
+They redistribute the gross edge without touching the friction bill, so every
+setting lands near zero. Observed across a 5× range:
+
+| Setting | Result |
+|---|---|
+| Stop 100%, re-entry on, no intra-minute | "dismal" |
+| Stop 400%, re-entry off, intra-minute on | +$19,331 |
+| Stop 80%, min premium 1, intra-minute on | −$11,604 |
+
+**That insensitivity is the diagnostic.** A mistuned strategy responds to its
+risk settings; one whose edge is consumed by friction does not. When a 5× change
+in the stop moves the result by less than the slippage assumption does, stop
+sweeping and go measure the friction.
+
+Lowering delta cannot help either, and the reason is structural. At 2:00 PM with
+~2h to expiry, SPX's 1σ move is ~40 points, so 35Δ/30Δ places the shorts **7 and
+9 points from spot — 0.12% and 0.17%.** Essentially at-the-money, tested almost
+every day (86% of condors had a side stop at an 80% stop). Moving far enough out
+to matter (~40 pts = 16Δ) collapses the credit while the four-leg friction load
+stays fixed. **Friction scales with legs and trade count, never with credit** —
+which is the whole trap for a 4-leg daily structure.
+
+### Two modelling errors worth not repeating
+
+- **OO logs an iron condor as three rows** — the long wings, the put side, the
+  call side — because `Exit - Puts` and `Exit - Calls` are managed separately.
+  Reading rows as trades triples the count and makes the wings row look like
+  "33% of entries taken for a debit." Group by (Date Opened, Time Opened).
+- **Do not model friction by counting legs.** An 8-leg-side assumption
+  overstated it ~3× and produced a $231k "gross edge" that did not exist. OO
+  charges slippage per row, and exit slippage only on positions that close early.
+  **Derive the friction from two runs differing only in slippage** and read the
+  slope. One diff beats any amount of reasoning about leg counts.
+
+### Decision
+
+Not added to the portfolio. If it gets traded it should be small and outside the
+sleeve, sized so a bad year doesn't matter — a coherent thing to do for its own
+sake, and one that needn't clear a bar designed for capital being relied on. What
+it should not be is the fifth strategy in a book where everything else earns 4×
+more per contract.
+
+---
+
 ## 2026-09-12 — QQQ Leap: the entry rule was never what we thought, and the fix is a trend gate
 
 Worked from the actual Option Omega exports joined to QQQ daily bars back to

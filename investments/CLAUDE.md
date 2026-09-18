@@ -219,9 +219,18 @@ were removed entirely in favour of Greek/VIX exits.
   15¢ → 35%, 25¢ → negative. **Under friction the book converges to QQQ Leap
   plus noise.** Measured entry slippage on 583 matched live pairs: **4.5–10¢/leg**
   at one contract.
-- **Iron condors were removed (Sept 2026).** With honest settings the same book went
-  from +$281k to −$32k over 4.3 years, 53% drawdown, test terminated early. Don't
-  re-add without clearing the bar: positive in every calendar year with flags set.
+- **Iron condors were removed (Sept 2026), and re-tested in Sept 2026 with the same
+  answer.** With honest settings the original book went from +$281k to −$32k over
+  4.3 years, 53% drawdown, test terminated early. The re-test found the mechanism:
+  a 0DTE SPX condor has a **$72,932 gross edge over 4.3 years and breaks even at
+  17¢/leg**, earning **$18–30/contract** at the measured 4.5–10¢ — 3–4× weaker than
+  the weakest strategy in the book. **Delta and stop sweeps cannot move it**; they
+  redistribute the edge without touching a friction load that scales with legs, not
+  credit. Don't re-add without clearing the bar: positive in every calendar year
+  with flags set (best found: 4 of 5). See the 2026-09-18 decisions entry.
+- **OO logs an iron condor as three rows** — long wings, put side, call side —
+  because `Exit - Puts` and `Exit - Calls` manage separately. Group by
+  (Date Opened, Time Opened) or trade counts triple.
 - **Never size by contract cap alone.** Percentage sizing divides an allocation by
   margin-per-contract, which collapses toward zero on degenerate calendars and
   produced a 1,402-contract position. Pair it with a **minimum premium filter**
