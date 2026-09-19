@@ -11,18 +11,22 @@ live in `../CLAUDE.md`. This file is only for judgment calls.
 
 ## Standing context
 
-**Three sleeves, each with a different job.** Judge each against its own job —
-weak capital gains in the income sleeve are not a failure. Target is roughly
-equal thirds, rebalanced annually as a **ratchet** — profits out of the options
+**Four sleeves, each with a different job.** Judge each against its own job —
+weak capital gains in the income sleeve are not a failure, and the dividend-growth
+sleeve's 2–3% starting yield is its design, not a shortfall (see 2026-09-19).
+Target is roughly equal quarters, rebalanced annually as a **ratchet** — profits out of the options
 sleeve on gains, never added back on losses. Tripwires for when to stop adding
 or reduce are in the 2026-09-12 entry; they are measured against the options
-sleeve's own backtested behaviour, never against the other two.
+sleeve's own backtested behaviour, never against the other three. Note the
+rebalancing-cost arithmetic in that entry was computed on *thirds*; the shape is
+unchanged at quarters but the dollar figures are not.
 
 | Sleeve | Job | Account |
 |---|---|---|
 | CEFs and BDCs | Income | Roth — eventually all of it |
 | Options (SPX) | Opportunistic growth | Roth at **1 lot** now → taxable **$200k** later (2026-09-08) |
 | Managed index, direct indexing | Growth + tax-loss harvesting | Must be taxable |
+| Dividend growth (individual) | Growth of *income* — judge on yield on cost | Taxable (2026-09-19, not yet funded) |
 
 Target shape, multi-year: a $300k lump sum converted to Roth in annual slices
 sized to a reasonable bracket, ending in a **~$400k Roth income bucket**. About
@@ -47,6 +51,158 @@ Two mechanics worth not forgetting:
 - **Wash sales cross into the Roth, and there the loss is permanently
   disallowed**, not deferred. Direct indexing sells hundreds of individual
   names; keep individual stocks out of the Roth and tell Fidelity it exists.
+
+---
+
+## 2026-09-19 — A fourth sleeve: dividend growth, and why its yield is 2–3% by construction
+
+Adding a fourth sleeve of **individual dividend-growth companies** — the Buffett
+framing, Coca-Cola as the archetype: strong businesses that raise the dividend
+consistently, bought for the income stream twenty years out rather than for
+current yield. Target moves from equal thirds to **four roughly equal quarters**.
+
+Not yet funded. This records the structure, the screen, and three approaches
+tested and rejected on the way.
+
+### What this sleeve is for
+
+**Growth of income, not income.** A 2.5% yield growing 11% a year reaches roughly
+8% yield on cost in fifteen years and 14% in twenty. Judged on current yield it
+looks worse than the CEF sleeve and always will; judged on yield-on-cost at year
+twenty it is the only sleeve that gets there. **Never compare its yield to the
+CEF sleeve's** — that is the same category error the tripwires warn about.
+
+Placement: taxable. Qualified dividends at 15% and no tax-loss harvesting value
+to protect, so it does not compete with the managed sleeve for the taxable slot.
+
+### The yield ceiling is arithmetic, and it settles a recurring argument
+
+Screening all 1,025 dividend payers in the S&P 1500, everything degrades
+monotonically as yield rises:
+
+| Yield | n | Div CAGR | Payout | FCF cov | 52w pos | vs 200d | Avg cuts |
+|---|---|---|---|---|---|---|---|
+| 0–1% | 224 | 7.56% | 16% | 5.48× | 57% | +1.9% | 1.4 |
+| 1–2% | 215 | **9.52%** | 30% | 3.18× | 52% | −0.1% | 1.3 |
+| **2–3%** | 202 | 8.33% | 44% | 1.86× | 56% | +1.0% | 1.8 |
+| 3–4% | 131 | 5.55% | 60% | 1.44× | 49% | −1.2% | 2.3 |
+| 4–5% | 75 | 5.99% | 91% | 1.13× | 37% | −3.6% | 2.3 |
+| 5–6% | 43 | 4.30% | **101%** | 1.40× | 22% | −8.5% | 2.0 |
+| 6–8% | 40 | 3.92% | **142%** | 1.29× | 38% | −0.5% | 2.1 |
+| 8%+ | 28 | 5.87% | 99% | 1.12× | **6%** | **−13.2%** | **3.7** |
+
+**Above 5% yield the median company pays out more than it earns.** The 8%+ bucket
+sits at the 6th percentile of its own 52-week range with nearly four cuts behind it.
+
+The mechanism: yield today ÷ yield at the start = (1+g_div)ⁿ ÷ (1+g_price)ⁿ. A
+screen demanding both dividend CAGR ≥7% and price CAGR ≥6% over 25+ years forces
+those to track, which pins the yield near where it started — and mature US
+companies initiate dividends at 2–3%. To show 8% today either the payout ratio
+expanded enormously or the price fell. **The screen is built to exclude both
+routes**, so raising the yield ceiling to 8% returns the identical names with a
+3.49% maximum. **The 2–3% band is the only one where dividend growth, payout,
+coverage and price position are simultaneously healthy.** That is not a
+compromise; it is where compounders live.
+
+### The screen
+
+Yield 2–5% · dividend CAGR ≥7% · price CAGR ≥6% · ≥25-year window · payout ≤80% ·
+FCF covers the dividend ≥1.0× · price ≥60% through its 52-week range · ≤1 cut.
+
+Both CAGRs are measured over **the same window** — the first full dividend year
+the price series also covers, through the last complete calendar year. Measuring
+dividends over 63 years against price over 40 flatters one against the other;
+KO reads 9.24%/10.58% aligned versus 9.58%/10.75% mismatched.
+
+Returns **7 names** from the S&P 1500: ADP, HPQ, TGT, SM, BDX, WLY, SCL — one per
+sector, portfolio yield 2.78%, dividend CAGR 10.60%, yield+growth 13.4%. Widening
+from the S&P 500 (4 names) to the S&P 1500 added three, which says the screen is
+demanding rather than that the universe was the constraint.
+
+Tools: a [yield-on-cost calculator](https://claude.ai/artifact/TzkcXLXRMnWHXWLXwdUGmb)
+for the assumptions, and the [screener](https://claude.ai/artifact/7oCuksREYjb1ViNXvDdnqT)
+over 1,025 payers. Data is Yahoo, split-adjusted, rebuildable from
+`scratchpad/build2.py` + `fund2.py`.
+
+### Three approaches tested and rejected
+
+**Buying the beaten-down names.** The original instinct — take screen survivors
+sitting near 52-week lows and buy the recovery. Tested on HRL, CLX, MCD, NKE, HD:
+**all five show monotonic dividend-growth deceleration** (HRL 11.47% life → 2.47%
+last year; HD 23.60% → 2.22%). Re-running yield+growth on the 3-year rate instead
+of the life rate cuts the implied return roughly in half — HD from 26.7% to 9.7%.
+
+Worse, the method is biased by construction: **screening on long-run growth and
+then selecting the ones at 52-week lows systematically finds companies whose past
+was better than their present.** The long history gets them through; the depressed
+price is the market pricing the deceleration. That is close to a definition of a
+value-trap filter. CLX at the extreme — payout 103%, FCF covering **0.19×** the
+dividend, operating cash flow 1.03×, earnings −50%.
+
+**The put-selling wheel as an entry method.** Sell cash-secured puts on names you
+want to own, collect premium until assigned. Structurally better than dip-buying —
+you are paid to wait and your basis lands below spot — but the premium is not
+there. A 40-day ~8% OTM put at mid, annualised, against the dividend forgone by
+not owning:
+
+| | Ann. premium | Div yield | Edge | Bid-ask |
+|---|---|---|---|---|
+| NKE | 23.6% | 4.62% | +19.0 | 29% |
+| HD | 12.6% | 3.10% | +9.5 | 21% |
+| MCD | 4.4% | 3.00% | +1.4 | 38% |
+| KO | 3.8% | 2.38% | +1.5 | **91%** |
+| ITW | 3.1% | 2.39% | +0.7 | **113%** |
+| CLX | 6.3% | 5.98% | +0.3 | 29% |
+| HRL | 5.9% | 5.61% | +0.2 | 40% |
+
+**On the stalwarts, selling puts pays roughly what the dividend pays** — and that
+is at mid, with 29–113% spreads and open interest of 4–63 contracts. At the bid
+several go negative, and premium is short-term ordinary income against qualified
+dividends at 15%, which makes the marginal cases negative after tax. The general
+rule: **you cannot harvest volatility from low-volatility stocks**, and low
+volatility is most of what makes a dividend compounder attractive. Viable as an
+opportunistic overlay on the few names where IV is genuinely elevated (HD, NKE),
+never as the standing entry method.
+
+**Arithmetic-average dividend growth as a column.** Considered, rejected. It reads
+higher than CAGR on every row because it averages percentage changes instead of
+compounding them — +50% then −33% averages +8.5%/yr on a position that ended flat.
+
+### Known limits
+
+- **Survivorship bias.** The universe is *current* index constituents, so companies
+  dropped for cutting dividends are absent. Structural to any index-based screen;
+  a dividend-champions list would be needed to fix it.
+- **The payout column cannot measure REITs.** They must distribute ~90% of taxable
+  income and are properly assessed on FFO, not EPS — so the 43 REITs yielding 5%+
+  read as 111% payout and fail a filter that does not apply to them. FFO is
+  non-GAAP and absent from Yahoo; operating cash flow per share is the nearest
+  proxy already in hand. **A REIT sleeve needs its own screen, not another column.**
+- **Free cash flow is lumpy.** KO reads 0.58× coverage and has no dividend problem;
+  a year of heavy capex or a settlement moves it. A writedown inflates the payout
+  ratio without cash moving, which is likely HRL's 188%. Both are flags for reading
+  the filings, not verdicts. The combination that has preceded cuts is failing
+  *both* with revenue declining.
+- **The momentum leg buys after the run.** It defends against value traps and
+  costs entry price. The check is the dividend-growth columns — if the 5-year rate
+  still tracks the life rate, price is following the business rather than leading it.
+
+### Mechanics settled
+
+**Equal weight, ~$20k per name, dividends pooled rather than DRIP'd.** Automatic
+reinvestment puts each dividend back into the stock that paid it, which compounds
+positions independently and lets winners drift — it is not rebalancing. Pooling
+the cash and directing it to whichever position has fallen furthest below weight
+rebalances without new capital and without a taxable sale. Schwab's DRIP setting
+does the first by default; it needs turning off.
+
+**A few outliers are wanted, not tolerated.** SM Energy is a commodity cyclical
+sitting among six developed-market consumer and industrial names that will
+correlate in a downturn. It is the only position that can rise when the others
+fall, and **no other sleeve in the portfolio holds an inflation-sensitive
+exposure** — options are short SPX beta, CEFs are credit and equity income, the
+managed sleeve is long beta. What makes it uncomfortable on a consistency screen
+is what makes it useful in the book.
 
 ---
 
