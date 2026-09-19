@@ -121,8 +121,9 @@ demanding rather than that the universe was the constraint.
 
 Tools: a [yield-on-cost calculator](https://claude.ai/artifact/TzkcXLXRMnWHXWLXwdUGmb)
 for the assumptions, and the [screener](https://claude.ai/artifact/7oCuksREYjb1ViNXvDdnqT)
-over 1,025 payers. Data is Yahoo, split-adjusted, rebuildable from
-`scratchpad/build2.py` + `fund2.py`.
+over 1,025 payers. Data is Yahoo, split-adjusted, rebuilt with
+`investments/dividend/build.py` then `render.py` — see that directory's README
+for the republish step and the data gotchas.
 
 ### Three approaches tested and rejected
 

@@ -1,0 +1,185 @@
+<script>
+(function(){
+var DATA=JSON.parse(document.getElementById('data').textContent);
+var $=function(i){return document.getElementById(i)};
+var SECT=[],IDX=[],sort={k:'tot',dir:-1},SHOWN=[];
+var PICK=(function(){try{return new Set(JSON.parse(localStorage.getItem('dcpick')||'[]'))}
+  catch(e){return new Set()}})();
+function savePick(){try{localStorage.setItem('dcpick',JSON.stringify(Array.from(PICK)))}catch(e){}}
+
+DATA.forEach(function(r){ r.tot=+(r.y+r.d).toFixed(2); });
+
+var idxs=['S&P 500','S&P 400','S&P 600'];
+$('idxchips').innerHTML='<span style="font-size:11.5px;font-weight:600;letter-spacing:.06em;'+
+  'text-transform:uppercase;color:var(--faint);align-self:center;margin-right:4px">Index</span>'+
+  idxs.map(function(s){return '<button class="chip" aria-pressed="false" data-i="'+s+'">'+s+
+  ' <span style="opacity:.6">'+DATA.filter(function(r){return r.ix===s}).length+'</span></button>'}).join('');
+Array.prototype.forEach.call(document.querySelectorAll('#idxchips .chip'),function(b){
+  b.addEventListener('click',function(){
+    var on=b.getAttribute('aria-pressed')==='true';
+    b.setAttribute('aria-pressed',String(!on));
+    var v=b.dataset.i;
+    if(on) IDX=IDX.filter(function(x){return x!==v}); else IDX.push(v);
+    render();
+  });
+});
+var sectors=Array.from(new Set(DATA.map(function(r){return r.s}))).sort();
+$('chips').innerHTML=sectors.map(function(s){
+  return '<button class="chip" aria-pressed="false" data-s="'+s+'">'+s+'</button>';
+}).join('');
+Array.prototype.forEach.call(document.querySelectorAll('.chip'),function(b){
+  b.addEventListener('click',function(){
+    var on=b.getAttribute('aria-pressed')==='true';
+    b.setAttribute('aria-pressed',String(!on));
+    var s=b.dataset.s;
+    if(on){SECT=SECT.filter(function(x){return x!==s})} else {SECT.push(s)}
+    render();
+  });
+});
+
+function cell(v,th,suf,higher){
+  if(v===null||v===undefined) return '<td class="na">\u2014</td>';
+  var cls= higher ? (v<th[0]?'risk':(v<th[1]?'warnv':'okv'))
+                  : (v>th[0]?'risk':(v>th[1]?'warnv':'okv'));
+  var txt= (suf==='%'&&higher) ? (v>0&&th[0]<0?'+':'')+v.toFixed(v%1?1:0)+suf
+         : higher ? v.toFixed(2)+suf : v.toFixed(0)+suf;
+  return '<td class="'+cls+'">'+txt+'</td>';
+}
+function spark(a){
+  if(!a||a.length<2) return '';
+  var w=104,h=22,p=2,mx=Math.max.apply(null,a),mn=Math.min.apply(null,a);
+  var rng=(mx-mn)||mx||1;
+  var X=function(i){return p+(i/(a.length-1))*(w-2*p)};
+  var Y=function(v){return h-p-((v-mn)/rng)*(h-2*p)};
+  var d='';
+  for(var i=0;i<a.length;i++) d+=(i?' L':'M')+X(i).toFixed(1)+','+Y(a[i]).toFixed(1);
+  var rising=a[a.length-1]>=a[0];
+  var col=rising?'var(--s2)':'var(--s3)';
+  return '<svg class="spark" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+
+    '" aria-hidden="true"><path d="'+d+'" fill="none" stroke="'+col+
+    '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>'+
+    '<circle cx="'+X(a.length-1).toFixed(1)+'" cy="'+Y(a[a.length-1]).toFixed(1)+
+    '" r="2.4" fill="'+col+'"/></svg>';
+}
+
+function render(){
+  var ymin=+$('ymin').value, ymax=+$('ymax').value, dmin=+$('dmin').value,
+      pmin=+$('pmin').value, hmin=+$('hmin').value,
+      prmax=+$('prmax').value, fcmin=+$('fcmin').value,
+      rgmin=+$('rgmin').value, cmax=+$('cmax').value,
+      q=$('q').value.trim().toLowerCase();
+  $('prmaxV').textContent=prmax+'%';
+  $('rgminV').textContent=rgmin+'%';
+  $('cmaxV').textContent=(cmax>=8?'any':String(cmax));
+  $('fcminV').textContent=fcmin.toFixed(1)+'\u00d7'+(fcmin===0?' (off)':'');
+  $('yminV').textContent=ymin.toFixed(1)+'%';
+  $('ymaxV').textContent=ymax.toFixed(1)+'%';
+  $('dminV').textContent=dmin.toFixed(1)+'%';
+  $('pminV').textContent=pmin.toFixed(1)+'%';
+  $('hminV').textContent=hmin+' yrs';
+
+  var out=DATA.filter(function(r){
+    if(r.y<ymin||r.y>ymax) return false;
+    if(r.d<dmin||r.x<pmin||r.w<hmin) return false;
+    if(cmax<8&&r.c>cmax) return false;
+    if(rgmin>0&&(r.rg52===null||r.rg52<rgmin)) return false;
+    if(prmax<200&&(r.pr===null||r.pr>prmax)) return false;
+    if(fcmin>0&&(r.fc===null||r.fc<fcmin)) return false;
+    if(SECT.length&&SECT.indexOf(r.s)<0) return false;
+    if(IDX.length&&IDX.indexOf(r.ix)<0) return false;
+    if(q&&(r.t.toLowerCase().indexOf(q)<0&&r.n.toLowerCase().indexOf(q)<0)) return false;
+    return true;
+  });
+  out.sort(function(a,b){
+    var k=sort.k,va=a[k],vb=b[k];
+    if(typeof va==='string') return sort.dir*va.localeCompare(vb);
+    return sort.dir*((va||0)-(vb||0));
+  });
+
+  $('count').textContent=out.length;
+  $('countS').textContent=out.length===1?'company clears the screen':'companies clear the screen';
+  $('empty').hidden=out.length>0;
+
+  $('rows').innerHTML=out.map(function(r){
+    var cut=r.c>0?'<span class="flag">'+r.c+'</span>':'<span class="flag ok">0</span>';
+    var on=PICK.has(r.t);
+    return '<tr'+(on?' class="sel"':'')+'><td class="pick"><input type="checkbox" data-t="'+r.t+
+      '" aria-label="Pick '+r.t+'"'+(on?' checked':'')+'></td>'+
+      '<th>'+r.t+'</th><td class="name" title="'+r.n.replace(/"/g,'&quot;')+'">'+r.n+
+      '</td><td class="sect">'+r.ix+'</td><td class="sect">'+r.s+'</td><td>$'+r.p.toFixed(2)+'</td><td>'+r.y.toFixed(2)+
+      '</td>'+cell(r.pr,[100,80],'%')+cell(r.fc,[1,1.5],'\u00d7',true)+
+      '<td>'+r.d.toFixed(2)+'</td><td>'+r.x.toFixed(2)+'</td><td class="tot">'+
+      r.tot.toFixed(1)+'</td>'+cell(r.rg52,[25,60],'%',true)+cell(r.m200,[-10,0],'%',true)+
+      '<td>'+r.w+'y</td><td>'+r.k+'</td><td>'+cut+
+      '</td><td class="l">'+spark(r.a)+'</td></tr>';
+  }).join('');
+
+  SHOWN=out;
+  if(out.length){
+    var mr=out.reduce(function(a,r){return a+(r.rg52||0)},0)/out.length;
+    var mt=out.reduce(function(a,r){return a+r.tot},0)/out.length;
+    $('shape').textContent='average '+mr.toFixed(0)+'% through the 52-week range, '+
+      mt.toFixed(1)+' yield+growth';
+  } else $('shape').textContent='';
+  syncSel();
+  Array.prototype.forEach.call(document.querySelectorAll('thead th'),function(th){
+    th.className=th.className.replace(/\s*(up|dn)/g,'');
+    if(th.dataset.k===sort.k) th.className+=(sort.dir>0?' up':' dn');
+  });
+}
+
+function syncSel(){
+  var picks=Array.from(PICK).sort();
+  $('selN').textContent=picks.length+(picks.length===1?' picked':' picked');
+  $('clear').disabled=!picks.length;
+  var shownT=SHOWN.map(function(r){return r.t});
+  var nOn=shownT.filter(function(t){return PICK.has(t)}).length;
+  var all=$('all');
+  all.checked=shownT.length>0&&nOn===shownT.length;
+  all.indeterminate=nOn>0&&nOn<shownT.length;
+  $('addAll').disabled=!shownT.length||nOn===shownT.length;
+  if(picks.length){
+    $('tick').textContent=picks.join(', ');
+    $('mode').textContent='Showing your picks. They survive filter changes.';
+  } else {
+    $('tick').textContent=shownT.length?shownT.join(', '):'—';
+    $('mode').textContent='Showing every company that clears the screen — tick rows to build your own list.';
+  }
+}
+$('rows').addEventListener('change',function(e){
+  var cb=e.target;
+  if(!cb.matches('input[type=checkbox][data-t]')) return;
+  if(cb.checked) PICK.add(cb.dataset.t); else PICK.delete(cb.dataset.t);
+  cb.closest('tr').classList.toggle('sel',cb.checked);
+  savePick(); syncSel();
+});
+$('all').addEventListener('change',function(){
+  var on=$('all').checked;
+  SHOWN.forEach(function(r){ on?PICK.add(r.t):PICK.delete(r.t) });
+  savePick(); render();
+});
+$('addAll').addEventListener('click',function(){
+  SHOWN.forEach(function(r){PICK.add(r.t)}); savePick(); render();
+});
+$('clear').addEventListener('click',function(){
+  PICK.clear(); savePick(); render();
+});
+
+Array.prototype.forEach.call(document.querySelectorAll('thead th[data-k]'),function(th){
+  th.tabIndex=0;
+  var go=function(){
+    var k=th.dataset.k;
+    if(sort.k===k) sort.dir=-sort.dir;
+    else {sort.k=k; sort.dir=(k==='t'||k==='n'||k==='s')?1:-1}
+    render();
+  };
+  th.addEventListener('click',go);
+  th.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}});
+});
+['ymin','ymax','dmin','pmin','hmin','prmax','fcmin','rgmin','cmax','q'].forEach(function(i){
+  $(i).addEventListener('input',render);
+});
+$('asof').textContent='19 September 2026';
+render();
+})();
+</script>

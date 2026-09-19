@@ -1,0 +1,147 @@
+<div class="wrap">
+<header>
+  <p class="eyebrow">Sleeve four &middot; first-pass screen</p>
+  <h1>Dividend Compounders</h1>
+  <p class="lede">Every dividend payer in the S&amp;P 1500 &mdash; large, mid and small cap
+  &mdash; measured over its own full history &mdash; dividend growth and price appreciation computed across the
+  <em>same</em> window so the two are comparable. A starting list to take into deeper research,
+  not a buy list.</p>
+</header>
+
+<section class="panel" aria-label="Screen criteria">
+  <div class="filters">
+    <div class="ctl">
+      <label for="ymin">Yield at least <span class="val" id="yminV">2.0%</span></label>
+      <input type="range" id="ymin" min="0" max="6" step="0.1" value="2">
+    </div>
+    <div class="ctl">
+      <label for="ymax">Yield at most <span class="val" id="ymaxV">5.0%</span></label>
+      <input type="range" id="ymax" min="1" max="12" step="0.1" value="5">
+    </div>
+    <div class="ctl">
+      <label for="dmin">Dividend growth <span class="val" id="dminV">7.0%</span></label>
+      <input type="range" id="dmin" min="0" max="20" step="0.5" value="7">
+    </div>
+    <div class="ctl">
+      <label for="pmin">Price appreciation <span class="val" id="pminV">6.0%</span></label>
+      <input type="range" id="pmin" min="-5" max="20" step="0.5" value="6">
+    </div>
+    <div class="ctl">
+      <label for="hmin">History at least <span class="val" id="hminV">25 yrs</span></label>
+      <input type="range" id="hmin" min="5" max="60" step="1" value="25">
+    </div>
+    <div class="ctl">
+      <label for="prmax">Payout at most <span class="val" id="prmaxV">80%</span></label>
+      <input type="range" id="prmax" min="10" max="200" step="5" value="80">
+    </div>
+    <div class="ctl">
+      <label for="fcmin">FCF covers dividend <span class="val" id="fcminV">1.0&times;</span></label>
+      <input type="range" id="fcmin" min="0" max="3" step="0.1" value="1">
+    </div>
+    <div class="ctl">
+      <label for="rgmin">In 52-week range, at least <span class="val" id="rgminV">60%</span></label>
+      <input type="range" id="rgmin" min="0" max="100" step="5" value="60">
+      <span class="hint">0% sits at the 52-week low, 100% at the high.</span>
+    </div>
+    <div class="ctl">
+      <label for="cmax">Cuts, at most <span class="val" id="cmaxV">1</span></label>
+      <input type="range" id="cmax" min="0" max="8" step="1" value="1">
+      <span class="hint">Years the annual dividend fell, across the window.</span>
+    </div>
+    <div class="ctl">
+      <label for="q">Name or ticker</label>
+      <input type="search" id="q" placeholder="Search&hellip;" autocomplete="off">
+    </div>
+  </div>
+  <div class="chips" id="idxchips"></div>
+  <div class="chips" id="chips"></div>
+</section>
+
+<div class="bar">
+  <span class="count" id="count">&ndash;</span>
+  <span style="color:var(--muted)" id="countS">companies clear the screen</span>
+  <span style="flex:1"></span>
+  <span class="mode" id="shape">&nbsp;</span>
+</div>
+
+<div class="scroller">
+  <table id="tbl">
+    <thead><tr>
+      <th class="pick"><input type="checkbox" id="all" aria-label="Select all rows currently shown"></th>
+      <th class="l" data-k="t">Ticker</th>
+      <th class="l" data-k="n">Company</th>
+      <th class="l" data-k="ix">Index</th>
+      <th class="l" data-k="s">Sector</th>
+      <th data-k="p">Price</th>
+      <th data-k="y">Yield</th>
+      <th data-k="pr">Payout</th>
+      <th data-k="fc">FCF cover</th>
+      <th data-k="d">Div CAGR</th>
+      <th data-k="x">Price CAGR</th>
+      <th data-k="tot">Yield+Growth</th>
+      <th data-k="rg52">52w range</th>
+      <th data-k="m200">vs 200d</th>
+      <th data-k="w">Window</th>
+      <th data-k="k">Streak</th>
+      <th data-k="c">Cuts</th>
+      <th class="l">Dividend, last 16 yrs</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="empty" hidden>Nothing clears this screen. Loosen a threshold.</div>
+</div>
+
+<div>
+  <h2 style="font-size:16px;font-family:var(--sans);font-weight:600">Ticker list for Schwab</h2>
+  <div class="selbar" style="margin-top:10px">
+    <span class="n" id="selN">0 picked</span>
+    <button class="btn" id="clear" disabled>Clear picks</button>
+    <button class="btn" id="addAll">Add all shown</button>
+    <span class="mode" id="mode">Showing every company that clears the screen &mdash; tick rows to build your own list.</span>
+  </div>
+  <div class="tickers" id="tick"></div>
+</div>
+
+<section class="notes">
+  <h2>How these numbers are built</h2>
+  <p><b>Source:</b> monthly price and full dividend history from Yahoo Finance, split-adjusted,
+  pulled <span id="asof">today</span>. Universe is the S&amp;P 1500 &mdash; 1,504 current
+  constituents of the S&amp;P 500, MidCap 400 and SmallCap 600. <b>1,025</b> have enough
+  dividend history to measure: 399 large cap, 269 mid, 357 small. The rest either pay nothing
+  or have fewer than three complete dividend years.</p>
+  <p><b>Small and mid caps change the risk, not just the count.</b> A 30-year dividend record
+  from a $2bn company is a different claim than the same record from a $200bn one &mdash;
+  thinner coverage, more concentrated end markets, and far worse option liquidity if you ever
+  want to sell premium against it. The Index column is there so you always know which you are
+  looking at.</p>
+  <p><b>The window matters.</b> Dividend growth and price appreciation are both measured from
+  the first full dividend year that the price series also covers, through the last complete
+  calendar year. Measuring dividends over 63 years and price over 40 would flatter one against
+  the other &mdash; so both use the same span, shown in the Window column.</p>
+  <p><b>Yield</b> is trailing twelve months of dividends over the current price, so a recent
+  raise is already in it. <b>Streak</b> counts consecutive calendar years of higher total
+  dividends; <b>Cuts</b> counts years the annual total fell, across the whole window. A long
+  streak with cuts behind it means the company rebuilt after a reduction &mdash; worth knowing
+  before you treat the streak as unbroken.</p>
+  <p><b>Yield + Growth</b> is the Chowder number, and it approximates total return CAGR when
+  the multiple is unchanged. Sort on it to see which names carry the arithmetic, then check
+  whether the price CAGR column agrees &mdash; a large gap between dividend growth and price
+  growth means the multiple did the work, in one direction or the other.</p>
+  <p><b>Payout</b> is trailing dividends over trailing earnings. <b>FCF cover</b> is free cash
+  flow divided by the actual cash cost of the dividend (shares outstanding &times; trailing
+  dividend per share) &mdash; below 1.0&times; means the payout is not being funded from free
+  cash flow this year. <b>73 of 361</b> measurable names sit below 1.0&times;, and 49 pay out
+  more than they earn. Red marks the threshold, amber a caution band.</p>
+  <p><b>Read both together, and read them gently.</b> Free cash flow is lumpy &mdash; a single
+  year of heavy capex or a legal settlement drops coverage without the dividend being at risk,
+  and a writedown inflates the payout ratio without cash changing hands. A name failing one
+  metric warrants a look at the filings; failing both, with revenue declining, is the
+  combination that has historically preceded cuts. 38 names have no coverage figure available
+  and are excluded whenever the FCF filter is above zero.</p>
+  <p><b>What this still cannot see:</b> debt maturities, earnings quality, or whether the
+  growth rate is intact. A 30-year dividend CAGR describes the past; the reason to screen on
+  it is that consistency is rare and worth starting from, not that it predicts. Run the
+  dividend-growth columns against each other &mdash; a 5-year rate far below the life rate is
+  deceleration the price has usually already noticed.</p>
+</section>
+</div>

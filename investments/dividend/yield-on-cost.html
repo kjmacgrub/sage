@@ -1,0 +1,497 @@
+<title>Yield on Cost</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#FAFAF7; --surface:#FFFFFF; --surface-2:#F2F3ED;
+  --ink:#1C2119; --ink-2:#414A3D; --muted:#5F6A5C; --faint:#8A9386;
+  --rule:#E2E5DC; --rule-strong:#CBD1C3;
+  --accent:#4E6D46; --accent-soft:#E8EEE4; --accent-ink:#3B5435;
+  --s1:#3B6EA5; --s2:#2F8F6B; --s3:#C97E1C;
+  --good:#2F8F6B; --good-bg:#E4F1EA; --warn-bg:#FBF0DD; --warn-ink:#8A5A12;
+  --shadow:0 1px 2px rgba(28,33,25,.06), 0 8px 24px -12px rgba(28,33,25,.18);
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#131612; --surface:#1A1E18; --surface-2:#232820;
+    --ink:#E7EBE2; --ink-2:#C2C9BC; --muted:#98A294; --faint:#6E786A;
+    --rule:#2A2F27; --rule-strong:#3B4337;
+    --accent:#8AAE7E; --accent-soft:#232C20; --accent-ink:#A6C69B;
+    --s1:#4C90DB; --s2:#35A87C; --s3:#BE8425;
+    --good:#35A87C; --good-bg:#17281F; --warn-bg:#2B2113; --warn-ink:#D9A45C;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131612; --surface:#1A1E18; --surface-2:#232820;
+  --ink:#E7EBE2; --ink-2:#C2C9BC; --muted:#98A294; --faint:#6E786A;
+  --rule:#2A2F27; --rule-strong:#3B4337;
+  --accent:#8AAE7E; --accent-soft:#232C20; --accent-ink:#A6C69B;
+  --s1:#4C90DB; --s2:#35A87C; --s3:#BE8425;
+  --good:#35A87C; --good-bg:#17281F; --warn-bg:#2B2113; --warn-ink:#D9A45C;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+body{background:var(--ground); color:var(--ink); font-family:var(--sans);
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;}
+.wrap{max-width:1040px; margin:0 auto; padding:40px 24px 72px;
+  display:flex; flex-direction:column; gap:34px;}
+h1,h2,h3{font-family:var(--serif); font-weight:500; text-wrap:balance; margin:0;}
+h1{font-size:40px; line-height:1.1; letter-spacing:-.015em;}
+h2{font-size:23px; line-height:1.2;}
+.eyebrow{font-size:11.5px; font-weight:600; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--accent); margin:0 0 8px;}
+.lede{color:var(--muted); max-width:66ch; margin:10px 0 0; font-size:16px;}
+.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
+
+/* ---- assumptions ---- */
+.panel{background:var(--surface); border:1px solid var(--rule); border-radius:10px;
+  padding:22px 24px; box-shadow:var(--shadow);}
+.controls{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:20px 26px;}
+.ctl{display:flex; flex-direction:column; gap:7px; min-width:0;}
+.ctl label{font-size:12px; font-weight:600; letter-spacing:.04em;
+  text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between;
+  align-items:baseline; gap:8px;}
+.ctl .val{font-family:var(--mono); font-size:14px; font-weight:500;
+  color:var(--ink); letter-spacing:0; text-transform:none;}
+input[type=range]{width:100%; accent-color:var(--accent); height:20px; margin:0; cursor:pointer;}
+input[type=number]{font-family:var(--mono); font-size:14px; padding:7px 9px; width:100%;
+  border:1px solid var(--rule-strong); border-radius:6px; background:var(--surface);
+  color:var(--ink);}
+input:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);
+  outline-offset:2px;}
+.hint{font-size:12.5px; color:var(--faint); line-height:1.45;}
+.togglerow{display:flex; flex-wrap:wrap; gap:18px; align-items:center;
+  margin-top:20px; padding-top:18px; border-top:1px solid var(--rule);}
+.check{display:flex; gap:8px; align-items:center; font-size:13.5px; color:var(--ink-2);
+  cursor:pointer;}
+.check input{accent-color:var(--accent); width:16px; height:16px; cursor:pointer;}
+.preset{font:inherit; font-size:12.5px; padding:5px 11px; border-radius:99px;
+  border:1px solid var(--rule-strong); background:var(--surface); color:var(--ink-2);
+  cursor:pointer;}
+.preset:hover{border-color:var(--accent); color:var(--accent-ink);}
+
+/* ---- result tiles ---- */
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(178px,1fr)); gap:1px;
+  background:var(--rule); border:1px solid var(--rule); border-radius:10px; overflow:hidden;}
+.tile{background:var(--surface); padding:18px 20px 20px; display:flex;
+  flex-direction:column; gap:3px; min-width:0;}
+.tile .k{font-size:11.5px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--muted);}
+.tile .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:31px;
+  font-weight:500; letter-spacing:-.02em; line-height:1.15; color:var(--ink);}
+.tile .s{font-size:12.5px; color:var(--faint);}
+.tile.lead .v{color:var(--accent-ink);}
+
+/* ---- chart ---- */
+figure{margin:0; display:flex; flex-direction:column; gap:14px;}
+.legend{display:flex; flex-wrap:wrap; gap:6px 20px; font-size:13px; color:var(--ink-2);}
+.legend span{display:inline-flex; align-items:center; gap:7px;}
+.sw{width:11px; height:11px; border-radius:2.5px; flex:none;}
+.chartbox{position:relative;}
+svg{display:block; width:100%; height:auto;}
+.tip{position:absolute; pointer-events:none; opacity:0; transition:opacity .12s;
+  background:var(--surface); border:1px solid var(--rule-strong); border-radius:8px;
+  padding:9px 11px; box-shadow:var(--shadow); font-size:12.5px; min-width:172px; z-index:5;}
+.tip .ty{font-weight:600; margin-bottom:5px; color:var(--ink);}
+.tip .tr{display:flex; justify-content:space-between; gap:14px; color:var(--muted);}
+.tip .tr b{font-family:var(--mono); font-weight:500; color:var(--ink);}
+.tip .tt{display:flex; justify-content:space-between; gap:14px; margin-top:5px;
+  padding-top:5px; border-top:1px solid var(--rule); color:var(--ink); font-weight:600;}
+.tip .tt b{font-family:var(--mono);}
+
+/* ---- grid ---- */
+.scroller{overflow-x:auto; border:1px solid var(--rule); border-radius:10px;
+  background:var(--surface);}
+table{border-collapse:collapse; width:100%; font-size:13.5px;}
+th,td{padding:9px 12px; text-align:right; white-space:nowrap;}
+thead th{font-size:11.5px; font-weight:600; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--muted); border-bottom:1px solid var(--rule-strong);}
+tbody th{text-align:left; font-weight:500; color:var(--ink-2); font-family:var(--mono);
+  font-variant-numeric:tabular-nums; border-right:1px solid var(--rule);}
+tbody td{font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--ink-2);}
+tbody tr+tr th,tbody tr+tr td{border-top:1px solid var(--rule);}
+td.hit{background:var(--good-bg); color:var(--ink); font-weight:600;}
+.corner{color:var(--faint); font-weight:500; font-family:var(--sans);
+  text-transform:none; letter-spacing:0; font-size:12px; text-align:left;}
+details{border-top:1px solid var(--rule); padding-top:16px;}
+summary{cursor:pointer; font-size:13.5px; color:var(--muted); font-weight:500;}
+.notes{color:var(--muted); font-size:13.5px; max-width:70ch;
+  display:flex; flex-direction:column; gap:10px;}
+.notes b{color:var(--ink); font-weight:600;}
+code{font-family:var(--mono); font-size:.92em; background:var(--surface-2);
+  padding:1px 5px; border-radius:4px;}
+.chow{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; font-size:13.5px;
+  color:var(--muted); margin-top:14px; padding-top:14px; border-top:1px solid var(--rule);}
+.pill{font-family:var(--mono); font-size:12.5px; font-weight:600; padding:3px 9px;
+  border-radius:99px; background:var(--good-bg); color:var(--good);}
+.pill.no{background:var(--warn-bg); color:var(--warn-ink);}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+@media (max-width:640px){ h1{font-size:31px} .wrap{padding:28px 16px 56px} .tile .v{font-size:26px} }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Sleeve four &middot; dividend growth</p>
+  <h1>Yield on Cost</h1>
+  <p class="lede">What a low-yield, high-growth dividend payer compounds into &mdash; and which
+  combinations of starting yield and dividend growth are worth screening for.</p>
+</header>
+
+<section class="panel" aria-label="Assumptions">
+  <div class="controls">
+    <div class="ctl">
+      <label for="amt">Initial investment <span class="val" id="amtV">$200,000</span></label>
+      <input type="number" id="amt" value="200000" min="1000" step="5000">
+    </div>
+    <div class="ctl">
+      <label for="yld">Starting yield <span class="val" id="yldV">3.00%</span></label>
+      <input type="range" id="yld" min="0.5" max="8" step="0.05" value="3">
+      <span class="hint">Annual dividend &divide; price you pay today.</span>
+    </div>
+    <div class="ctl">
+      <label for="dg">Dividend growth <span class="val" id="dgV">9.0%</span></label>
+      <input type="range" id="dg" min="0" max="20" step="0.5" value="9">
+      <span class="hint">Per year, sustained. Your target band is 5&ndash;15%.</span>
+    </div>
+    <div class="ctl">
+      <label for="pg">Price growth <span class="val" id="pgV">9.0%</span></label>
+      <input type="range" id="pg" min="-4" max="20" step="0.5" value="9">
+      <span class="hint" id="pgHint">Tracking dividend growth &mdash; constant multiple.</span>
+    </div>
+    <div class="ctl">
+      <label for="yrs">Horizon <span class="val" id="yrsV">20 years</span></label>
+      <input type="range" id="yrs" min="5" max="40" step="1" value="20">
+    </div>
+    <div class="ctl">
+      <label for="tax">Dividend tax <span class="val" id="taxV">15%</span></label>
+      <input type="range" id="tax" min="0" max="40" step="1" value="15">
+      <span class="hint">Qualified rate. Set 0 for a tax-free account.</span>
+    </div>
+  </div>
+  <div class="togglerow">
+    <label class="check"><input type="checkbox" id="track" checked>
+      Price growth tracks dividend growth</label>
+    <label class="check"><input type="checkbox" id="drip" checked>
+      Reinvest dividends</label>
+    <span style="flex:1"></span>
+    <button class="preset" data-y="3" data-g="9">Target profile</button>
+    <button class="preset" data-y="2.9" data-g="5.5">Coca-Cola-like</button>
+    <button class="preset" data-y="4" data-g="6">Higher yield</button>
+    <button class="preset" data-y="1.5" data-g="14">Fast grower</button>
+  </div>
+  <div class="chow">
+    <span>Yield + dividend growth &mdash; the screening heuristic dividend investors call the
+    <b style="color:var(--ink-2)">Chowder number</b>:</span>
+    <span class="pill" id="chow">12.0 &middot; clears 12</span>
+  </div>
+</section>
+
+<section class="tiles" aria-label="Results">
+  <div class="tile lead">
+    <span class="k">Total return CAGR</span>
+    <span class="v num" id="oCagr">&ndash;</span>
+    <span class="s" id="oCagrS">annualised, dividends reinvested</span>
+  </div>
+  <div class="tile">
+    <span class="k">Ending value</span>
+    <span class="v num" id="oEnd">&ndash;</span>
+    <span class="s" id="oEndS">&nbsp;</span>
+  </div>
+  <div class="tile">
+    <span class="k">Income in final year</span>
+    <span class="v num" id="oInc">&ndash;</span>
+    <span class="s" id="oIncS">&nbsp;</span>
+  </div>
+  <div class="tile">
+    <span class="k">Yield on cost</span>
+    <span class="v num" id="oYoc">&ndash;</span>
+    <span class="s" id="oYocS">against the original outlay</span>
+  </div>
+</section>
+
+<figure>
+  <div>
+    <h2>Where the money comes from</h2>
+    <p class="lede" style="font-size:14.5px; margin-top:6px">Original capital never moves.
+    The question is when the dividend contribution overtakes price appreciation.</p>
+  </div>
+  <div class="legend" id="legend"></div>
+  <div class="chartbox">
+    <svg id="chart" viewBox="0 0 820 330" role="img" aria-labelledby="chartTitle"></svg>
+    <div class="tip" id="tip"></div>
+  </div>
+  <details>
+    <summary>Show the numbers</summary>
+    <div class="scroller" style="margin-top:12px">
+      <table id="tbl"><caption class="sr" style="position:absolute;left:-9999px">Value by year</caption></table>
+    </div>
+  </details>
+</figure>
+
+<section>
+  <h2>What to screen for</h2>
+  <p class="lede" style="font-size:14.5px; margin-top:6px">Total return CAGR for each pairing,
+  assuming price tracks dividends and payouts are reinvested. Shaded cells clear your target of
+  <b id="tgtLabel" style="color:var(--ink)">10%</b>.</p>
+  <div class="ctl" style="max-width:320px; margin:16px 0 18px">
+    <label for="tgt">Target CAGR <span class="val" id="tgtV">10.0%</span></label>
+    <input type="range" id="tgt" min="5" max="18" step="0.5" value="10">
+  </div>
+  <div class="scroller">
+    <table id="grid"></table>
+  </div>
+</section>
+
+<section class="notes">
+  <h2 style="margin-bottom:4px">How this computes</h2>
+  <p>Total return decomposes the way John Bogle framed it: <b>starting yield + earnings
+  growth + change in the multiple</b>. The first two are what you can screen for; the third
+  is the part nobody forecasts honestly. Leaving price growth tracking dividend growth sets
+  that third term to zero &mdash; the neutral assumption, and the one worth planning against.</p>
+  <p>That is why the screening grid reduces to <code>(1 + g) &times; (1 + y) &minus; 1</code>
+  and doesn't depend on the horizon. A 3% yield growing at 9% returns about 12.3% a year whether
+  you hold it for eight years or thirty. Time changes the <em>size</em> of the outcome, not the rate.</p>
+  <p><b>Yield on cost</b> is the figure this style of investing is really about. It is the current
+  dividend measured against what you originally paid, so it climbs even when the market yield
+  stays flat &mdash; and it is why a 3% starter can become a double-digit income stream without
+  the stock ever looking high-yielding to anyone buying it today.</p>
+  <p><b>What the model does not know:</b> dividends get cut, payout ratios drift upward before
+  they do, and multiples compress for years at a time. A constant growth rate held for thirty
+  years is an arithmetic exercise, not a forecast. Treat the grid as a screen &mdash; the
+  combinations worth researching &mdash; rather than as a return you have located.</p>
+</section>
+
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var ids=['amt','yld','dg','pg','yrs','tax'];
+  var S={};
+
+  function readInputs(){
+    S.amt=Math.max(1000,+$('amt').value||200000);
+    S.yld=+$('yld').value/100; S.dg=+$('dg').value/100;
+    S.track=$('track').checked; S.drip=$('drip').checked;
+    if(S.track){ $('pg').value=$('dg').value; }
+    S.pg=+$('pg').value/100;
+    S.yrs=+$('yrs').value; S.tax=+$('tax').value/100;
+    S.tgt=+$('tgt').value/100;
+  }
+
+  function money(v){
+    var a=Math.abs(v);
+    if(a>=1e9) return '$'+(v/1e9).toFixed(2)+'B';
+    if(a>=1e6) return '$'+(v/1e6).toFixed(2)+'M';
+    if(a>=1e4) return '$'+Math.round(v/1e3)+'k';
+    return '$'+Math.round(v).toLocaleString();
+  }
+  var pct=function(v,d){return (v*100).toFixed(d===undefined?1:d)+'%'};
+
+  /* year 0..N: price index, units held, value split three ways */
+  function model(){
+    var rows=[],units=1,P=S.amt;
+    for(var t=0;t<=S.yrs;t++){
+      var price=P*Math.pow(1+S.pg,t);
+      var divPerUnit=t===0?0:P*S.yld*Math.pow(1+S.dg,t);
+      var gross=divPerUnit*units, net=gross*(1-S.tax);
+      if(t>0&&S.drip&&price>0) units+=net/price;
+      var held=units*price;
+      rows.push({t:t,price:price,gross:gross,net:net,units:units,
+        capital:P, appr:price-P, divs:held-price, total:held});
+    }
+    if(!S.drip){
+      var cum=0;
+      for(var i=0;i<rows.length;i++){
+        cum+=rows[i].net;
+        rows[i].divs=cum; rows[i].total=rows[i].price+cum; rows[i].units=1;
+      }
+    }
+    return rows;
+  }
+
+  function render(){
+    readInputs();
+    var R=model(), last=R[R.length-1], N=S.yrs;
+
+    $('amtV').textContent=money(S.amt);
+    $('yldV').textContent=(S.yld*100).toFixed(2)+'%';
+    $('dgV').textContent=(S.dg*100).toFixed(1)+'%';
+    $('pgV').textContent=(S.pg*100).toFixed(1)+'%';
+    $('yrsV').textContent=N+' years';
+    $('taxV').textContent=Math.round(S.tax*100)+'%';
+    $('tgtV').textContent=(S.tgt*100).toFixed(1)+'%';
+    $('tgtLabel').textContent=(S.tgt*100).toFixed(1)+'%';
+    $('pg').disabled=S.track;
+    $('pgHint').textContent=S.track?'Tracking dividend growth — constant multiple.'
+      :'Set independently — the multiple is changing.';
+
+    var cagr=Math.pow(last.total/S.amt,1/N)-1;
+    $('oCagr').textContent=pct(cagr,2);
+    $('oCagrS').textContent=S.drip?'annualised, dividends reinvested'
+      :'annualised, dividends taken as income';
+    $('oEnd').textContent=money(last.total);
+    $('oEndS').textContent=(last.total/S.amt).toFixed(1)+'× the original '+money(S.amt);
+    $('oInc').textContent=money(last.gross);
+    $('oIncS').textContent=money(last.net)+' after tax, in year '+N;
+    var yoc=last.gross/S.amt;
+    $('oYoc').textContent=pct(yoc,1);
+    $('oYocS').textContent='started at '+(S.yld*100).toFixed(2)+'% — '+
+      (yoc/S.yld).toFixed(1)+'× higher';
+
+    var ch=(S.yld+S.dg)*100, ok=ch>=12;
+    var cp=$('chow'); cp.textContent=ch.toFixed(1)+(ok?' · clears 12':' · under 12');
+    cp.className='pill'+(ok?'':' no');
+
+    drawChart(R);
+    drawTable(R);
+    drawGrid();
+    try{localStorage.setItem('yoc',JSON.stringify({a:$('amt').value,y:$('yld').value,
+      d:$('dg').value,p:$('pg').value,r:$('yrs').value,x:$('tax').value,
+      t:$('tgt').value,k:S.track,i:S.drip}));}catch(e){}
+  }
+
+  var SERIES=[
+    {k:'capital',label:'Original capital',c:'--s1'},
+    {k:'appr',label:'Price appreciation',c:'--s2'},
+    {k:'divs',label:'Dividend contribution',c:'--s3'}
+  ];
+
+  function drawChart(R){
+    var W=820,H=330,ml=68,mr=16,mt=14,mb=34;
+    var iw=W-ml-mr, ih=H-mt-mb, N=R.length-1;
+    var max=0; for(var i=0;i<R.length;i++) if(R[i].total>max) max=R[i].total;
+    max=max*1.06||1;
+    var X=function(t){return ml+(t/N)*iw}, Y=function(v){return mt+ih-(v/max)*ih};
+
+    var ticks=[],step=Math.pow(10,Math.floor(Math.log10(max/4)));
+    [1,2,2.5,5,10].some(function(m){ if(max/(step*m)<=5.2){step=step*m;return true} return false});
+    for(var v=0;v<=max;v+=step) ticks.push(v);
+
+    var xs=[],span=N<=12?2:(N<=24?4:5);
+    for(var t=0;t<=N;t+=span) xs.push(t);
+    if(xs[xs.length-1]!==N) xs.push(N);
+
+    var o=[];
+    o.push('<title id="chartTitle">Portfolio value by year, split into original capital, '+
+      'price appreciation and dividend contribution</title>');
+    ticks.forEach(function(v){
+      o.push('<line x1="'+ml+'" y1="'+Y(v).toFixed(1)+'" x2="'+(W-mr)+'" y2="'+Y(v).toFixed(1)+
+        '" stroke="var(--rule)" stroke-width="1" fill="none"/>');
+      o.push('<text x="'+(ml-10)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end" '+
+        'font-family="var(--mono)" font-size="11.5" fill="var(--faint)">'+money(v)+'</text>');
+    });
+
+    var base=R.map(function(){return 0});
+    SERIES.forEach(function(s){
+      var top=R.map(function(r,i){return base[i]+r[s.k]});
+      var d='M'+X(0)+','+Y(base[0]).toFixed(1);
+      for(var i=0;i<R.length;i++) d+=' L'+X(i).toFixed(1)+','+Y(top[i]).toFixed(1);
+      for(var j=R.length-1;j>=0;j--) d+=' L'+X(j).toFixed(1)+','+Y(base[j]).toFixed(1);
+      d+=' Z';
+      o.push('<path d="'+d+'" fill="var('+s.c+')" fill-opacity=".9" '+
+        'stroke="var(--surface)" stroke-width="2" stroke-linejoin="round"/>');
+      base=top;
+    });
+
+    xs.forEach(function(t){
+      o.push('<text x="'+X(t).toFixed(1)+'" y="'+(H-12)+'" text-anchor="middle" '+
+        'font-family="var(--mono)" font-size="11.5" fill="var(--faint)">'+
+        (t===0?'now':'yr '+t)+'</text>');
+    });
+    o.push('<line class="cross" x1="0" y1="'+mt+'" x2="0" y2="'+(mt+ih)+
+      '" stroke="var(--ink)" stroke-width="1" opacity="0" stroke-dasharray="3 3"/>');
+    o.push('<rect id="hit" x="'+ml+'" y="'+mt+'" width="'+iw+'" height="'+ih+
+      '" fill="transparent" style="cursor:crosshair"/>');
+
+    var svg=$('chart'); svg.innerHTML=o.join('');
+    $('legend').innerHTML=SERIES.map(function(s){
+      return '<span><i class="sw" style="background:var('+s.c+')"></i>'+s.label+'</span>';
+    }).join('')+'<span style="color:var(--faint)">Total '+money(R[R.length-1].total)+'</span>';
+
+    var tip=$('tip'), cross=svg.querySelector('.cross'), box=svg.parentNode;
+    function move(ev){
+      var rect=svg.getBoundingClientRect();
+      var px=(ev.clientX-rect.left)/rect.width*W;
+      var t=Math.round(((px-ml)/iw)*N);
+      if(t<0)t=0; if(t>N)t=N;
+      var r=R[t];
+      cross.setAttribute('x1',X(t)); cross.setAttribute('x2',X(t));
+      cross.setAttribute('opacity','.45');
+      tip.innerHTML='<div class="ty">'+(t===0?'Today':'Year '+t)+'</div>'+
+        SERIES.map(function(s){return '<div class="tr"><span>'+s.label+
+          '</span><b>'+money(r[s.k])+'</b></div>'}).join('')+
+        '<div class="tt"><span>Value</span><b>'+money(r.total)+'</b></div>'+
+        '<div class="tr" style="margin-top:4px"><span>Income that year</span><b>'+
+        money(r.gross)+'</b></div>';
+      tip.style.opacity='1';
+      var lx=(X(t)/W)*rect.width;
+      tip.style.left=Math.max(4,Math.min(rect.width-186,lx-93))+'px';
+      tip.style.top='6px';
+    }
+    var hit=svg.querySelector('#hit');
+    hit.addEventListener('mousemove',move);
+    hit.addEventListener('mouseleave',function(){tip.style.opacity='0';cross.setAttribute('opacity','0')});
+  }
+
+  function drawTable(R){
+    var step=R.length>16?Math.ceil((R.length-1)/12):1, o=[];
+    o.push('<thead><tr><th class="corner">Year</th><th>Original</th><th>Appreciation</th>'+
+      '<th>Dividends</th><th>Value</th><th>Income</th><th>Yield on cost</th></tr></thead><tbody>');
+    for(var i=0;i<R.length;i+=step){
+      var r=R[i];
+      o.push('<tr><th>'+r.t+'</th><td>'+money(r.capital)+'</td><td>'+money(r.appr)+
+        '</td><td>'+money(r.divs)+'</td><td>'+money(r.total)+'</td><td>'+money(r.gross)+
+        '</td><td>'+pct(r.gross/S.amt,1)+'</td></tr>');
+    }
+    var L=R[R.length-1];
+    if((R.length-1)%step!==0)
+      o.push('<tr><th>'+L.t+'</th><td>'+money(L.capital)+'</td><td>'+money(L.appr)+
+        '</td><td>'+money(L.divs)+'</td><td>'+money(L.total)+'</td><td>'+money(L.gross)+
+        '</td><td>'+pct(L.gross/S.amt,1)+'</td></tr>');
+    $('tbl').innerHTML=o.join('')+'</tbody>';
+  }
+
+  function drawGrid(){
+    var ys=[2,2.5,3,3.5,4,4.5,5], gs=[4,6,8,10,12,14,16], o=[];
+    o.push('<thead><tr><th class="corner">Yield ↓ &nbsp;Growth →</th>');
+    gs.forEach(function(g){o.push('<th>'+g+'%</th>')});
+    o.push('</tr></thead><tbody>');
+    ys.forEach(function(y){
+      o.push('<tr><th>'+y.toFixed(1)+'%</th>');
+      gs.forEach(function(g){
+        var c=(1+g/100)*(1+(y/100)*(1-S.tax))-1;
+        o.push('<td class="'+(c>=S.tgt?'hit':'')+'">'+(c*100).toFixed(1)+'</td>');
+      });
+      o.push('</tr>');
+    });
+    $('grid').innerHTML=o.join('')+'</tbody>';
+  }
+
+  try{
+    var sv=JSON.parse(localStorage.getItem('yoc')||'null');
+    if(sv){ $('amt').value=sv.a; $('yld').value=sv.y; $('dg').value=sv.d; $('pg').value=sv.p;
+      $('yrs').value=sv.r; $('tax').value=sv.x; $('tgt').value=sv.t;
+      $('track').checked=!!sv.k; $('drip').checked=!!sv.i; }
+  }catch(e){}
+
+  ids.concat(['tgt']).forEach(function(id){
+    $(id).addEventListener('input',render);
+  });
+  ['track','drip'].forEach(function(id){$(id).addEventListener('change',render)});
+  Array.prototype.forEach.call(document.querySelectorAll('.preset'),function(b){
+    b.addEventListener('click',function(){
+      $('yld').value=b.dataset.y; $('dg').value=b.dataset.g;
+      $('track').checked=true; render();
+    });
+  });
+  window.addEventListener('resize',function(){render()});
+  render();
+})();
+</script>
