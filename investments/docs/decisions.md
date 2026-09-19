@@ -57,6 +57,102 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-09-19 — Tracking the taxable sleeve: what already exists, and the one fork left open
+
+**Parked, not decided.** Recorded so the next pass starts from the findings
+rather than rediscovering them.
+
+### What the Investments app already does — more than it looks
+
+It is **import-driven**, not live-connected: nothing updates until a Schwab CSV
+is fed in. That is not the same as stateless, and the distinction matters because
+the instinct is to assume nothing persists and rebuild it.
+
+| | |
+|---|---|
+| `distributions` | **573 rows back to 2021-06-01**, `UNIQUE(ticker, ex_date)` so re-imports accumulate |
+| `broker_trades` | 1,279 rows since 2021-05-17 |
+| `holdings` | 64 positions with shares, cost basis, dividends received, `acquired_date` |
+| `schwab_import.py` | already parses `Reinvest Shares`, `Qualified Dividend`, `Non-Qualified Div`, `Special Dividend` |
+
+Critically, `distributions` stores **`amount` per share separately from `shares`
+held**. That is exactly the structure the dividend sleeve needs, because under
+DRIP total dividends received grows for two reasons at once — the company
+raising, and owning more shares — and the quarterly screen check only cares about
+the first. Without that split the check could not be run at all.
+
+### The problem that must be solved before the first dividend lands
+
+**Under DRIP, `cost_basis` stops meaning what yield on cost needs it to mean.**
+Every reinvestment adds to it. A $20k position over 20 years at 2.8% yield and
+13.4% total return:
+
+| Yr | Value | Div/yr | Cost basis | YoC vs basis | **YoC vs outlay** |
+|---|---|---|---|---|---|
+| 1 | $22,739 | $619 | $20,619 | 3.00% | 3.10% |
+| 10 | $72,196 | $1,966 | $31,801 | 6.18% | **9.83%** |
+| 20 | $260,612 | $7,098 | $74,402 | 9.54% | **35.49%** |
+
+Basis grows $20,000 → $74,402 purely from reinvestment. The app's current formula
+(`dividends ÷ cost_basis`, `cef/static/app.js:255`) would report **9.54%** where
+the figure this sleeve exists to produce is **35.49%** — understated **3.7×**, and
+widening every year.
+
+That formula is *correct* for the CEF sleeve, where distributions come out as cash
+and basis stays put. It breaks only under DRIP. **The fix is an immutable
+`initial_cost` on `holdings`, written once, with yield on cost using it when set
+and falling back to `cost_basis` when not** — so CEFs keep the right behaviour and
+the dividend sleeve gets its own.
+
+**It cannot be fixed later.** Once reinvestments blend into cost basis the
+original outlay is only recoverable by replaying the full transaction history.
+
+### The structural gap: there is no account dimension
+
+```
+funds          ticker PRIMARY KEY                      — no account
+holdings       ticker UNIQUE                           — no account
+broker_trades  UNIQUE(date, action, ticker, shares)    — no account
+schwab_import  mentions "account" only in comments
+```
+
+**The app models one portfolio.** Fine while everything lived in one place.
+Importing a second account's CSV merges it into the same holdings with no way to
+separate, and a ticker held in both accounts collides on `holdings.ticker UNIQUE`.
+
+### The fork, undecided
+
+**A — add an account/sleeve dimension to the existing schema.** One app, one
+database, one import, and eventually a consolidated four-sleeve view. Migration
+defaults existing rows to the Roth so nothing breaks. More work; touches a live
+database.
+
+**B — a separate database for the taxable sleeve.** Clean separation, no risk to
+the working CEF book, simpler. Costs two imports and gives no total-portfolio
+picture.
+
+**Leaning A**, because the four-sleeve structure will want a single view of the
+whole book, and retrofitting the dimension later means migrating more data than
+doing it now — 64 holdings today against however many after the sleeve is funded.
+`../CLAUDE.md` says never to modify `cef.db` directly during dev; this is a
+schema migration with backups in place, which is a different thing, but the
+caution is why this is parked rather than done.
+
+### Time-sensitive, independent of the fork
+
+**Elect specific lot identification at Schwab before the first purchase.** The
+default is FIFO and you cannot retroactively choose lots on a settled sale. Free
+optionality even for buy-and-hold, and with ~800 tax lots after 20 years of DRIP
+it matters if a sale ever happens.
+
+Lower priority: `distributions` does not store the qualified/non-qualified split
+that `schwab_import.py` already recognises. It matters for tax estimation but
+arrives on the 1099 each January. Note that reinvested shares bought within 60
+days of an ex-date can produce non-qualified dividends on the next payment, so
+the qualified share will not be exactly 100%.
+
+---
+
 ## 2026-09-19 — Options move to the Roth; the settlement question is closed
 
 **Reverses the placement decided 2026-09-08.** That entry put the options sleeve
