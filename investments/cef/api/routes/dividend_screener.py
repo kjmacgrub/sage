@@ -4,7 +4,8 @@ import threading
 import httpx
 from fastapi import APIRouter
 
-from ...database import get_db
+from ...dividend.database import get_db, init_db
+from ...dividend import importer
 from ...services import dividend_growth as svc
 
 router = APIRouter()
@@ -20,9 +21,9 @@ _COLS = ("ticker,name,idx,sector,industry,price,div_ttm,yield_pct,div_cagr,price
 def list_rows():
     with get_db() as conn:
         rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM dividend_screener_cache ORDER BY ticker")]
-        watch = {r["ticker"] for r in conn.execute("SELECT ticker FROM funds WHERE active=1")}
+            "SELECT * FROM screener_cache ORDER BY ticker")]
         held = {r["ticker"] for r in conn.execute("SELECT ticker FROM holdings WHERE shares>0")}
+        watch = set()
     for r in rows:
         r["annuals"] = json.loads(r["annuals"]) if r.get("annuals") else []
         r["in_watchlist"] = r["ticker"] in watch
@@ -82,12 +83,12 @@ def _do_refresh():
 
         _state.update(phase="saving", done=0, total=len(rows))
         with get_db() as conn:
-            conn.execute("DELETE FROM dividend_screener_cache")
+            conn.execute("DELETE FROM screener_cache")
             for row in rows:
                 svc.enrich(row, fundamentals.get(row["ticker"]), quotes.get(row["ticker"]))
                 row["annuals"] = json.dumps(row.get("annuals") or [])
                 conn.execute(
-                    f"INSERT INTO dividend_screener_cache ({_COLS},fetched_at) VALUES ("
+                    f"INSERT INTO screener_cache ({_COLS},fetched_at) VALUES ("
                     + ",".join(f":{c}" for c in _COLS.split(","))
                     + ",datetime('now'))", row)
                 _state["done"] += 1

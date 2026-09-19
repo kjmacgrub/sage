@@ -330,8 +330,18 @@ Individual dividend-growth companies, judged on **yield on cost** twenty years
 out rather than current yield. Screener lives under **Screen › Dividend Growth**;
 the yield-on-cost calculator under the top-level **Calculators** tab.
 
-- `dividend_screener_cache` — 1,025 S&P 1500 payers. Rebuild from the UI
+- **Its own database, `dividend.db`** — not `cef.db`. The two sleeves want
+  different schemas and this one may move to Fidelity; see the 2026-09-19
+  decisions entry. Code in `cef/dividend/`, routes at `/api/dividend*`.
+- `screener_cache` — 1,025 S&P 1500 payers. Rebuild from the UI
   (**↻ Rebuild**, ~10 min, three phases with progress) or `dividend/build.py`.
+- **`initial_cost` is written once and never updated.** Under DRIP every
+  reinvestment inflates `cost_basis`, so yield on cost measured against it
+  understates by ~3.7× at year 20. It cannot be reconstructed later without
+  replaying every transaction.
+- **Imports are refused when the account can't be read from the filename.**
+  Schwab gives one file per account with no account column; the name carries it.
+  Guessing would file a taxable export under the Roth, silently.
 - **The 2–3% starting yield is arithmetic, not a compromise.** Yield today ÷
   yield at the start = (1+g_div)ⁿ ÷ (1+g_price)ⁿ, so a screen demanding both
   CAGRs over 25+ years pins the yield near where it began. Raising the ceiling

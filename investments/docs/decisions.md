@@ -120,23 +120,48 @@ schwab_import  mentions "account" only in comments
 Importing a second account's CSV merges it into the same holdings with no way to
 separate, and a ticker held in both accounts collides on `holdings.ticker UNIQUE`.
 
-### The fork, undecided
+### Resolved — B, a separate `dividend.db`
 
-**A — add an account/sleeve dimension to the existing schema.** One app, one
-database, one import, and eventually a consolidated four-sleeve view. Migration
-defaults existing rows to the Roth so nothing breaks. More work; touches a live
-database.
+Considered A (add an account dimension to the existing schema, one database, a
+consolidated four-sleeve view) and rejected it, reversing an earlier lean toward
+it. Three things decided it:
 
-**B — a separate database for the taxable sleeve.** Clean separation, no risk to
-the working CEF book, simpler. Costs two imports and gives no total-portfolio
-picture.
+- **The two sleeves want different schemas.** `holdings` already carries
+  `manual_nav` and `div_tracking_since`, which mean nothing to a stock; the
+  dividend sleeve needs `initial_cost`, which means nothing to a CEF. Sharing
+  tables makes every row carry the other sleeve's columns as nulls, and forces
+  the audit and the screener each to learn which rows to skip.
+- **The sleeve may end up at Fidelity.** That needs a second parser either way —
+  Schwab's vocabulary (`Reinvest Shares`, `Pr Yr Div Reinvest`) is its own — but
+  under A every Fidelity quirk becomes a change to tables the live CEF book
+  depends on.
+- **The consolidated view was never asked for.** It was the main argument for A
+  and it was assumed rather than required. This file says to judge each sleeve
+  against its own job; what actually crosses sleeves is **four totals once a
+  year for the ratchet**, which is two broker statements and a minute of
+  arithmetic.
 
-**Leaning A**, because the four-sleeve structure will want a single view of the
-whole book, and retrofitting the dimension later means migrating more data than
-doing it now — 64 holdings today against however many after the sleeve is funded.
-`../CLAUDE.md` says never to modify `cef.db` directly during dev; this is a
-schema migration with backups in place, which is a different thing, but the
-caution is why this is parked rather than done.
+Built as `cef/dividend/` with its own `dividend.db`. `dividend_screener_cache`
+moved out of `cef.db` so everything about this sleeve lives in one file.
+
+**The importer is a normalising core plus one adapter per broker** — an adapter's
+only job is to turn a CSV into `{date, action, ticker, shares, price, fees,
+amount, qualified}` with `action` normalised to BUY · SELL · REINVEST ·
+DIVIDEND · OTHER. Adding Fidelity is one adapter and touches nothing else.
+
+**Account comes from the filename.** Schwab exports one file per account with no
+account column, but names it
+`Roth_Contributory_IRA_XXX967_Transactions_20260919-035541.csv`. Parse it; **if
+it does not match, refuse the import rather than defaulting** — filing a taxable
+export under the Roth is very hard to spot afterwards and harder to unwind. A
+retirement-account name also raises a warning, because importing the Roth export
+here would pull the whole CEF book in as stock positions.
+
+**Per-share dividend amounts are derived, not given.** Schwab reports the cash
+total; the share count on each pay date comes from this import's own trades, so
+the backfill runs after the trades are written. Getting this wrong is silent —
+`distributions.amount` was `NOT NULL` at first and `INSERT OR IGNORE` swallowed
+every row without error.
 
 ### Time-sensitive, independent of the fork
 

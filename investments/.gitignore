@@ -7,3 +7,8 @@ venv/
 .DS_Store
 site/
 *.db.bak-*
+
+# dividend sleeve database — never commit
+dividend.db
+dividend.db-shm
+dividend.db-wal
