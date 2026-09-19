@@ -302,6 +302,10 @@ compromise; it is where compounders live.
 Yield 2–5% · dividend CAGR ≥7% · price CAGR ≥6% · ≥25-year window · payout ≤80% ·
 FCF covers the dividend ≥1.0× · price ≥60% through its 52-week range · ≤1 cut.
 
+**The last leg is a default, not a conclusion** — see the amendment below. Every
+other criterion is load-bearing; the 52-week position is the one the evidence
+does not support in the direction it is set.
+
 Both CAGRs are measured over **the same window** — the first full dividend year
 the price series also covers, through the last complete calendar year. Measuring
 dividends over 63 years against price over 40 flatters one against the other;
@@ -317,6 +321,48 @@ for the assumptions, and the [screener](https://claude.ai/artifact/7oCuksREYjb1V
 over 1,025 payers. Data is Yahoo, split-adjusted, rebuilt with
 `investments/dividend/build.py` then `render.py` — see that directory's README
 for the republish step and the data gotchas.
+
+### Amendment — the 52-week leg is unresolved, and quality is doing the work
+
+Held-position simulations run after the screen was settled, on the observed
+history of the names each version selects. **Both baskets are chosen on today's
+data and carry look-ahead bias — but in opposite directions**, which is what
+makes the comparison worth anything: momentum is flattered by its recent run,
+value is selected while depressed.
+
+Same quality screen throughout (yield 2–5% · div CAGR ≥7% · price CAGR ≥6% ·
+≥25y window · payout ≤80% · FCF ≥1.0× · ≤1 cut). Only the 52-week leg differs.
+
+| | Momentum (≥60%) — 7 names | Value (≤40%) — 5 names |
+|---|---|---|
+| 10-year CAGR | **7.5%** | 7.3% |
+| 20-year CAGR | **7.2%** | **10.7%** |
+| 20-year, DRIP | 8.2% | **11.9%** |
+| dividends as % of capital, 20y | 83% | **170%** |
+| worst name, 20y | SM 0.6% | INGR 7.2% |
+
+Value names: MCD, HD, AOS, INGR, HSY. At 20 years **every one returned at least
+7.2%**, which the momentum basket could not manage (SM 0.6%, WLY 3.4%). Yield on
+cost reached **HD 25.4%, AOS 20.7%, MCD 19.1%**.
+
+**The decisive filter is quality, not price position.** All five value names clear
+payout ≤80% and FCF ≥1.0× *while beaten down*. That is a different population from
+HRL and CLX, which fail both — and the value-trap finding recorded above was
+diagnosed on those, not on quality names trading cheaply. **Scope it accordingly:
+buying the dip is a trap when the dividend is not funded, not because the price
+fell.**
+
+**What this does not establish.** Samples of five and seven. AOS alone contributed
+$189k of the value basket's 20-year gain and its 2006 price reflects three splits;
+remove it and the gap narrows sharply. Working the other way, HPQ's 5.2% ignores
+the HPE shares a 2006 holder received and BDX's ignores Embecta, so correcting
+both would close some of the 3.5-point difference.
+
+**So: the 52-week leg stays in the screen as a default, but it is not settled and
+should not be described as defending against value traps.** The payout and FCF
+filters do that. Running the screen at both ends and choosing on fundamentals is
+at least as defensible as requiring momentum, and the 20-year evidence leans that
+way.
 
 ### Three approaches tested and rejected
 
@@ -377,8 +423,10 @@ compounding them — +50% then −33% averages +8.5%/yr on a position that ended
   ratio without cash moving, which is likely HRL's 188%. Both are flags for reading
   the filings, not verdicts. The combination that has preceded cuts is failing
   *both* with revenue declining.
-- **The momentum leg buys after the run.** It defends against value traps and
-  costs entry price. The check is the dividend-growth columns — if the 5-year rate
+- **The momentum leg buys after the run, and is the least settled part of the
+  screen.** It does *not* defend against value traps — payout and FCF coverage do
+  that. See the amendment above: over 20 years the same quality screen run at the
+  *cheap* end returned 10.7%/yr against momentum's 7.2%. The check is the dividend-growth columns — if the 5-year rate
   still tracks the life rate, price is following the business rather than leading it.
 
 ### Placement: taxable, and the Roth goes to CEFs instead
