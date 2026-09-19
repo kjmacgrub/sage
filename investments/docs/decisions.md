@@ -14,7 +14,10 @@ live in `../CLAUDE.md`. This file is only for judgment calls.
 **Four sleeves, each with a different job.** Judge each against its own job —
 weak capital gains in the income sleeve are not a failure, and the dividend-growth
 sleeve's 2–3% starting yield is its design, not a shortfall (see 2026-09-19).
-Target is roughly equal quarters, rebalanced annually as a **ratchet** — profits out of the options
+Target is **equal quarters on ~$800k**, with the Roth holding options and CEFs
+and the taxable account holding dividend growth and the managed index — total tax
+drag 0.16% (see the 2026-09-19 placement reversal). Rebalanced annually as a
+**ratchet** — profits out of the options
 sleeve on gains, never added back on losses. Tripwires for when to stop adding
 or reduce are in the 2026-09-12 entry; they are measured against the options
 sleeve's own backtested behaviour, never against the other three. Note the
@@ -23,10 +26,10 @@ unchanged at quarters but the dollar figures are not.
 
 | Sleeve | Job | Account |
 |---|---|---|
-| CEFs and BDCs | Income | Roth — eventually all of it |
-| Options (SPX) | Opportunistic growth | Roth at **1 lot** now → taxable **$200k** later (2026-09-08) |
+| CEFs and BDCs | Income | **Roth, $200k** — receives the annual ratchet from options, so it does drift toward all of it |
+| Options (SPX) | Opportunistic growth | **Roth, $200k** — reversed from taxable 2026-09-19 once nine months of live IRA trading closed the settlement question |
 | Managed index, direct indexing | Growth + tax-loss harvesting | Must be taxable |
-| Dividend growth (individual) | Growth of *income* — judge on yield on cost | **Taxable by design** — its 0.42% drag is 8× smaller than the CEF sleeve's, so the Roth goes there first (2026-09-19; not yet funded) |
+| Dividend growth (individual) | Growth of *income* — judge on yield on cost | **Taxable by design** — 0.42% drag, nearly tax-efficient by construction (2026-09-19; not yet funded) |
 
 Target shape, multi-year: a $300k lump sum converted to Roth in annual slices
 sized to a reasonable bracket, ending in a **~$400k Roth income bucket**. About
@@ -51,6 +54,98 @@ Two mechanics worth not forgetting:
 - **Wash sales cross into the Roth, and there the loss is permanently
   disallowed**, not deferred. Direct indexing sells hundreds of individual
   names; keep individual stocks out of the Roth and tell Fidelity it exists.
+
+---
+
+## 2026-09-19 — Options move to the Roth; the settlement question is closed
+
+**Reverses the placement decided 2026-09-08.** That entry put the options sleeve
+in taxable on the grounds that "putting an unvalidated edge in the account that
+can never be refilled is the aggressive choice, not the neutral one," and left
+open "whether the IRA permits trading on unsettled proceeds." Both halves have
+now moved.
+
+### The open question is answered by nine months of our own trading
+
+`····6967` **is the Roth**, and the live condor log shows **1,478 trades in it
+between 2026-01-06 and 2026-09-18** — daily-entry 0DTE structures, proceeds
+available immediately, new positions opened the same session up to the buying
+power limit.
+
+That is not a support rep's answer or an analogy from the taxable account. It is
+direct evidence in the exact account type at the exact trade frequency for three
+quarters. **T+1 settlement does not starve daily-entry strategies in a Schwab
+IRA.** Close the item.
+
+### The remaining argument is worth about $24k, and repays in 18 months
+
+"Space that can never be refilled" shrinks when priced. A 50% drawdown on $200k
+destroys $100k of *capital* — which taxable would have destroyed too. The space
+survives and holds whatever is left; if the sleeve fails it holds CEFs instead.
+The only genuine asymmetry is the tax treatment of the loss:
+
+| | |
+|---|---|
+| $100k loss in taxable | capital loss worth ~**$23,800** |
+| $100k loss in a Roth | worth nothing |
+
+Sheltering options saves **$15,600/yr** when it works, so the shelter repays that
+asymmetry in **1.5 years**.
+
+**Section 1256 losses carry back three years** against prior 1256 gains, which is
+a real taxable-account feature specific to this strategy — five good years paying
+~$78k of tax followed by a bad one recovers up to ~$47k. It softens the gap
+without closing it: Roth is still ahead by ~$31k in that scenario and by the full
+$78k if the sleeve simply works.
+
+### And one argument in the original entry actually pointed this way
+
+2026-09-08 recorded that "1256 marks to market at year end, so ~30% of each
+year's gains leave for tax whether or not anything closed. The sleeve cannot
+fully compound and a good year produces a bill that must be funded." That was
+written as a **cost of taxable placement**. In a Roth there is no mark-to-market
+tax, the sleeve compounds fully, and there is no annual bill to fund.
+
+### The ratchet still works, internally
+
+Taking profits out of options annually looked like it would force a Roth
+distribution, which *would* destroy space permanently. It does not have to leave:
+**options → CEFs, both inside the Roth.** The ratchet runs internally and the
+Roth drifts toward CEFs over time, which is the original "Roth — eventually all
+of it" intent anyway.
+
+### Settled shape
+
+Equal quarters on ~$800k, funded in two stages:
+
+| Sleeve | Account | Notes |
+|---|---|---|
+| Options (SPX) | **Roth** | $200k |
+| CEFs and BDCs | **Roth** | $200k; receives the annual ratchet from options |
+| Dividend growth | Taxable | $200k; 0.42% drag, nearly tax-efficient by construction |
+| Managed index | Taxable | ~$200k; must be taxable for loss harvesting |
+
+Tax drag falls from **1.69% to 0.16%** of the portfolio against the CEF-only-Roth
+arrangement, and gross return rises because the sleeves return to equal weight.
+
+**Sequencing.** Condo money (~$400–500k) lands first and funds the two taxable
+sleeves. The $300k lump sum converts the following year, as much as the bracket
+allows, with the balance in later years. **Pay the conversion tax from outside
+the converted amount** — at a 24% rate that is $300k rather than $228k landing in
+the Roth, worth **~$695k more at 20 years**; at 32% it is ~$926k.
+
+**Run the options sleeve in taxable for the six months before the conversion
+lands.** It costs nothing to do — 1256 marks to market at year end regardless of
+holding period, so a short run still produces a real 1099 to compare against the
+modelled 26% blended rate — and it generates live fill data against the
+4.5–10¢/leg benchmark that every strategy in the book turns on.
+
+### Still open
+
+**Whether an IRA holds the full spread width or width-minus-credit as
+collateral.** This decides capital efficiency at $200k and does not need Schwab
+to answer: the live Roth trade log carries `Margin Req.` per trade for the same
+structures the backtest sizes, so compare them directly.
 
 ---
 
@@ -212,7 +307,10 @@ two sheltered:
 | **CEFs in Roth, dividends taxable** | **$3,641,973** |
 | Difference | **$445,102 — 13.9%** |
 
-**So this sleeve is taxable and the CEF sleeve has first claim on Roth space.**
+**So this sleeve is taxable.** (The ranking below originally concluded the CEF
+sleeve had first claim on the Roth; the placement reversal recorded above puts
+*options* and CEFs there instead, and this sleeve stays taxable either way — its
+0.42% drag is the smallest of the four.)
 A dividend-growth sleeve is nearly tax-efficient by construction: most of the
 return is unrealised appreciation you never pay on until you sell, and the plan
 is never to sell. Options stay out of the Roth for the reason already recorded
