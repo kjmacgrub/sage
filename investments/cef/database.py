@@ -222,6 +222,39 @@ def init_db():
                 fetched_at     TEXT
             );
 
+            -- Dividend-growth screener over the S&P 1500. A different question
+            -- from the CEF and BDC screens: not "is the yield earned" but "has
+            -- this company raised the dividend for decades and can it keep
+            -- doing so". div_cagr and price_cagr are measured over the SAME
+            -- window (win_from..win_to) because Yahoo returns dividends back to
+            -- 1962 but monthly prices only to ~1985 for most names, and
+            -- measuring each over its own span flatters one against the other.
+            CREATE TABLE IF NOT EXISTS dividend_screener_cache (
+                ticker       TEXT PRIMARY KEY,
+                name         TEXT,
+                idx          TEXT,     -- S&P 500 | S&P 400 | S&P 600
+                sector       TEXT,
+                industry     TEXT,
+                price        REAL,
+                div_ttm      REAL,
+                yield_pct    REAL,
+                div_cagr     REAL,     -- %/yr over the aligned window
+                price_cagr   REAL,     -- %/yr over the same window
+                win_years    INTEGER,
+                win_from     INTEGER,
+                hist_years   REAL,     -- full price history, may exceed the window
+                streak       INTEGER,  -- consecutive years of a higher annual total
+                cuts         INTEGER,  -- years the annual total fell, across the window
+                payout_pct   REAL,     -- trailing dividends / trailing EPS
+                fcf_cover    REAL,     -- FCF / (shares x div_ttm); <1 = not funded from FCF
+                ocf_cover    REAL,
+                rev_growth   REAL,
+                range_52w    REAL,     -- 0 = at the 52-week low, 100 = at the high
+                vs_200d      REAL,     -- % above/below the 200-day average
+                annuals      TEXT,     -- JSON list, last 16 annual dividend totals
+                fetched_at   TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS bdc_fundamentals (
                 id                 INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker             TEXT NOT NULL,

@@ -16,6 +16,14 @@ let _importResult = null;  // survives the re-render after a confirmed import
 let _summaryView = 'current';   // 'current' | 'lifetime'
 let _screenKind = 'cef';        // 'cef' | 'bdc' — different sources entirely
 let _bdcScreen = [];            // GET /api/bdc-screener/funds
+let _divScreen = [];            // GET /api/dividend-screener/funds
+let _divState = { running: false, phase: '', done: 0, total: 0, errors: [] };
+let _divPollTimer = null;
+let _divFilters = { yMin: 2, yMax: 5, dMin: 7, xMin: 6, hMin: 25, prMax: 80,
+                    fcMin: 1, rgMin: 60, cMax: 1, idx: '' };
+let _divPicks = new Set((() => {
+  try { return JSON.parse(localStorage.getItem('sage-div-picks') || '[]'); } catch (e) { return []; }
+})());
 let _bdcState = { running: false, done: 0, total: 0, errors: [] };
 let _bdcPollTimer = null;
 let _bdcShowLow = false;   // include rows too stale or unverifiable to rank
@@ -133,6 +141,7 @@ function renderApp() {
       <button class="tab ${_tab === 'portfolio' ? 'active' : ''}" onclick="setTab('portfolio')">Portfolio</button>
       <button class="tab ${_tab === 'watchlist' ? 'active' : ''}" onclick="setTab('watchlist')">Watchlist</button>
       <button class="tab ${_tab === 'screen' ? 'active' : ''}" onclick="setTab('screen')">Screen</button>
+      <button class="tab ${_tab === 'calc' ? 'active' : ''}" onclick="setTab('calc')">Calculators</button>
       <button class="tab ${_tab === 'import' ? 'active' : ''}" onclick="setTab('import')">Import</button>
       <button class="tab ${_tab === 'add' ? 'active' : ''}" onclick="setTab('add')">+ Add Fund</button>
     </div>
@@ -141,6 +150,7 @@ function renderApp() {
       ${_tab === 'portfolio' ? renderPortfolio() : ''}
       ${_tab === 'watchlist' ? renderWatchlist() : ''}
       ${_tab === 'screen' ? renderScreen() : ''}
+      ${_tab === 'calc' ? renderCalculators() : ''}
       ${_tab === 'import' ? renderImport() : ''}
       ${_tab === 'add' ? renderAddFund() : ''}
     </div>
@@ -1503,6 +1513,7 @@ function screenKindToggle() {
   return `<div class="summary-toggle" style="order:0;margin:0 0 12px">
     ${btn('cef', 'CEFs', 'Closed-end funds, from CEFConnect')}
     ${btn('bdc', 'BDCs', 'Business development companies, from SEC XBRL filings')}
+    ${btn('dividend', 'Dividend Growth', 'S&P 1500 companies that have raised the dividend for decades')}
   </div>`;
 }
 
@@ -1510,6 +1521,7 @@ async function setScreenKind(kind) {
   _screenKind = kind;
   _sortCol = null;
   if (kind === 'bdc' && !_bdcScreen.length) await loadBdcScreen();
+  if (kind === 'dividend' && !_divScreen.length) await loadDividendScreen();
   renderApp();
 }
 
@@ -1646,6 +1658,7 @@ function renderBdcScreen() {
 
 function renderScreen() {
   if (_screenKind === 'bdc') return renderBdcScreen();
+  if (_screenKind === 'dividend') return renderDividendScreen();
   const state = _screenData.length === 0 ? 'empty' : 'loaded';
   const isRunning = _screenPollTimer != null;
 
@@ -2975,4 +2988,382 @@ async function deleteBdcQuarter(ticker, quarterEnd) {
     await DELETE(`/api/audit/bdc/${ticker}/${quarterEnd}`);
     openBdcEntry(ticker);
   } catch (e) { toast('Delete failed: ' + e.message); }
+}
+
+/* ============================================================================
+   Dividend-growth screen — S&P 1500
+   A different question from the CEF and BDC screens: not "is the yield earned"
+   but "has this company raised the dividend for decades, and can it keep going".
+   Judged on yield on cost twenty years out, so the 2-3% starting yields are the
+   design rather than a shortfall. See docs/decisions.md, 2026-09-19.
+   ========================================================================== */
+
+async function loadDividendScreen() {
+  try {
+    const r = await GET('/api/dividend-screener/funds');
+    _divScreen = r.funds || [];
+    _divState = r.state || _divState;
+  } catch (e) { _divScreen = []; }
+}
+
+async function refreshDividendScreen() {
+  try {
+    await POST('/api/dividend-screener/refresh', {});
+    _divState = { running: true, phase: 'universe', done: 0, total: 0, errors: [] };
+    renderApp();
+    if (_divPollTimer) clearInterval(_divPollTimer);
+    _divPollTimer = setInterval(async () => {
+      const st = await GET('/api/dividend-screener/status');
+      _divState = st;
+      if (!st.running) {
+        clearInterval(_divPollTimer); _divPollTimer = null;
+        await loadDividendScreen();
+      }
+      renderApp();
+    }, 2500);
+  } catch (e) { toast('Refresh failed'); }
+}
+
+function readDivFilters() {
+  const num = id => { const v = document.getElementById(id); return v && v.value !== '' ? +v.value : null; };
+  ['yMin','yMax','dMin','xMin','hMin','prMax','fcMin','rgMin','cMax'].forEach(k => {
+    const v = num('df-' + k); if (v != null) _divFilters[k] = v;
+  });
+  const sel = document.getElementById('df-idx');
+  if (sel) _divFilters.idx = sel.value;
+  renderApp();
+}
+
+function resetDivFilters() {
+  _divFilters = { yMin: 2, yMax: 5, dMin: 7, xMin: 6, hMin: 25, prMax: 80,
+                  fcMin: 1, rgMin: 60, cMax: 1, idx: '' };
+  renderApp();
+}
+
+function applyDivFilters(rows) {
+  const f = _divFilters;
+  return rows.filter(r => {
+    if (r.yield_pct == null || r.yield_pct < f.yMin || r.yield_pct > f.yMax) return false;
+    if (r.div_cagr == null || r.div_cagr < f.dMin) return false;
+    if (r.price_cagr == null || r.price_cagr < f.xMin) return false;
+    if ((r.win_years || 0) < f.hMin) return false;
+    if (f.prMax < 200 && (r.payout_pct == null || r.payout_pct > f.prMax)) return false;
+    if (f.fcMin > 0 && (r.fcf_cover == null || r.fcf_cover < f.fcMin)) return false;
+    if (f.rgMin > 0 && (r.range_52w == null || r.range_52w < f.rgMin)) return false;
+    if (f.cMax < 9 && (r.cuts || 0) > f.cMax) return false;
+    if (f.idx && r.idx !== f.idx) return false;
+    return true;
+  });
+}
+
+/** Dividend sparkline — 16 annual totals. Rising ends green, falling amber. */
+function divSpark(a) {
+  if (!a || a.length < 2) return '';
+  const w = 86, h = 20, p = 2;
+  const mx = Math.max(...a), mn = Math.min(...a), rng = (mx - mn) || mx || 1;
+  const X = i => p + (i / (a.length - 1)) * (w - 2 * p);
+  const Y = v => h - p - ((v - mn) / rng) * (h - 2 * p);
+  const d = a.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ');
+  const col = a[a.length - 1] >= a[0] ? 'var(--green)' : 'var(--yellow)';
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    <path d="${d}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="${X(a.length - 1).toFixed(1)}" cy="${Y(a[a.length - 1]).toFixed(1)}" r="2.2" fill="${col}"/>
+  </svg>`;
+}
+
+function renderDividendScreen() {
+  const f = _divFilters;
+  const noData = _divScreen.length === 0;
+  const rows = applyDivFilters(_divScreen).map(r => ({ ...r, chowder: (r.yield_pct || 0) + (r.div_cagr || 0) }));
+  const sorted = sortData(rows, _sortCol || 'chowder', _sortCol ? _sortAsc : false);
+  const running = _divState.running;
+  const pct = _divState.total ? Math.round(_divState.done / _divState.total * 100) : 0;
+  const fetched = _divScreen.length ? _divScreen[0].fetched_at : null;
+
+  const nf = (id, label, val, step, tip) =>
+    `<div class="filter-input-group" title="${tip}">
+       <label>${label}</label>
+       <input class="filter-input" type="number" id="df-${id}" value="${val}" step="${step}"
+              onchange="readDivFilters()">
+     </div>`;
+
+  // payout and coverage are graded, not merely printed — a screen that shows
+  // 103% payout in the same ink as 45% buries the thing you are screening for
+  const grade = (v, bad, warn, suffix, higherIsBetter, dp) => {
+    if (v == null) return '<td style="color:var(--text-muted)">—</td>';
+    const risky = higherIsBetter ? v < bad : v > bad;
+    const caution = higherIsBetter ? v < warn : v > warn;
+    const color = risky ? 'var(--red)' : caution ? 'var(--yellow)' : 'var(--text)';
+    return `<td style="color:${color};font-weight:${risky || caution ? 600 : 400}">${v.toFixed(dp)}${suffix}</td>`;
+  };
+
+  return `
+    <div style="padding:0 0 24px">
+      ${screenKindToggle()}
+      ${running ? `<div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">
+          ${_divState.phase || 'working'}… ${_divState.done} / ${_divState.total || '?'}</div>
+        <div style="height:4px;background:var(--surface2);border-radius:2px">
+          <div style="height:4px;background:var(--accent);border-radius:2px;width:${pct}%;transition:width .3s"></div>
+        </div></div>` : ''}
+
+      <div class="toolbar">
+        <span style="color:var(--text-2);font-size:13px">
+          ${noData ? 'No dividend data yet' : `${sorted.length} of ${_divScreen.length} companies`}
+          ${fetched ? ` · updated ${fetched.slice(0, 10)}` : ''}</span>
+        <div class="toolbar-right">
+          <select class="filter-input" id="df-idx" onchange="readDivFilters()" style="width:auto">
+            <option value="">All indexes</option>
+            <option value="S&P 500" ${f.idx === 'S&P 500' ? 'selected' : ''}>S&P 500</option>
+            <option value="S&P 400" ${f.idx === 'S&P 400' ? 'selected' : ''}>S&P 400</option>
+            <option value="S&P 600" ${f.idx === 'S&P 600' ? 'selected' : ''}>S&P 600</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="resetDivFilters()">Reset</button>
+          <button class="btn btn-ghost btn-sm" onclick="refreshDividendScreen()" ${running ? 'disabled' : ''}>
+            ${running ? 'Refreshing…' : '↻ Rebuild'}</button>
+        </div>
+      </div>
+
+      <div class="filter-row" style="display:flex;flex-wrap:wrap;gap:10px 14px;margin-bottom:12px">
+        ${nf('yMin', 'Yield ≥', f.yMin, '0.1', 'Trailing 12-month dividends ÷ price')}
+        ${nf('yMax', 'Yield ≤', f.yMax, '0.1', 'A high yield here is usually the market pricing decline, not a bargain')}
+        ${nf('dMin', 'Div CAGR ≥', f.dMin, '0.5', 'Annualised dividend growth over the window')}
+        ${nf('xMin', 'Price CAGR ≥', f.xMin, '0.5', 'Annualised price appreciation over the same window')}
+        ${nf('hMin', 'Window ≥', f.hMin, '1', 'Years both the dividend and price series cover')}
+        ${nf('prMax', 'Payout ≤', f.prMax, '5', 'Trailing dividends ÷ trailing EPS. Meaningless for REITs — they are assessed on FFO.')}
+        ${nf('fcMin', 'FCF cover ≥', f.fcMin, '0.1', 'Free cash flow ÷ the cash cost of the dividend. Below 1.0 it was not funded from FCF this year.')}
+        ${nf('rgMin', '52w pos ≥', f.rgMin, '5', '0 = at the 52-week low, 100 = at the high')}
+        ${nf('cMax', 'Cuts ≤', f.cMax, '1', 'Years the annual dividend total fell, across the window')}
+      </div>
+
+      <div class="settings-hint" style="margin:0 0 12px">
+        Dividend CAGR and price CAGR are measured over the <strong>same window</strong> — Yahoo
+        returns dividends back to 1962 but monthly prices only to ~1985, and measuring each over
+        its own span flatters one against the other. <strong>Yield+Growth</strong> is the Chowder
+        number and approximates total return when the multiple is unchanged. Free cash flow is
+        lumpy, so a single year below 1.0× is a reason to read the filings rather than a verdict.
+      </div>
+
+      ${noData ? `<div class="empty-state"><h3>No dividend data yet</h3>
+         <p>Click <strong>Rebuild</strong> to pull the S&P 1500 from Yahoo. Takes about ten minutes.</p></div>` : `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="col-num">#</th>
+            ${th('ticker', 'Ticker', true, 1)}
+            ${th('name', 'Name', true, 2)}
+            ${th('idx', 'Index', true)}
+            ${th('price', 'Price')}
+            ${th('yield_pct', 'Yield', false, false, 'Trailing 12-month dividends ÷ price')}
+            ${th('payout_pct', 'Payout', false, false, 'Trailing dividends ÷ trailing EPS')}
+            ${th('fcf_cover', 'FCF Cover', false, false, 'Free cash flow ÷ shares × trailing dividend. Below 1.0× the payout was not funded from free cash flow.')}
+            ${th('div_cagr', 'Div CAGR', false, false, 'Annualised dividend growth over the window')}
+            ${th('price_cagr', 'Price CAGR', false, false, 'Annualised price growth over the same window')}
+            ${th('chowder', 'Yield+Growth', false, false, 'The Chowder number — approximates total return CAGR with an unchanged multiple')}
+            ${th('range_52w', '52w Pos', false, false, '0 = at the 52-week low, 100 = at the high')}
+            ${th('vs_200d', 'vs 200d')}
+            ${th('win_years', 'Window')}
+            ${th('streak', 'Streak', false, false, 'Consecutive years of a higher annual dividend total')}
+            ${th('cuts', 'Cuts', false, false, 'Years the annual total fell, across the window')}
+            <th class="left">Dividend, 16 yrs</th>
+            <th title="Build a list to take to your broker">Pick</th>
+          </tr></thead>
+          <tbody>
+            ${sorted.map((r, i) => `
+              <tr>
+                <td class="col-num">${i + 1}</td>
+                <td class="left col-sticky">
+                  <span class="ticker-cell">
+                    ${r.in_portfolio ? '<span title="In portfolio" style="color:var(--green);font-size:8px;margin-right:4px">●</span>'
+                      : r.in_watchlist ? '<span title="On watchlist" style="color:var(--accent);font-size:8px;margin-right:4px">●</span>' : ''}
+                    <a class="ticker-link" href="https://finance.yahoo.com/quote/${r.ticker}"
+                       target="_blank">${r.ticker}</a>
+                  </span>
+                </td>
+                <td class="left col-sticky-2" style="color:var(--text-2)">${(r.name || '').slice(0, 30)}</td>
+                <td class="left" style="color:var(--text-muted);font-size:11px">${r.idx || '—'}</td>
+                <td>${fmt$(r.price)}</td>
+                <td class="positive">${r.yield_pct != null ? r.yield_pct.toFixed(2) + '%' : '—'}</td>
+                ${grade(r.payout_pct, 100, 80, '%', false, 0)}
+                ${grade(r.fcf_cover, 1, 1.5, '×', true, 2)}
+                <td class="positive">${r.div_cagr != null ? r.div_cagr.toFixed(2) + '%' : '—'}</td>
+                <td>${r.price_cagr != null ? r.price_cagr.toFixed(2) + '%' : '—'}</td>
+                <td style="font-weight:600">${r.chowder ? r.chowder.toFixed(1) : '—'}</td>
+                ${grade(r.range_52w, 25, 60, '%', true, 0)}
+                <td class="${gainClass(r.vs_200d)}">${r.vs_200d != null ? fmtPct(r.vs_200d) : '—'}</td>
+                <td style="color:var(--text-muted)">${r.win_years != null ? r.win_years + 'y' : '—'}</td>
+                <td>${r.streak != null ? r.streak : '—'}</td>
+                <td style="color:${r.cuts ? 'var(--yellow)' : 'var(--text-muted)'}">${r.cuts != null ? r.cuts : '—'}</td>
+                <td class="left">${divSpark(r.annuals)}</td>
+                <td><input type="checkbox" onchange="toggleDivPick('${r.ticker}')"
+                      ${_divPicks.has(r.ticker) ? 'checked' : ''}
+                      title="Add ${r.ticker} to the pick list" style="cursor:pointer"></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="toolbar" style="margin-top:14px">
+        <span style="color:var(--text-2);font-size:13px">
+          <strong style="color:var(--text)">${_divPicks.size}</strong> picked — survives filter changes</span>
+        <div class="toolbar-right">
+          <button class="btn btn-ghost btn-sm" onclick="pickAllShown()">Add all shown</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearDivPicks()" ${_divPicks.size ? '' : 'disabled'}>Clear</button>
+        </div>
+      </div>
+      <div class="settings-hint" style="margin:0;user-select:all;font-family:ui-monospace,Menlo,monospace">
+        ${_divPicks.size ? [..._divPicks].sort().join(', ')
+          : sorted.map(r => r.ticker).join(', ') || '—'}
+      </div>`}
+    </div>`;
+}
+
+function toggleDivPick(t) {
+  _divPicks.has(t) ? _divPicks.delete(t) : _divPicks.add(t);
+  saveDivPicks(); renderApp();
+}
+function pickAllShown() {
+  applyDivFilters(_divScreen).forEach(r => _divPicks.add(r.ticker));
+  saveDivPicks(); renderApp();
+}
+function clearDivPicks() { _divPicks.clear(); saveDivPicks(); renderApp(); }
+function saveDivPicks() {
+  try { localStorage.setItem('sage-div-picks', JSON.stringify([..._divPicks])); } catch (e) {}
+}
+
+/* ============================================================================
+   Calculators — yield on cost
+   The sleeve's whole case is that a 2-3% starting yield compounds into a
+   double-digit yield on cost, so the arithmetic deserves to be visible rather
+   than asserted. Total return decomposes the way Bogle framed it: starting
+   yield + earnings growth + change in the multiple. Leaving price growth
+   tracking dividend growth sets that third term to zero, which is the neutral
+   assumption and the one worth planning against.
+   ========================================================================== */
+
+let _calc = { amt: 200000, yld: 3, dg: 9, pg: 9, yrs: 20, tax: 15,
+              track: true, drip: true, tgt: 10 };
+
+function readCalc() {
+  const n = id => { const e = document.getElementById(id); return e ? +e.value : null; };
+  const b = id => { const e = document.getElementById(id); return e ? e.checked : false; };
+  _calc.amt = Math.max(1000, n('c-amt') || 200000);
+  _calc.yld = n('c-yld'); _calc.dg = n('c-dg');
+  _calc.track = b('c-track'); _calc.drip = b('c-drip');
+  _calc.pg = _calc.track ? _calc.dg : n('c-pg');
+  _calc.yrs = n('c-yrs'); _calc.tax = n('c-tax'); _calc.tgt = n('c-tgt');
+  renderApp();
+}
+
+/** Year-by-year: price index, units held, income. Units only grow under DRIP. */
+function calcModel() {
+  const { amt, yld, dg, pg, yrs, tax, drip } = _calc;
+  const rows = []; let units = 1, cum = 0;
+  for (let t = 0; t <= yrs; t++) {
+    const price = amt * Math.pow(1 + pg / 100, t);
+    const perUnit = t === 0 ? 0 : amt * (yld / 100) * Math.pow(1 + dg / 100, t);
+    const gross = perUnit * units, net = gross * (1 - tax / 100);
+    if (t > 0 && drip && price > 0) units += net / price;
+    if (t > 0 && !drip) cum += net;
+    rows.push({ t, price, gross, net, units, total: drip ? units * price : price + cum });
+  }
+  return rows;
+}
+
+function renderCalculators() {
+  const c = _calc;
+  const R = calcModel(), last = R[R.length - 1];
+  const cagr = (Math.pow(last.total / c.amt, 1 / c.yrs) - 1) * 100;
+  const yoc = last.gross / c.amt * 100;
+  const chow = c.yld + c.dg;
+
+  const money = v => {
+    const a = Math.abs(v);
+    if (a >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+    if (a >= 1e4) return '$' + Math.round(v / 1e3) + 'k';
+    return '$' + Math.round(v).toLocaleString();
+  };
+  const fld = (id, label, val, step, tip, min, max) =>
+    `<div class="filter-input-group" title="${tip}">
+       <label>${label}</label>
+       <input class="filter-input" type="number" id="c-${id}" value="${val}" step="${step}"
+              ${min != null ? `min="${min}"` : ''} ${max != null ? `max="${max}"` : ''}
+              onchange="readCalc()">
+     </div>`;
+  const tile = (k, v, s, lead) =>
+    `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+                 padding:14px 16px;min-width:0">
+       <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2)">${k}</div>
+       <div style="font-size:26px;font-weight:600;margin-top:2px;
+                   color:${lead ? 'var(--primary)' : 'var(--text)'};font-variant-numeric:tabular-nums">${v}</div>
+       <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">${s}</div>
+     </div>`;
+
+  const ys = [2, 2.5, 3, 3.5, 4, 4.5, 5], gs = [4, 6, 8, 10, 12, 14, 16];
+
+  return `
+    <div style="padding:0 0 24px">
+      <div class="summary-toggle" style="order:0;margin:0 0 12px">
+        <button class="summary-toggle-btn active" title="What a dividend grower compounds into">Yield on Cost</button>
+      </div>
+
+      <div class="filter-row" style="display:flex;flex-wrap:wrap;gap:10px 14px;margin-bottom:14px">
+        ${fld('amt', 'Invested', c.amt, '5000', 'Initial outlay', 1000)}
+        ${fld('yld', 'Start yield %', c.yld, '0.05', 'Annual dividend ÷ price you pay today', 0, 15)}
+        ${fld('dg', 'Div growth %', c.dg, '0.5', 'Sustained annual dividend growth', 0, 30)}
+        ${fld('pg', 'Price growth %', c.track ? c.dg : c.pg, '0.5', 'Uncheck "tracks dividend" to set the multiple change yourself', -10, 30)}
+        ${fld('yrs', 'Years', c.yrs, '1', 'Holding period', 1, 50)}
+        ${fld('tax', 'Div tax %', c.tax, '1', 'Qualified rate. Zero for a tax-free account.', 0, 50)}
+        <div class="filter-input-group"><label>&nbsp;</label>
+          <label class="filter-check"><input type="checkbox" id="c-track" ${c.track ? 'checked' : ''}
+            onchange="readCalc()"> Price tracks dividend</label></div>
+        <div class="filter-input-group"><label>&nbsp;</label>
+          <label class="filter-check"><input type="checkbox" id="c-drip" ${c.drip ? 'checked' : ''}
+            onchange="readCalc()"> Reinvest</label></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px;margin-bottom:16px">
+        ${tile('Total return CAGR', cagr.toFixed(2) + '%',
+               c.drip ? 'dividends reinvested' : 'dividends taken as income', true)}
+        ${tile('Ending value', money(last.total), (last.total / c.amt).toFixed(1) + '× the original outlay')}
+        ${tile('Income in year ' + c.yrs, money(last.gross), money(last.net) + ' after tax')}
+        ${tile('Yield on cost', yoc.toFixed(1) + '%',
+               'started at ' + c.yld.toFixed(2) + '% — ' + (yoc / c.yld).toFixed(1) + '× higher')}
+      </div>
+
+      <div class="settings-hint" style="margin:0 0 14px">
+        Total return decomposes as <strong>starting yield + earnings growth + change in the
+        multiple</strong>. Leaving price growth tracking dividend growth sets the third term to
+        zero — the neutral assumption, and the one worth planning against. That is also why the
+        grid below does not depend on the horizon: a 3% yielder growing at 9% returns about
+        12.3% a year whether held eight years or thirty. Time changes the size of the outcome,
+        not the rate. Yield + growth here is <strong>${chow.toFixed(1)}</strong>${chow >= 12
+          ? ' — clears the conventional Chowder threshold of 12.'
+          : ' — under the conventional Chowder threshold of 12.'}
+      </div>
+
+      <div class="toolbar">
+        <span style="color:var(--text-2);font-size:13px">
+          Total return CAGR by starting yield and dividend growth. Shaded cells clear
+          <strong style="color:var(--text)">${c.tgt.toFixed(1)}%</strong>.</span>
+        <div class="toolbar-right">${fld('tgt', 'Target %', c.tgt, '0.5', 'Your hurdle rate', 1, 30)}</div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="left">Yield ↓ &nbsp; Growth →</th>
+            ${gs.map(g => `<th>${g}%</th>`).join('')}</tr></thead>
+          <tbody>
+            ${ys.map(y => `<tr>
+              <td class="left" style="color:var(--text-2)">${y.toFixed(1)}%</td>
+              ${gs.map(g => {
+                const v = ((1 + g / 100) * (1 + (y / 100) * (1 - c.tax / 100)) - 1) * 100;
+                const hit = v >= c.tgt;
+                return `<td style="${hit ? 'background:var(--green-dim);color:var(--text);font-weight:600' : ''}">${v.toFixed(1)}</td>`;
+              }).join('')}
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
 }

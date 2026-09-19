@@ -19,11 +19,15 @@
 - `cef/static/` — frontend (HTML/JS/CSS), dark theme
 - `cef/static/styles.css` — dark theme + white nav override; uses `.global-tab-nav` / `.global-tab-link`
 - `cef/api/app.py` — FastAPI app factory
-- `cef/api/routes/` — funds, prices, holdings, distributions, screener, nav_history, imports, settings, audit, bdc_screener
+- `cef/api/routes/` — funds, prices, holdings, distributions, screener, nav_history, imports, settings, audit, bdc_screener, dividend_screener
 - `cef/services/audit.py` — position audit engine (grading, coverage windows, discrepancy checks)
 - `cef/services/schwab_import.py` — Schwab CSV -> DB; shared by the Import tab and the CLI
 - `cef/services/bdc_screener.py` — BDC universe + metrics from SEC XBRL (CEFConnect has no BDCs)
 - `cef/services/exposure.py` — exposure taxonomy + category→exposure default map
+- `cef/services/dividend_growth.py` — S&P 1500 dividend-growth screen (sleeve four).
+  Both CAGRs measured over the SAME window; `range=max` truncates dividend
+  history so an explicit `period1` is required. Standalone copies of the same
+  pipeline live in `dividend/` for rebuilding the published artifact.
 - `backfill_leverage.py` — populate leverage for already-cached screener rows without a full refresh
 - `import_schwab_transactions.py` — command-line front end for the same importer
 - `cef/settings.py` — user-tunable settings; code defaults, DB rows override
@@ -307,6 +311,25 @@ Calendar $130.51 · Puts $76.76 · QQQ $2,655.51) · drawdown >20% · MTW win ra
 in 2027 · two consecutive losing years. **One = investigate, two = stop adding.**
 The first two are the fast detectors — track fill-versus-mid and per-contract edge
 by strategy from day one.
+
+## Sleeve four — dividend growth
+
+Individual dividend-growth companies, judged on **yield on cost** twenty years
+out rather than current yield. Screener lives under **Screen › Dividend Growth**;
+the yield-on-cost calculator under the top-level **Calculators** tab.
+
+- `dividend_screener_cache` — 1,025 S&P 1500 payers. Rebuild from the UI
+  (**↻ Rebuild**, ~10 min, three phases with progress) or `dividend/build.py`.
+- **The 2–3% starting yield is arithmetic, not a compromise.** Yield today ÷
+  yield at the start = (1+g_div)ⁿ ÷ (1+g_price)ⁿ, so a screen demanding both
+  CAGRs over 25+ years pins the yield near where it began. Raising the ceiling
+  to 8% returns identical names. Above 5% yield the median company pays out more
+  than it earns. Never compare this sleeve's yield to the CEF sleeve's.
+- **The payout column cannot measure REITs** — they distribute ~90% of taxable
+  income and are assessed on FFO, which is non-GAAP and absent from Yahoo.
+- **FCF cover** is against the cash cost of the dividend (shares × trailing DPS),
+  not inferred from the payout ratio. Free cash flow is lumpy: KO reads 0.58×
+  and has no dividend problem.
 
 ## Design
 - Dark theme throughout
