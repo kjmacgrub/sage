@@ -251,10 +251,18 @@ were removed entirely in favour of Greek/VIX exits.
   because of 0–2 day holds against a 2–3 day cadence; QQQ Leap peaks at 10 because
   a 78-day hold against a 14-day cadence makes stacking unavoidable. **Anything
   that lengthens holds removes the accidental protection.**
-- **Don't pause QQQ when positions stack, and don't tune its entry filter.** The
-  stacking signal is the entry-quality signal — pausing at three open costs 42% of
-  the strategy, and a regime filter that removes the six losers gives up $723k of
-  winners to save $24k. `Max RSI 69` does not screen bear markets.
+- **Don't pause QQQ when positions stack.** The stacking signal is the
+  entry-quality signal — pausing at three open costs 42% of the strategy.
+- **Superseded 2026-09-12 — the entry filter was never what this note assumed.**
+  Reconstructed against all 74 real trades: `SMA10 > SMA20` held on only **28 of
+  74** entries and `Max RSI 69` blocked **zero days**, so neither leg was
+  filtering anything. `gap ≤ −1.5%` alone reproduces every entry. The warning
+  against tuning still stands for *fitted* filters — the one that removes the six
+  2022 losers gives up $723k to save $24k, and the 2022 pattern reverses over 27
+  years — but a **rising-SMA200 trend gate is not that**: it holds in both eras
+  (78.1% pre-2017 against a 70.3% baseline) and is now part of the settled config.
+  Threshold and delta sweeps remain a leverage dial, not an edge parameter. Full
+  working in the 2026-09-12 decisions entry.
 - **This book wants room.** A wider profit target beat a narrower one; the deep put
   stop (90) beat 70/80; the hedge's every dollar comes from letting positions expire
   while its two management exits lose $4.66M. Defined-risk structures recover.
@@ -284,10 +292,14 @@ were removed entirely in favour of Greek/VIX exits.
   priced $65–131. Pull the chain from
   `https://cdn.cboe.com/api/global/delayed_quotes/options/QQQ.json` — it carries
   OI, volume and greeks; Yahoo's options endpoint now 401s.
-- **Corrected:** `Max Open Positions` **does** survive the portfolio tester — a
-  5-position cap held with a time-at-cap distribution matching standalone. The
-  earlier byte-identical finding no longer reproduces. Re-test before relying on
-  either result.
+- **`Max Open Positions` is unreliable per-run, which is worse than broken.**
+  A cap of 5 bound correctly (peak concurrency fell 7 → 5), then a cap of 3
+  returned files **byte-identical** to the cap-5 run — same MD5, 79 minutes apart,
+  max concurrent still 5. It had bound once and silently did nothing the next
+  time. **Verify the effect in the output before reading any result**, and prefer
+  a change that must be unmissable (set the cap to 1). This supersedes the earlier
+  "does survive the portfolio tester" correction: both results are real, which is
+  the point.
 - **Backtest gotcha.** A standalone run of one strategy starves itself and silently
   skips entries it can't afford — QQQ dropped 24 of 34 signals that way, biased
   toward the high-IV ones that perform best.
