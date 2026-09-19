@@ -26,7 +26,7 @@ unchanged at quarters but the dollar figures are not.
 | CEFs and BDCs | Income | Roth — eventually all of it |
 | Options (SPX) | Opportunistic growth | Roth at **1 lot** now → taxable **$200k** later (2026-09-08) |
 | Managed index, direct indexing | Growth + tax-loss harvesting | Must be taxable |
-| Dividend growth (individual) | Growth of *income* — judge on yield on cost | Taxable (2026-09-19, not yet funded) |
+| Dividend growth (individual) | Growth of *income* — judge on yield on cost | **Taxable by design** — its 0.42% drag is 8× smaller than the CEF sleeve's, so the Roth goes there first (2026-09-19; not yet funded) |
 
 Target shape, multi-year: a $300k lump sum converted to Roth in annual slices
 sized to a reasonable bracket, ending in a **~$400k Roth income bucket**. About
@@ -72,8 +72,10 @@ looks worse than the CEF sleeve and always will; judged on yield-on-cost at year
 twenty it is the only sleeve that gets there. **Never compare its yield to the
 CEF sleeve's** — that is the same category error the tripwires warn about.
 
-Placement: taxable. Qualified dividends at 15% and no tax-loss harvesting value
-to protect, so it does not compete with the managed sleeve for the taxable slot.
+Placement: **taxable** — but for a better reason than first recorded. The
+original argument was that qualified dividends at 15% are cheap enough. The
+actual argument is that the CEF sleeve bleeds 8× faster and therefore has a
+stronger claim on the Roth. See *Placement* below.
 
 ### The yield ceiling is arithmetic, and it settles a recurring argument
 
@@ -188,14 +190,89 @@ compounding them — +50% then −33% averages +8.5%/yr on a position that ended
   costs entry price. The check is the dividend-growth columns — if the 5-year rate
   still tracks the life rate, price is following the business rather than leading it.
 
-### Mechanics settled
+### Placement: taxable, and the Roth goes to CEFs instead
 
-**Equal weight, ~$20k per name, dividends pooled rather than DRIP'd.** Automatic
-reinvestment puts each dividend back into the stock that paid it, which compounds
-positions independently and lets winners drift — it is not rebalancing. Pooling
-the cash and directing it to whichever position has fallen furthest below weight
-rebalances without new capital and without a taxable sale. Schwab's DRIP setting
-does the first by default; it needs turning off.
+**Counterintuitive and worth not re-deriving: tax drag scales with yield, not
+return.** The instinct is to shelter the fastest-compounding asset. The
+arithmetic says shelter the one bleeding hardest.
+
+| Annual tax drag | |
+|---|---|
+| CEF sleeve — 12% yield at ordinary rates | **3.36%** |
+| Dividend growth — 2.8% yield, qualified | **0.42%** |
+| Options — 1256, 60/40, ~30% return | 7.80% (excluded, see below) |
+
+Eight times the bleeding, so eight times the value from a shelter, even though
+CEFs compound more slowly. Over 20 years on $200k each, with exactly one of the
+two sheltered:
+
+| | 20-year total |
+|---|---|
+| Dividends in Roth, CEFs taxable | $3,196,872 |
+| **CEFs in Roth, dividends taxable** | **$3,641,973** |
+| Difference | **$445,102 — 13.9%** |
+
+**So this sleeve is taxable and the CEF sleeve has first claim on Roth space.**
+A dividend-growth sleeve is nearly tax-efficient by construction: most of the
+return is unrealised appreciation you never pay on until you sell, and the plan
+is never to sell. Options stay out of the Roth for the reason already recorded
+on 2026-09-08 — an unvalidated edge does not belong in space that cannot be
+refilled — and the managed sleeve must be taxable for loss harvesting to mean
+anything.
+
+The trade-off only bites when something must sit in taxable. At a $400k Roth
+with $200k sleeves both fit and there is nothing to decide; growing the CEF
+sleeve past $200k to fill the Roth is an **allocation** decision that shifts the
+book toward income, and should be argued on its own terms rather than as a tax
+consequence.
+
+### Mechanics settled — leave DRIP on
+
+**Supersedes this entry's original recommendation to pool dividends.** That said
+to turn DRIP off and direct the cash to whichever position had fallen furthest
+below weight. Simulated over 20 years on the observed dispersion of long-run
+price CAGR among 141 quality payers, that is both more work and worse:
+
+| Dividends deployed as | Sleeve at yr 20 | Largest | Largest ÷ smallest |
+|---|---|---|---|
+| **DRIP, each into itself** | **$2,134,503** | 19.4% | 4.6× |
+| Pooled, spread evenly | $2,120,951 | 17.2% | 3.3× |
+| Pooled, to most underweight | $2,006,284 | 12.9% | 1.4× |
+
+Directed rebalancing costs about **6.4% of terminal value** because it
+systematically feeds the laggards and starves the compounders. The price of DRIP
+is a 19.4% largest position — roughly 5% of the whole book — which is
+concentration the market chose rather than you, and it arrives without a taxable
+sale.
+
+**The one refinement, and it costs nothing: turn DRIP off on any name that fails
+the quarterly screen.** That is the low-effort form of the quality gate. You stop
+automatically buying more of something deteriorating without having to decide
+where the money goes instead; failing names accumulate cash until the next look.
+
+**Equal weight, ~$20k per name, and no thinning.** Concentration is not a reason
+to sell. Untouched, the sleeve concentrates on its own (largest position 19.2% at
+year 20), and deliberately trimming ten names to five in a taxable account
+realises ~$500k of gain — **6.2% of the sleeve at 15%, 7.8% with NIIT** — money
+that then stops compounding. The only good reason to sell is **failing the
+screen**: payout past 100%, FCF no longer covering, or the streak breaking. Not
+underperformance, which after two decades is as likely to mean-revert as persist.
+
+**What diversification actually buys.** At 5 names each is 20% and at 10 each is
+10%, so more names means an impairment is *more likely* and costs *half as much*
+— expected loss is identical. The benefit is lower variance, which for a sleeve
+that cannot easily be rebuilt is the thing worth paying for.
+
+**Quarterly review, and watch the streak rather than the price.** Long-run CAGRs
+and the window barely move quarter to quarter; payout, FCF coverage and dividend
+declarations do. **A company that has raised for thirty years and then holds the
+dividend flat is signalling before the payout ratio does** — the Streak column
+catches it the quarter it happens.
+
+**Practical note on taxable DRIP:** it defers nothing — the dividend is taxed
+whether reinvested or not — and it creates four small tax lots per position per
+year, so roughly 800 lots across the sleeve after 20 years. Fine for buy-and-hold;
+it matters only if a sale ever happens, where lot selection does real work.
 
 **A few outliers are wanted, not tolerated.** SM Energy is a commodity cyclical
 sitting among six developed-market consumer and industrial names that will
