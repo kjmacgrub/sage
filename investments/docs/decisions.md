@@ -11,25 +11,30 @@ live in `../CLAUDE.md`. This file is only for judgment calls.
 
 ## Standing context
 
-**Four sleeves, each with a different job.** Judge each against its own job —
-weak capital gains in the income sleeve are not a failure, and the dividend-growth
-sleeve's 2–3% starting yield is its design, not a shortfall (see 2026-09-19).
-Target is **equal quarters on ~$800k**, with the Roth holding options and CEFs
-and the taxable account holding dividend growth and the managed index — total tax
-drag 0.16% (see the 2026-09-19 placement reversal). Rebalanced annually as a
-**ratchet** — profits out of the options
-sleeve on gains, never added back on losses. Tripwires for when to stop adding
-or reduce are in the 2026-09-12 entry; they are measured against the options
-sleeve's own backtested behaviour, never against the other three. Note the
-rebalancing-cost arithmetic in that entry was computed on *thirds*; the shape is
-unchanged at quarters but the dollar figures are not.
+**Three sleeves, each with a different job.** Judge each against its own job —
+weak capital gains in the income sleeve are not a failure. **Everything outside
+the Roth is Fidelity's**, run at their existing ~66/34 allocation with tax-loss
+harvesting; the two Roth sleeves are the parts run here (see 2026-09-19,
+"Fidelity keeps the taxable side"). Rebalanced annually as a **ratchet** —
+profits out of the options sleeve on gains, never added back on losses.
+
+Tripwires for when to stop adding or reduce are in the 2026-09-12 entry. They
+are still measured against the options sleeve's own backtested behaviour, never
+relative to the other sleeves — **but their consequence is now portfolio-wide,
+not sleeve-local.** The taxable side has no drawdown defence of its own, so an
+options sleeve that trips its tripwires has also removed the only thing standing
+against a 66/34 book in a withdrawal phase. Read a tripwire as a portfolio
+event. Note the rebalancing-cost arithmetic in that entry was computed on
+*thirds*; the shape is unchanged but the dollar figures are not.
 
 | Sleeve | Job | Account |
 |---|---|---|
 | CEFs and BDCs | Income | **Roth, $200k** — receives the annual ratchet from options, so it does drift toward all of it |
-| Options (SPX) | Opportunistic growth | **Roth, $200k** — reversed from taxable 2026-09-19 once nine months of live IRA trading closed the settlement question |
-| Managed index, direct indexing | Growth + tax-loss harvesting | Must be taxable |
-| Dividend growth (individual) | Growth of *income* — judge on yield on cost | **Taxable by design** — 0.42% drag, nearly tax-efficient by construction (2026-09-19; not yet funded) |
+| Options (SPX) | Opportunistic growth + the portfolio's only crash-positive stream | **Roth, $200k** — reversed from taxable 2026-09-19 once nine months of live IRA trading closed the settlement question |
+| Fidelity managed | Conservative growth + tax-loss harvesting | **Everything taxable.** ~46% US / 20% intl / 34% bonds, 0.83%/yr fee |
+
+**Retired: the dividend-growth sleeve** (2026-09-19, never funded). It took full
+single-stock equity risk and returned balanced-portfolio numbers. See the entry.
 
 Target shape, multi-year: a $300k lump sum converted to Roth in annual slices
 sized to a reasonable bracket, ending in a **~$400k Roth income bucket**. About
@@ -54,6 +59,141 @@ Two mechanics worth not forgetting:
 - **Wash sales cross into the Roth, and there the loss is permanently
   disallowed**, not deferred. Direct indexing sells hundreds of individual
   names; keep individual stocks out of the Roth and tell Fidelity it exists.
+
+---
+
+## 2026-09-19 — Fidelity keeps the taxable side; the dividend sleeve is retired
+
+Two days of work on a fourth sleeve ended by killing it. The trigger was asking
+the question that had never been asked: **how does the screen compare to simply
+owning the index?** It had only ever been compared against its own inversion.
+
+### The screen loses to everything, including cheap dividend ETFs
+
+10 years from 2016-09, $20k per name, dividends reinvested, identical windows:
+
+| | CAGR |
+|---|---|
+| SPY | **15.39%** |
+| VTI | 14.88% |
+| SCHD (0.06% ER) | 13.01% |
+| NOBL (0.35% ER) | 9.89% |
+| **The screen (quality)** | **8.25%** |
+| The inverted screen (value) | 7.67% |
+
+Last but one. It lost to SPY by **7.1 points a year** and to a six-basis-point
+dividend ETF by 4.8. Over 20 years it returns 8.23% against SPY's 11.19%, and
+there the *inverted* screen beats it by 3.7 points — the same reversal found
+earlier in the week.
+
+**And 8.23% is flattered.** Names were drawn from *today's* S&P 1500 with today's
+dividend record, so every 2006-era grower that cut, was acquired, or dropped out
+is missing by construction. The true figure is lower; quantifying it needs a
+point-in-time constituent history that isn't free.
+
+SCHD and NOBL didn't exist 20 years ago — their long-window figures cover 14.9
+and 12.9 years from inception into a post-GFC bull and are **not comparable**.
+Only the 10-year row is clean for all six.
+
+### Two structural arguments, independent of returns
+
+- **The sleeve would have wash-saled against direct indexing.** Both taxable,
+  both holding large-cap US names. Direct indexing harvests by selling
+  individual names at a loss continuously; a DRIP'd dividend sleeve buys seven
+  to ten of those same names automatically every quarter. Any harvest within 30
+  days of a reinvestment has its loss disallowed. Not occasional friction — the
+  DRIP schedule makes the collisions systematic, and it degrades the one thing
+  direct indexing exists to do.
+- **The income framing doesn't survive the gap.** "Judge on yield on cost at 20
+  years, not total return" only holds if the income is taken instead of selling
+  shares. If it compounds untouched either way, yield on cost is a nicer-sounding
+  way to report a worse total return, and the 2–3% starting yield is the cost of
+  the constraint rather than a design feature.
+
+### The Fidelity account is not what it looked like
+
+Six and a half years of monthly balance detail (Feb 2020 → Sep 2026, 80 months,
+opened at $0). The accounting identity checks to the cent bar a few dollars of
+dividend accrual; the chain has no gaps.
+
+**The naive comparison would have been badly misleading.** Against SPY the
+account looks 6 points/yr behind. But grid-searching the static mix that best
+tracks its monthly returns gives **46% US / 20% international / 34% bonds**
+(tracking error 3.94%/yr) — a moderate balanced mandate, not an equity account.
+
+| | CAGR |
+|---|---|
+| Account, **gross** of fees | 9.85% |
+| **Its own best-fit benchmark** | **9.38%** |
+| Account, **net** of fees | 8.96% |
+| 100% SPY | 15.32% |
+
+Gross of fees it beats its own benchmark by **+0.47 points**; net it trails by
+**−0.42**. The fee is 0.83%/yr and costs slightly more than the manager adds —
+the ordinary outcome, not a failure. **The 6-point gap to SPY is asset
+allocation, not manager skill,** and no change of vehicle touches it.
+
+Headline return over the max period, on actual dated flows (money-weighted, so
+no weighting assumption about the opening month): **9.47%/yr net of fees**,
+10.35% gross. $198,183 in, $63,460 withdrawn, $285,489 remaining — $150,766 of
+gain after $13,607 of fees. Time-weighted lands 9.0–10.2% depending on how the
+Feb 2020 stub is treated; the account opened at $0 in the week the COVID selloff
+began, so that month has no beginning balance to divide by.
+
+### Why direct indexing was the wrong lever
+
+The proposal had been to convert everything to direct indexing. It doesn't
+address the gap:
+
+- Direct indexing is a **tax** technology, not a return technology. At 66/34 it
+  still returns ~9%.
+- Harvesting is an **equity** technique — it does nothing for the 34% in bonds.
+- **A drawdown account is a poor host for it.** $19,440/yr has been withdrawn
+  since 2024 (~6.8% of the current balance). Harvesting manufactures losses
+  while funding withdrawals realizes gains; the two partly cancel and the tax
+  alpha is smaller than the pitch assumes.
+
+### The decision
+
+**Everything outside the Roth goes to Fidelity at the existing allocation.** The
+66/34 is appropriate for an account assumed to fund withdrawals forever, the
+manager is performing at benchmark, and consolidating removes the wash-sale
+interference. The two Roth sleeves supply what the Fidelity money lacked —
+income and a crash-positive return stream — which is what made the fourth sleeve
+redundant rather than merely mediocre.
+
+**One calibration on that last point.** The Roth's protection is weaker than
+"strong hedge" implies, and it was checked rather than assumed:
+
+- The hedge **does not reduce drawdown**. −11.11% with it, −10.74% without. Per
+  the 2026-09-12 entry it "is not buying protection, it is generating return
+  while being long puts."
+- What it does is return **+34% in the 2022 bear** against 17.9% without — an
+  uncorrelated stream that was strongly positive while equities fell. Real, and
+  the right portfolio property. But a hedge pays *because* the market falls;
+  this *happened to* pay during one fall, on an instrument that has existed
+  since 2022-05-11 — after that bear had already started. **n = 1.**
+- Only ~42% of the sleeve is crash-positive. **QQQ Leap (20.9%) is long QQQ and
+  correlated with the Fidelity equity** — in a crash it adds to the drawdown.
+
+**Forward-looking caution:** 9.47% over 2020–2026 is partly the era. SPY
+returned 15.4% against a ~10% long-run average, so a 66/34 delivering 9.5% is
+what an above-average equity stretch hands a balanced book. The durable finding
+is *at benchmark*; the absolute number is not a planning figure.
+
+**Also watch:** 6 of 18 CEF positions currently show coverage below 1.0× (AVK
+0.88, BSTZ 0.84, ECAT 0.71, HGLB 0.95, NPFD 0.95, NXG 0.79). Roughly a third of
+the book pays out more than it earns. Tax-free in the Roth, but income meant to
+be *lived on* has to be earned or principal funds it. The quarterly audit is now
+a retirement-income check, not housekeeping.
+
+### What is left behind
+
+The code stays — `dividend.db`, the importer, the S&P 1500 screener and the
+yield-on-cost calculator all work and cost nothing to keep. The screen is a
+reasonable research tool; it is just not a funded sleeve. **Don't re-derive the
+case for one without re-running the index comparison first** — that is the test
+the original two days skipped.
 
 ---
 

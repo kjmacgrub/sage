@@ -306,7 +306,7 @@ were removed entirely in favour of Greek/VIX exits.
 
 #### Sleeve structure
 
-One third of a whole: **options (taxable) · CEFs (Roth) · managed index (taxable)**,
+One of three: **options (Roth) · CEFs (Roth) · Fidelity managed (all taxable)**,
 rebalanced annually as a **ratchet** — profits out on gains, **never added back on
 losses**. An options book underperforming is evidence the edge stopped working, not
 a discount. Costs ~4 points of portfolio CAGR; Section 1256 mark-to-market makes it
@@ -324,10 +324,25 @@ in 2027 · two consecutive losing years. **One = investigate, two = stop adding.
 The first two are the fast detectors — track fill-versus-mid and per-contract edge
 by strategy from day one.
 
-## Sleeve four — dividend growth
+**A tripwire is now a portfolio event, not a sleeve event.** Everything outside
+the Roth is a 66/34 Fidelity book with no drawdown defence of its own, so this
+sleeve is the portfolio's only crash-positive stream — and only ~42% of it is
+(QQQ Leap is long QQQ, correlated with that equity). The hedge does not reduce
+drawdown (−11.11% with, −10.74% without); what it does is return +34% in the
+2022 bear against 17.9% without, on an instrument that has existed since
+2022-05-11. **n = 1.** Size the reliance to that.
 
-Individual dividend-growth companies, judged on **yield on cost** twenty years
-out rather than current yield. Lives behind the **Dividend Growth** sleeve
+## Sleeve four — dividend growth (RETIRED 2026-09-19, never funded)
+
+**Do not rebuild the case for this without re-running the index comparison** —
+the test the original work skipped. Over 10 years the screen returned 8.25%/yr
+against SPY's 15.39% and SCHD's 13.01%, having taken full single-stock equity
+risk to deliver balanced-portfolio returns; the selection bias flatters even
+that. It would also have wash-saled against direct indexing in the same taxable
+space. See the 2026-09-19 decisions entry.
+
+The code stays and works — it is a research tool, not a sleeve. Everything
+below still describes it accurately. Lives behind the **Dividend Growth** sleeve
 switch in the header — Holdings · Screen · Calculators · Import.
 
 - **Its own database, `dividend.db`** — not `cef.db`. The two sleeves want
