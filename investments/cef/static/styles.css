@@ -92,13 +92,51 @@ body {
   z-index: 100;
 }
 
-.header-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
+/* The sleeve switch replaced a `CEF.` wordmark that named an archived repo and
+   stopped describing the app three features ago. Sleeve sits above the tab row
+   because Portfolio/Watchlist/Import are views *of* a sleeve, not peers of one. */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
-.header-title span { color: var(--accent); }
+.sleeve-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.sleeve-btn {
+  padding: 5px 13px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-2);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
+}
+
+.sleeve-btn:hover { color: var(--text); background: var(--surface2); }
+.sleeve-btn.active { color: var(--accent); background: var(--surface2); font-weight: 600; }
+.sleeve-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Which account you are looking at, stated rather than implied. */
+.sleeve-context {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 720px) { .sleeve-context { display: none; } }
 
 .header-right {
   display: flex;

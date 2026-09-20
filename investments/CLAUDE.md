@@ -327,8 +327,8 @@ by strategy from day one.
 ## Sleeve four — dividend growth
 
 Individual dividend-growth companies, judged on **yield on cost** twenty years
-out rather than current yield. Screener lives under **Screen › Dividend Growth**;
-the yield-on-cost calculator under the top-level **Calculators** tab.
+out rather than current yield. Lives behind the **Dividend Growth** sleeve
+switch in the header — Holdings · Screen · Calculators · Import.
 
 - **Its own database, `dividend.db`** — not `cef.db`. The two sleeves want
   different schemas and this one may move to Fidelity; see the 2026-09-19
@@ -352,6 +352,31 @@ the yield-on-cost calculator under the top-level **Calculators** tab.
 - **FCF cover** is against the cash cost of the dividend (shares × trailing DPS),
   not inferred from the payout ratio. Free cash flow is lumpy: KO reads 0.58×
   and has no dividend problem.
+
+## Navigation — the sleeve switch
+
+The header carries a two-way switch (**Income** · **Dividend Growth**) with the
+account named beside it; the tab row below belongs to whichever sleeve is
+selected. It replaced a `CEF.` wordmark that named the archived `cef` repo and
+had stopped describing the app.
+
+Sleeve is **not** a peer of Portfolio/Watchlist/Screen — those are views *of* a
+sleeve. Putting the dividend holdings in that row would have left two unlabelled
+portfolios side by side, and one Import tab would have had to guess whether a
+Schwab CSV was the Roth or the taxable account — the exact guess
+`cef/api/routes/dividend.py` refuses to make. Sleeve context answers it instead.
+
+- Tab keys are namespaced (`screen` / `div-screen`, `import` / `div-import`) so a
+  `_tab` restored from a previous session can never render one sleeve's view
+  under the other's header. `normalizeTab()` runs before the first paint.
+- Selection persists in `localStorage` under `sage-sleeve`.
+- `screenKindToggle()` belongs to the **income** sleeve only, and appears in
+  exactly two places (`renderScreen`, `renderBdcScreen`). A string-replace that
+  strips it will match `renderBdcScreen` first — both blocks open identically
+  with `padding:0 0 24px` followed by a `${running ? …}` progress bar.
+- `holdings` is keyed on **ticker alone**, so the same ticker held in two
+  accounts would collide on import. Fine while this sleeve is one taxable
+  account; revisit before adding a second.
 
 ## Design
 - Dark theme throughout

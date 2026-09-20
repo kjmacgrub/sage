@@ -57,6 +57,56 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-09-19 — Sleeve becomes the top level of the app; `CEF.` retired
+
+Option B gave the dividend sleeve its own database. That left a navigation
+question the old layout could not answer.
+
+**The tab row was the wrong place for it.** Portfolio, Watchlist and Import were
+all silently CEF-scoped — nothing said so, they just were. Adding a dividend
+Holdings tab beside them would have put two unlabelled portfolios in one row,
+and left Watchlist quietly meaning "CEF watchlist". Worse, a single Import tab
+would have had to guess whether an uploaded Schwab CSV belonged to the Roth or
+the taxable account — the exact guess the importer refuses to make, reintroduced
+one layer up in the UI.
+
+**Sleeve is not a peer of those tabs; it is the thing they are views of.** So it
+went one level above the tab row, into the header. The switch names both sleeves
+and the account beside it (`CEFs & BDCs · Roth IRA` / `Individual companies ·
+taxable`), and the tab row belongs to whichever is selected:
+
+| Sleeve | Tabs | Database |
+|---|---|---|
+| Income | Portfolio · Watchlist · Screen · Import · + Add Fund | `cef.db` |
+| Dividend Growth | Holdings · Screen · Calculators · Import | `dividend.db` |
+
+Screen › Dividend Growth moved out from under Screen, which is now CEFs/BDCs
+again. Calculators moved with it — yield on cost is a dividend-sleeve question
+and had no business at the top level.
+
+**`CEF.` is gone.** It was the wordmark of the standalone `cef` repo, archived in
+favour of this one. By now the book held two BDCs, Screen served a stock
+screener, and Calculators was entirely dividend-sleeve — it was the only thing
+on the page still claiming the app was about closed-end funds, while the global
+nav directly above already said Investments.
+
+**What this costs:** CEF Portfolio is one extra click from Dividend Holdings.
+They are different accounts under different tax treatment and are not compared
+side by side, so the click is the right trade. If that ever stops being true the
+answer is a combined view, not a flattened nav.
+
+**Two things noted while building, neither fixed:**
+
+- `holdings` is keyed on **ticker alone**. The same ticker in two accounts would
+  collide on import. Correct while this is one taxable account; revisit before
+  a second.
+- The holdings table grades payout and FCF coverage in red/amber, the same as
+  the screen. KO reads 0.58× FCF cover and has no dividend problem — free cash
+  flow is lumpy. The column header carries that caveat; the colour is a prompt
+  to read the filings, not a verdict.
+
+---
+
 ## 2026-09-19 — Tracking the taxable sleeve: what already exists, and the one fork left open
 
 **Parked, not decided.** Recorded so the next pass starts from the findings

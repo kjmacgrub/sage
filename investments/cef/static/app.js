@@ -28,6 +28,15 @@ let _bdcState = { running: false, done: 0, total: 0, errors: [] };
 let _bdcPollTimer = null;
 let _bdcShowLow = false;   // include rows too stale or unverifiable to rank
 let _lifetime = null;           // GET /api/holdings/lifetime
+
+// Which sleeve is on screen. Not a view of one dataset -- the two sleeves live
+// in different databases and different accounts (cef.db / Roth, dividend.db /
+// taxable), so `Portfolio` meant two different things until this existed.
+let _sleeve = (() => {
+  try { return localStorage.getItem('sage-sleeve') || 'income'; } catch (e) { return 'income'; }
+})();
+let _divHoldings = null;     // GET /api/dividend/holdings
+let _divImport = { csv: null, filename: null, plan: null, result: null };
 let _showInactive = false;
 let _inactiveFunds = null;  // null = not yet loaded
 let _screenPollTimer = null;
@@ -70,7 +79,10 @@ async function PATCH(url, body) {
 
 // === INIT ===
 async function init() {
+  normalizeTab();
   renderApp();
+  if (_tab === 'div-holdings') loadDivHoldings().then(renderApp);
+  if (_tab === 'div-screen') loadDividendScreen().then(renderApp);
   await loadAll();
   renderApp();
   // Auto-refresh prices from Yahoo Finance, then re-render with live data
@@ -121,29 +133,69 @@ async function loadSparklines() {
 }
 
 // === RENDER ===
+
+/** Sleeve is the level above the tab row, not a peer of it.
+ *
+ *  Portfolio, Watchlist and Import were all silently CEF-scoped; adding the
+ *  dividend sleeve's own holdings beside them would have put two unlabelled
+ *  portfolios in one row. Worse, one Import tab would have had to guess whether
+ *  a Schwab CSV belonged to the Roth or the taxable account -- exactly the guess
+ *  the importer refuses to make. Switching sleeve answers it from context.
+ *
+ *  Tab keys are namespaced per sleeve (`screen` vs `div-screen`) so a stale
+ *  `_tab` can never render one sleeve's view under the other's header. */
+const SLEEVES = {
+  income: {
+    label: 'Income',
+    context: 'CEFs & BDCs · Roth IRA',
+    tabs: [['portfolio', 'Portfolio'], ['watchlist', 'Watchlist'], ['screen', 'Screen'],
+           ['import', 'Import'], ['add', '+ Add Fund']],
+  },
+  dividend: {
+    label: 'Dividend Growth',
+    context: 'Individual companies · taxable',
+    tabs: [['div-holdings', 'Holdings'], ['div-screen', 'Screen'],
+           ['calc', 'Calculators'], ['div-import', 'Import']],
+  },
+};
+
+function sleeveSwitch() {
+  return Object.entries(SLEEVES).map(([k, v]) =>
+    `<button class="sleeve-btn${_sleeve === k ? ' active' : ''}" onclick="setSleeve('${k}')"
+       title="${v.context}">${v.label}</button>`).join('');
+}
+
+function setSleeve(key) {
+  if (_sleeve === key || !SLEEVES[key]) return;
+  _sleeve = key;
+  try { localStorage.setItem('sage-sleeve', key); } catch (e) {}
+  _sortCol = null;
+  setTab(SLEEVES[key].tabs[0][0]);
+}
+
 function renderApp() {
+  const sleeve = SLEEVES[_sleeve] || SLEEVES.income;
   document.getElementById('app').innerHTML = `
     <header id="app-header">
-      <div class="header-title">CEF<span>.</span></div>
+      <div class="header-left">
+        <div class="sleeve-switch">${sleeveSwitch()}</div>
+        <span class="sleeve-context">${sleeve.context}</span>
+      </div>
       <div class="header-right">
-        ${_lastUpdated ? `<span class="last-updated">Updated ${formatTime(_lastUpdated)}</span>` : ''}
+        ${_sleeve === 'income' && _lastUpdated ? `<span class="last-updated">Updated ${formatTime(_lastUpdated)}</span>` : ''}
         ${_tab === 'portfolio' ? `<button class="btn btn-ghost btn-sm" onclick="auditAllHeld()"
           title="Run the distribution audit on every held position, one at a time">⚖ Audit all</button>` : ''}
         ${_tab === 'watchlist' ? `<button class="btn btn-ghost btn-sm" onclick="auditAllWatchlist()"
           title="Audit every fund currently shown on the watchlist, one at a time">⚖ Audit all</button>` : ''}
-        <button class="btn btn-ghost btn-sm" onclick="refreshPrices()" id="refresh-btn">
+        ${_sleeve === 'income' ? `<button class="btn btn-ghost btn-sm" onclick="refreshPrices()" id="refresh-btn">
           ↻ Refresh
-        </button>
+        </button>` : ''}
       </div>
     </header>
 
     <div class="tabs">
-      <button class="tab ${_tab === 'portfolio' ? 'active' : ''}" onclick="setTab('portfolio')">Portfolio</button>
-      <button class="tab ${_tab === 'watchlist' ? 'active' : ''}" onclick="setTab('watchlist')">Watchlist</button>
-      <button class="tab ${_tab === 'screen' ? 'active' : ''}" onclick="setTab('screen')">Screen</button>
-      <button class="tab ${_tab === 'calc' ? 'active' : ''}" onclick="setTab('calc')">Calculators</button>
-      <button class="tab ${_tab === 'import' ? 'active' : ''}" onclick="setTab('import')">Import</button>
-      <button class="tab ${_tab === 'add' ? 'active' : ''}" onclick="setTab('add')">+ Add Fund</button>
+      ${sleeve.tabs.map(([k, label]) =>
+        `<button class="tab ${_tab === k ? 'active' : ''}" onclick="setTab('${k}')">${label}</button>`).join('')}
     </div>
 
     <div id="main">
@@ -153,6 +205,9 @@ function renderApp() {
       ${_tab === 'calc' ? renderCalculators() : ''}
       ${_tab === 'import' ? renderImport() : ''}
       ${_tab === 'add' ? renderAddFund() : ''}
+      ${_tab === 'div-holdings' ? renderDivHoldings() : ''}
+      ${_tab === 'div-screen' ? renderDividendScreen() : ''}
+      ${_tab === 'div-import' ? renderDivImport() : ''}
     </div>
 
     <div id="toast"></div>
@@ -1513,7 +1568,6 @@ function screenKindToggle() {
   return `<div class="summary-toggle" style="order:0;margin:0 0 12px">
     ${btn('cef', 'CEFs', 'Closed-end funds, from CEFConnect')}
     ${btn('bdc', 'BDCs', 'Business development companies, from SEC XBRL filings')}
-    ${btn('dividend', 'Dividend Growth', 'S&P 1500 companies that have raised the dividend for decades')}
   </div>`;
 }
 
@@ -1521,7 +1575,6 @@ async function setScreenKind(kind) {
   _screenKind = kind;
   _sortCol = null;
   if (kind === 'bdc' && !_bdcScreen.length) await loadBdcScreen();
-  if (kind === 'dividend' && !_divScreen.length) await loadDividendScreen();
   renderApp();
 }
 
@@ -1658,7 +1711,6 @@ function renderBdcScreen() {
 
 function renderScreen() {
   if (_screenKind === 'bdc') return renderBdcScreen();
-  if (_screenKind === 'dividend') return renderDividendScreen();
   const state = _screenData.length === 0 ? 'empty' : 'loaded';
   const isRunning = _screenPollTimer != null;
 
@@ -1985,7 +2037,16 @@ function setTab(tab) {
   if (tab === 'portfolio' && !Object.keys(_navSparklines).length) {
     loadSparklines().then(renderApp);
   }
+  if (tab === 'div-screen' && !_divScreen.length) loadDividendScreen().then(renderApp);
+  if (tab === 'div-holdings' && _divHoldings === null) loadDivHoldings().then(renderApp);
   renderApp();
+}
+
+/** A tab key saved under one sleeve must not survive into the other. */
+function normalizeTab() {
+  if (!SLEEVES[_sleeve]) _sleeve = 'income';
+  const keys = SLEEVES[_sleeve].tabs.map(t => t[0]);
+  if (!keys.includes(_tab)) _tab = keys[0];
 }
 
 function toggleHideHeld() {
@@ -3099,7 +3160,6 @@ function renderDividendScreen() {
 
   return `
     <div style="padding:0 0 24px">
-      ${screenKindToggle()}
       ${running ? `<div style="margin-bottom:12px">
         <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">
           ${_divState.phase || 'working'}… ${_divState.done} / ${_divState.total || '?'}</div>
@@ -3366,4 +3426,263 @@ function renderCalculators() {
         </table>
       </div>
     </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════
+// DIVIDEND SLEEVE — holdings and import (dividend.db, taxable)
+// ════════════════════════════════════════════════════════════════
+
+async function loadDivHoldings() {
+  try {
+    _divHoldings = await GET('/api/dividend/holdings');
+  } catch (e) {
+    _divHoldings = { holdings: [], total_value: 0, total_cost: 0, total_income_ttm: 0 };
+  }
+}
+
+/** Yield on cost is the column this sleeve exists for, so it leads.
+ *
+ *  It is measured against `initial_cost` -- the original outlay, written once --
+ *  not against cost_basis, which every DRIP purchase inflates. The two diverge
+ *  slowly and then enormously: at year 20 the same position reads 9.5% against
+ *  basis and 35.5% against the outlay. Both are shown so the gap is visible
+ *  rather than something to take on trust. */
+function renderDivHoldings() {
+  if (_divHoldings === null) {
+    return `<div class="empty-state"><p>Loading…</p></div>`;
+  }
+  const rows = _divHoldings.holdings || [];
+  if (!rows.length) return renderDivHoldingsEmpty();
+
+  const cost = _divHoldings.total_cost || 0;
+  const value = _divHoldings.total_value || 0;
+  const income = _divHoldings.total_income_ttm || 0;
+  const yoc = cost ? income / cost * 100 : null;
+  const curYld = value ? income / value * 100 : null;
+  const gain = value - cost;
+
+  const sorted = sortData(rows, _sortCol || 'value', _sortCol ? _sortAsc : false);
+
+  const tile = (k, v, s, lead) =>
+    `<div class="summary-item">
+       <div class="summary-label">${k}</div>
+       <div class="summary-value${lead ? ' positive' : ''}">${v}</div>
+       <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">${s}</div>
+     </div>`;
+
+  const num = (v, dp, suffix) => v == null
+    ? '<td style="color:var(--text-muted)">—</td>'
+    : `<td>${v.toFixed(dp)}${suffix || ''}</td>`;
+
+  // Same grading as the screen: a position that stops covering its dividend is
+  // the whole reason for the quarterly check, and it must not read as ordinary.
+  const grade = (v, bad, warn, suffix, higherIsBetter, dp) => {
+    if (v == null) return '<td style="color:var(--text-muted)">—</td>';
+    const risky = higherIsBetter ? v < bad : v > bad;
+    const caution = higherIsBetter ? v < warn : v > warn;
+    const color = risky ? 'var(--red)' : caution ? 'var(--yellow)' : 'var(--text)';
+    return `<td style="color:${color};font-weight:${risky || caution ? 600 : 400}">${v.toFixed(dp)}${suffix}</td>`;
+  };
+
+  return `
+    <div style="padding:0 0 24px">
+      <div class="summary-bar">
+        ${tile('Market value', fmt$(value),
+               `${fmtGain$(gain)} on ${fmt$(cost)} invested`)}
+        ${tile('Income (TTM)', fmt$(income),
+               `${fmt$(income / 12)} a month, before tax`)}
+        ${tile('Yield on cost', yoc != null ? yoc.toFixed(2) + '%' : '—',
+               curYld != null ? `${curYld.toFixed(2)}% against today's value` : '', true)}
+        ${tile('Positions', String(rows.length),
+               rows.length ? `${[...new Set(rows.map(r => r.account))].join(', ')}` : '')}
+      </div>
+
+      <div class="toolbar">
+        <span style="color:var(--text-2);font-size:13px">
+          Yield on cost is measured against the original outlay, never against
+          cost basis — DRIP inflates basis every quarter.</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            ${th('ticker', 'Ticker', true, 1)}
+            ${th('name', 'Name', true)}
+            ${th('shares', 'Shares')}
+            ${th('value', 'Value')}
+            ${th('weight', 'Weight', false, 0, 'Share of this sleeve at market value')}
+            ${th('initial_cost', 'Invested', false, 0, 'The original outlay. Written once at import and never updated — yield on cost is measured against this.')}
+            ${th('cost_basis', 'Basis', false, 0, 'Original outlay plus every reinvested dividend. Higher than Invested under DRIP, and the reason the two columns are separate.')}
+            ${th('yield_on_cost', 'YoC', false, 0, 'Trailing twelve months of dividends ÷ the original outlay. The number this sleeve is judged on.')}
+            ${th('yield_current', 'Yield', false, 0, "Current yield — what a new buyer gets today. Falls as the price rises; that is not a problem for a position already held.")}
+            ${th('div_cagr', 'Div CAGR', false, 0, 'Annual dividend growth over the measured window, from the screen')}
+            ${th('income_ttm', 'Income', false, 0, 'Dividends received over the trailing twelve months')}
+            ${th('payout_pct', 'Payout', false, 0, 'Dividend ÷ earnings. Cannot measure REITs, which are assessed on FFO.')}
+            ${th('fcf_cover', 'FCF cov', false, 0, 'Free cash flow ÷ the cash cost of the dividend. Lumpy — KO reads 0.58× and has no dividend problem.')}
+            <th style="position:static">Per share</th>
+          </tr></thead>
+          <tbody>
+            ${sorted.map(h => {
+              const ps = h.per_share || {};
+              const years = Object.keys(ps).sort();
+              const series = years.map(y => ps[y]);
+              return `<tr>
+                <td class="left col-sticky"><strong>${h.ticker}</strong></td>
+                <td class="left" style="color:var(--text-2);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                    title="${(h.name || '').replace(/"/g, '&quot;')}">${h.name || '—'}</td>
+                ${num(h.shares, 3)}
+                <td>${fmt$(h.value)}</td>
+                ${num(h.weight, 1, '%')}
+                <td>${fmt$(h.initial_cost)}</td>
+                <td style="color:var(--text-2)" title="${h.initial_cost && h.cost_basis > h.initial_cost
+                    ? fmt$(h.cost_basis - h.initial_cost) + ' of reinvested dividends' : 'No reinvestment recorded'}">${fmt$(h.cost_basis)}</td>
+                ${num(h.yield_on_cost, 2, '%')}
+                ${num(h.yield_current, 2, '%')}
+                ${num(h.div_cagr, 1, '%')}
+                <td>${fmt$(h.income_ttm)}</td>
+                ${grade(h.payout_pct, 100, 80, '%', false, 0)}
+                ${grade(h.fcf_cover, 0.8, 1.0, '×', true, 2)}
+                <td title="${years.map(y => y + ': $' + ps[y].toFixed(4)).join('  ')}">
+                  ${series.length > 1 ? divSpark(series)
+                    : series.length === 1 ? `<span style="color:var(--text-2)">$${series[0].toFixed(2)}</span>`
+                    : '<span style="color:var(--text-muted)">—</span>'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderDivHoldingsEmpty() {
+  return `
+    <div style="max-width:620px;margin:40px auto;color:var(--text-2);font-size:13.5px;line-height:1.6">
+      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:10px">
+        No positions yet</div>
+      <p style="margin:0 0 14px">
+        This sleeve is empty until a broker export is imported. Download the
+        transactions CSV from the taxable account and load it under
+        <strong>Import</strong> — leave the filename as Schwab wrote it, since
+        that is where the account number lives.</p>
+      <div style="padding:12px 14px;border-left:3px solid var(--yellow);
+                  background:rgba(240,192,64,0.08);border-radius:var(--radius-sm)">
+        <strong style="color:var(--text)">Before the first purchase:</strong>
+        elect <em>specific lot identification</em> as the cost-basis method at the
+        broker. It cannot be applied retroactively to shares already bought, and
+        the default (average cost or FIFO) gives away the ability to choose which
+        lots to sell.</div>
+      <p style="margin:14px 0 0;color:var(--text-muted);font-size:12.5px">
+        Candidates come from <strong>Screen</strong>; what a position compounds
+        into is under <strong>Calculators</strong>.</p>
+    </div>`;
+}
+
+// ------------------------------------------------------------------ import
+
+function renderDivImport() {
+  const r = _divImport.result;
+  return `
+    <div style="max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:24px">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em">Import broker transactions</div>
+        <p style="font-size:13px;color:var(--text-2);margin:0 0 12px;line-height:1.55">
+          In Schwab: <strong>Accounts → History → Export</strong>, the <strong>All</strong>
+          date range. <strong>Do not rename the file</strong> — Schwab puts no account
+          column in the CSV, so the account is read from the filename and an
+          unreadable name is refused rather than guessed at.
+        </p>
+        <input type="file" accept=".csv" onchange="onDivUpload(this)" style="color:var(--text-2)">
+        <div id="div-import-status" style="font-size:13px;color:var(--text-2);margin-top:8px"></div>
+        ${r ? `<div style="margin-top:12px;padding:10px 12px;border-left:3px solid var(--green);
+          background:rgba(46,204,113,0.08);border-radius:var(--radius-sm);font-size:13px;line-height:1.5">
+          <strong style="color:var(--green)">Import complete.</strong> ${r}
+        </div>` : ''}
+      </div>
+      <div id="div-import-preview" style="display:none">
+        <div id="div-import-preview-content"></div>
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+          <button class="btn btn-primary" id="div-import-confirm-btn" onclick="confirmDivImport()" disabled>Confirm Import</button>
+          <span id="div-import-result" style="font-size:13px;color:var(--text-2)"></span>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function onDivUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _divImport = { csv: await file.text(), filename: file.name, plan: null, result: null };
+  const status = document.getElementById('div-import-status');
+  if (status) status.textContent = 'Reading ' + file.name + '…';
+  try {
+    const plan = await POST('/api/dividend/import/preview',
+      { csv: _divImport.csv, filename: file.name, broker: 'schwab' });
+    renderDivImportPlan(plan);
+    if (status) status.innerHTML = `Read <strong>${file.name}</strong> — account <strong>${plan.account}</strong>`;
+  } catch (e) {
+    if (status) status.innerHTML = `<span style="color:var(--red)">${e.message}</span>`;
+    const pv = document.getElementById('div-import-preview');
+    if (pv) pv.style.display = 'none';
+  }
+}
+
+function renderDivImportPlan(plan) {
+  _divImport.plan = plan;
+  document.getElementById('div-import-preview').style.display = '';
+  const btn = document.getElementById('div-import-confirm-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Confirm Import'; }
+
+  const table = (title, list) => !list.length ? '' : `
+    <h4 style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin:16px 0 8px">${title}</h4>
+    <table style="width:100%;font-size:13px">
+      <thead><tr><th class="left" style="position:static">Ticker</th>
+        <th style="position:static">Shares</th>
+        <th style="position:static" title="The original outlay — set once on a new position and never updated afterwards">Invested</th>
+        <th style="position:static" title="Outlay plus reinvested dividends">Basis</th>
+        <th style="position:static">Dividends</th></tr></thead>
+      <tbody>${list.map(x => `<tr>
+        <td class="left">${x.ticker}</td>
+        <td>${x.shares}</td>
+        <td>${x.initial_cost != null ? fmt$(x.initial_cost) : '—'}</td>
+        <td>${fmt$(x.cost_basis)}</td>
+        <td class="positive">${fmt$(x.dividends_received)}</td></tr>`).join('')}
+      </tbody></table>`;
+
+  document.getElementById('div-import-preview-content').innerHTML = `
+    ${(plan.warnings || []).map(w => `<div style="margin-bottom:14px;padding:10px 12px;
+      border-left:3px solid var(--red);background:rgba(231,76,60,0.08);
+      border-radius:var(--radius-sm);font-size:12.5px;line-height:1.5">
+      <strong style="color:var(--red)">Check the account.</strong> ${w}</div>`).join('')}
+    <div style="display:flex;gap:20px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:13px">
+      <div><div style="font-size:11px;color:var(--text-muted)">Account</div><div>${plan.account}</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted)">Trades</div><div>${plan.trades}</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted)">Dividend rows</div><div>${plan.dividends}</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted)">Positions</div><div>${plan.new.length + plan.updated.length}</div></div>
+    </div>
+    ${table('New positions', plan.new)}
+    ${table('Existing positions — updated', plan.updated)}
+    ${plan.updated.length ? `<div style="margin-top:12px;font-size:12px;color:var(--text-muted);line-height:1.5">
+      <strong>Invested</strong> is left untouched on existing positions. It records the
+      original outlay and cannot be reconstructed once overwritten.</div>` : ''}`;
+}
+
+async function confirmDivImport() {
+  if (!_divImport.csv) return;
+  const btn = document.getElementById('div-import-confirm-btn');
+  const resultEl = document.getElementById('div-import-result');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Importing…'; }
+  try {
+    const res = await POST('/api/dividend/import/confirm',
+      { csv: _divImport.csv, filename: _divImport.filename, broker: 'schwab' });
+    const c = res.counts;
+    _divImport = { csv: null, filename: null, plan: null,
+      result: `${res.account} — ${c.holdings} positions, ${c.trades} new trades, `
+            + `${c.dividends} new dividend rows.` };
+    await loadDivHoldings();
+    renderApp();
+    toast(`Import complete — ${c.holdings} positions updated`);
+  } catch (e) {
+    if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm Import'; }
+  }
 }
