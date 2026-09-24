@@ -184,7 +184,7 @@ Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 |---|---|---|---|
 | Long Put Hedge | none, 2% | 41.9% | 0 DTE, net credit — the crash convexity |
 | QQQ Leap | none | 20.9% | 74 trades, 6 losses — thinnest evidence in the book |
-| Sell puts on rising SMA | 100 | 20.6% | 65 DTE credit put spread, goes flat before dislocations |
+| Sell puts on rising SMA | 100 | 20.6% | 65 DTE credit put spread, goes flat before dislocations. Filter is `Compare SMA, 10 > 20` — a **crossover**, despite the name; no RSI leg |
 | Double Calendar (MTW) | 50 | 16.6% | 2/7 DTE, Mon/Tue/Wed only |
 
 Backtest CAGR 74.3%, max drawdown 11.01%, peak margin 35.7%.

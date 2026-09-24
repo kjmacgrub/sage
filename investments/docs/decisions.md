@@ -1702,7 +1702,11 @@ belief has been shaping designs around a constraint that may not exist.
 ### Sell puts on rising SMA — added
 
 5-wide SPX credit put spread, daily entry, SMA filter, 1% allocation, 5 max
-open. Standalone: 26.5% CAGR, **1.9% max drawdown**, 7 losers in 1,317 trades.
+open. **The filter is `Compare SMA, 10 > 20` — a crossover, not a slope**
+(confirmed from the OO settings screen 2026-09-24; both RSI fields are empty,
+so there is no RSI leg). The strategy's *name* says "rising SMA," which reads as
+a slope test and gives the opposite answer on some days: on 2026-09-24 SPX had
+10 below 20 while both SMAs were rising. Judge it on the crossover. Standalone: 26.5% CAGR, **1.9% max drawdown**, 7 losers in 1,317 trades.
 Went flat through COVID, Aug 2024 and Apr 2025 — zero positions open at the
 midpoint of each. In the portfolio it improved **every** metric at once:
 
