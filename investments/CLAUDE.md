@@ -291,7 +291,8 @@ were removed entirely in favour of Greek/VIX exits.
 - **Superseded 2026-09-12 — the entry filter was never what this note assumed.**
   Reconstructed against all 74 real trades: `SMA10 > SMA20` held on only **28 of
   74** entries and `Max RSI 69` blocked **zero days**, so neither leg was
-  filtering anything. `gap ≤ −1.5%` alone reproduces every entry. The warning
+  filtering anything. `gap ≤ −1.5%` alone reproduced every one of those 74.
+  **That is history, not the live config — see the entry rule below.** The warning
   against tuning still stands for *fitted* filters — the one that removes the six
   2022 losers gives up $723k to save $24k, and the 2022 pattern reverses over 27
   years — but a **rising-SMA200 trend gate is not that**: it holds in both eras
@@ -301,7 +302,25 @@ were removed entirely in favour of Greek/VIX exits.
 - **This book wants room.** A wider profit target beat a narrower one; the deep put
   stop (90) beat 70/80; the hedge's every dollar comes from letting positions expire
   while its two management exits lose $4.66M. Defined-risk structures recover.
-- **QQQ Leap sizing — use 7%, and price it at the strike you actually buy.**
+- **QQQ Leap's live entry is `Move Down ≥ 1.75%` at a 15:30 entry, above a
+  rising 200-day SMA** — profit target 60%, exit at 3 DTE, round strike to 5.
+  Verified against all 37 entries in the 2019–2026 run: Movement median −2.29%,
+  every entry qualifying, while **only 3 of 37 would have passed `gap ≤ −1.5%`**.
+  A late entry widens OO's `Move` window to most of the session, so this is an
+  intraday slide caught near the close — the nearest thing OO can express to a
+  true intraday touch. **The gap-vs-move table in the 2026-09-12 decisions entry
+  predates fixed sizing and is not a live comparison**; it was measured on $30M
+  endings with floating position size.
+- **Sizing is by CONTRACT CAP, not percentage allocation (2026-09-26).** Each
+  strategy runs a fixed count — 2 / 2 / 2 / 1 / 3 for Puts, Calendar, CIC-AM,
+  QQQ Leap, Hedge. A strategy's configured percentage (QQQ Leap still reads 5%)
+  is **deliberately overridden by the cap** and the effective allocation is far
+  lower — QQQ Leap runs at ~0.89% of the account. That is the design, not a
+  misconfiguration: caps are what made the book measurable, and they get raised
+  methodically on live evidence rather than by restoring a percentage. The
+  percentage-sizing warnings below are history from the pre-cap era.
+- **QQQ Leap sizing — historical, from the percentage era; superseded by the cap
+  above.**
   The strategy enters at **362–448 DTE, strike ≈ 0.974 × spot**, which is ~66
   delta, not 60. At QQQ $716.66 (2026-09-11) that strike costs **~$9,264**, not
   the ~$7,800 a true 60-delta implies — an 18% difference that moves every

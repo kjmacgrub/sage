@@ -156,6 +156,27 @@ It is still the strategy to watch, because the year-by-year swing is enormous:
 Two years below alarm (2023, 2024) and **2026 running at −$30/contract**. Keep
 it; track it as its own line rather than inside the total.
 
+### Sizing is by contract cap now, and QQQ Leap's entry is the Move rule
+
+Two things a reader will misinterpret from the configs alone:
+
+**The strategies' percentage allocations are deliberately overridden.** QQQ Leap
+still reads `Allocate 5% of portfolio` in its dialog, but every one of its 37
+trades is **1 contract at ~0.89% of the account**. That is the cap doing its
+job, not a misconfiguration. Contract caps replaced percentage sizing precisely
+because percentage sizing is what produced the $18.7M fantasy — and caps are
+raised methodically on live evidence, not restored to a percentage. Anyone
+reading "5%" and computing 4–7 contracts is reading the wrong number.
+
+**QQQ Leap's live entry is `Move Down ≥ 1.75%` at 15:30**, above a rising
+200-day, with a 60% profit target and a 3 DTE exit. Verified across all 37
+entries: Movement median **−2.29%**, every entry qualifying, while **only 3 of 37
+would have passed the `gap ≤ −1.5%` rule** recorded for the original 74 trades.
+A 15:30 entry widens OO's `Move` window to most of the session, so this triggers
+on an intraday slide caught near the close — the closest OO can get to a true
+intraday touch, per the 2026-09-12 entry. The gap-vs-move table there was
+measured under percentage sizing and is **not** a live comparison.
+
 ### What is still thin
 
 - **7.36 years with one real bear**, and 2022 was mild at the index level.
@@ -1313,6 +1334,12 @@ original trades.
 Consequence: **a true intraday touch — "fell 3% below yesterday's close at any
 point" — is not expressible in OO at any entry time.** The nearest available
 thing is a late entry, which widens the Move window to most of the session.
+
+**Read the table below as history.** It was measured with *percentage* sizing
+on $30M endings; the book moved to fixed contract caps on 2026-09-26 and the
+comparison has not been re-run under them. The live config is `MOVE −1.75%
+@15:30`, chosen on this work — the MAR edge shown for GAP belongs to a sizing
+regime that no longer applies.
 
 Tested at a 15:30 entry, everything else at the settled config:
 
