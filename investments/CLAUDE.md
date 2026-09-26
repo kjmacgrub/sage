@@ -180,15 +180,23 @@ Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 
 **Current book** — rebuilt Sept 2026, backtested 2017-05-16 → 2026-09-08 on $200k:
 
-| Strategy | Cap | Share | Notes |
-|---|---|---|---|
-| Long Put Hedge | none, 2% | 41.9% | 0 DTE, net credit — the crash convexity |
-| QQQ Leap | none | 20.9% | 74 trades, 6 losses — thinnest evidence in the book |
-| Sell puts on rising SMA | 100 | 20.6% | 65 DTE credit put spread, goes flat before dislocations. Filter is `Compare SMA, 10 > 20` — a **crossover**, despite the name; no RSI leg |
-| Double Calendar (MTW) | 50 | 16.6% | 2/7 DTE, Mon/Tue/Wed only |
+| Strategy | Cap | Share | $/ctr | Notes |
+|---|---|---|---|---|
+| Sell puts on rising SMA | 100 | 37.3% | +78 | 65 DTE credit put spread, goes flat before dislocations. Filter is `Compare SMA, 10 > 20` — a **crossover**, despite the name; no RSI leg |
+| Double Calendar (MTW) | 50 | 24.6% | +98 | 2/7 DTE, Mon/Tue/Wed only. Lifetime fine but **−$30/ctr in 2026** — track it separately |
+| **CIC - AM** | **2** | 18.8% | +42 | 10:00 SPX 0DTE condor, 15Δ shorts / ~1Δ wings, 200% stop. Replaced both afternoon condors. **Never traded live** |
+| QQQ Leap | none | 9.7% | +1,849 | 37 trades in 7.4 yrs; absent entirely in 2022 and 2026 |
+| Long Put Hedge | none, 2% | 9.6% | +95 | 0 DTE, net credit. $95 is the **post-2022-05-11** figure; see the blended-figure trap below |
 
-Backtest CAGR 74.3%, max drawdown 11.01%, peak margin 35.7%.
-**Plan against 30% CAGR and 20% drawdown**, not the backtest figures.
+**Measured 2019-05-16 → 2026-09-25 at FIXED sizing** (2/2/2/1/3 contracts, flat
+across eight years), from the **portfolio export**: $200k → **$904,622**,
+**22.8% CAGR**, **−5.50% max drawdown** marked daily with open positions
+included, **positive in 8 of 8 calendar years**, zero days worse than −10% in
+1,851 sessions. **Plan against 20% CAGR and 10% drawdown** — this supersedes the
+old 30%/20% figures, which came from a run that compounded position size.
+
+Shares here are not comparable to the pre-2026-09-26 table, where floating
+sizing put the Hedge at 41.9% and QQQ Leap at 20.9%.
 
 **Daily Calendar 14/16 was cut** — $13/contract across 2,143 trades. Stop losses
 were removed entirely in favour of Greek/VIX exits.
@@ -319,6 +327,23 @@ were removed entirely in favour of Greek/VIX exits.
   priced $65–131. Pull the chain from
   `https://cdn.cboe.com/api/global/delayed_quotes/options/QQQ.json` — it carries
   OI, volume and greeks; Yahoo's options endpoint now 401s.
+- **Ignore any portfolio backtest that lets position sizing float.** The same
+  book unconstrained reached $18.7M and an 85.3% CAGR on median 211-contract
+  hedges and 79-contract QQQ Leaps — the latter unfillable per the chain check.
+  Fix sizing to what you would actually trade, then read the portfolio export.
+- **Share of P/L is a function of sizing, not merit.** At fixed size the Hedge
+  is 9.6% of P/L rather than 41.9%; `CIC - AM` read 0.7% in the floating run
+  purely because it is capped at 2 while everything else scaled 25–100×. Judge
+  on per-contract edge.
+- **The Long Put Hedge's blended per-contract edge is a false alarm on any window
+  reaching before 2022-05-11**, when its instrument launched: −$22/contract
+  before (n=315), **+$95 after (n=427)**, against a $51 alarm. A full-history run
+  will keep reporting ~$45 and look like a tripwire. It is not.
+- **A margin-starved run silently selects losers.** At $40k the book took **13 of
+  137** Double Calendar signals in Q4 2024 and they were the bad ones, making the
+  strategy read $46/contract (below alarm) where at tradeable size it is **+$98
+  lifetime**. Check trade counts against a full-size run before trusting any
+  per-contract figure.
 - **`Max Open Positions` is unreliable per-run, which is worse than broken.**
   A cap of 5 bound correctly (peak concurrency fell 7 → 5), then a cap of 3
   returned files **byte-identical** to the cap-5 run — same MD5, 79 minutes apart,
