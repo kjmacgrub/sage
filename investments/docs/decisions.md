@@ -164,9 +164,14 @@ margin by which wins exceed losses:
 | 51.4% | +$11 |
 | 53.0% | **+$3** |
 
-A five-point move in stop rate removes 90% of the carry. Pulling the shorts out
-and taking the stop rate from ~52% to ~28% is what made everything else
-possible. **No wing setting can fix a broken carry.**
+A five-point move in stop rate removes 90% of the carry. Taking the stop rate
+from ~52% to ~28% is what made everything else possible, and it took **two**
+changes together: shorts pulled from 20Δ put / 30Δ call out to **15Δ / 15Δ**,
+and the stop widened from **100% to 200%**. The stop widening is probably the
+larger of the two — a wider stop is simply hit less often, and with a
+defined-risk spread the loss is bounded by the width regardless, so the tighter
+stop was buying less protection than it appeared to. **No wing setting can fix a
+broken carry.**
 
 **Fixed-point wing offsets drift as the index rises.** A ±100 offset was a
 3.09% tail at SPX 3,900 and a 1.61% tail at SPX 7,400 — nearly twice as close to
@@ -182,7 +187,24 @@ automatically better.
 
 ### Where it landed — `CIC - AM`
 
-10:00 entry, SPX, one contract, no re-entry, delta-set wings, ~28% stop rate:
+**The config, reconstructed from the trade log** (deltas backed out from fill
+prices, so this survives losing the dialog):
+
+| setting | value |
+|---|---|
+| Underlying / entry / DTE | SPX · **10:00** · **0 DTE**, exact |
+| Contracts · re-entry | **1** · **off** (max 1 entry/day across 1,095 sessions) |
+| Sell Put / Sell Call | **15Δ / 15Δ** (backs out to 15.1 and 15.2) |
+| Buy Put / Buy Call | **~1Δ** (backs out to 1.3-1.4; deep-OTM delta is IV-sensitive) |
+| Stop loss | **200%** (closes at 3.05x credit, p25 3.04 / p75 3.09) |
+| Profit target | none — held to expiry |
+| Commissions · slippage | 1.175 / 1.22 · entry 0.035 · stop 0.05 |
+| 0-DTE Intra-Minute Stops | **ON** |
+
+Resulting structure, produced by the deltas rather than set: spread width median
+**55pt** (p10 35, p90 115, max 190); margin median **$6,388**, p90 $12,563.
+
+Results — 10:00 entry, SPX, one contract, no re-entry, delta-set wings, ~28% stop rate:
 
 | | carry | surplus | total | calendar yrs | margin |
 |---|---|---|---|---|---|

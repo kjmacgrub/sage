@@ -224,12 +224,13 @@ were removed entirely in favour of Greek/VIX exits.
   plus noise.** Measured entry slippage on 583 matched live pairs: **4.5–10¢/leg**
   at one contract.
 - **Iron condors: three attempts. The third (2026-09-26) cleared the bar.**
-  `CIC - AM` — 10:00 SPX entry, one contract, no re-entry, **delta-set wings**,
-  ~28% stop rate — is positive in all five calendar years *and* its carry covers
+  `CIC - AM` — 10:00 SPX entry, 0 DTE, one contract, no re-entry, **15Δ shorts /
+  ~1Δ wings, 200% stop** — is positive in all five calendar years *and* its carry covers
   its ticket cost in all five. +$78,530 carry, +$63,389 total, ~$11,443 margin.
-  **The two levers that mattered: stop rate 52% → 28% (the carry is a knife edge
-  on it — 47.8% pays $41/short, 53.0% pays $3), and delta-set rather than
-  fixed-point wings (a ±100 offset was a 3.09% tail at SPX 3,900 and a 1.61%
+  **The two levers that mattered: stop rate 52% → 28% — which took BOTH pulling
+  the shorts from 20Δ/30Δ out to 15Δ/15Δ AND widening the stop from 100% to 200%
+  (the carry is a knife edge on it — 47.8% pays $41/short, 53.0% pays $3) — and
+  delta-set rather than fixed-point wings (a ±100 offset was a 3.09% tail at SPX 3,900 and a 1.61%
   tail at 7,400, tripling ticket costs).** Fits the capital only on its own —
   running it alongside the afternoon pair puts 58 of 184 days over budget. Never
   traded live. See the 2026-09-26 decisions entry for the full sequence; the
