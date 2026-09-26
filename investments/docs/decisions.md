@@ -62,6 +62,112 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-09-26 — The rebuilt book, measured properly: 22.8% CAGR, −5.5% drawdown
+
+`CIC - AM` replaces both afternoon condors. Measured **2019-05-16 → 2026-09-25,
+7.36 years, fixed position sizing, from the portfolio export** rather than the
+trade log:
+
+| | |
+|---|---|
+| Start / end net liquidity | $200,000 → **$904,622** |
+| CAGR | **22.8%** |
+| **Max drawdown** | **−5.50%** (2022-02-23, marked daily *including open positions*) |
+| Days worse than −10% | **0 of 1,851** |
+| Calendar years positive | **8 of 8** |
+
+Returns by year: 12.7 · 36.9 · 19.7 · 21.1 · 19.8 · 22.8 · 29.9 · 6.0 (2026 part-year).
+Worst drawdown by year never exceeds −5.50%.
+
+**This supersedes the "plan against 30% CAGR and 20% drawdown" framing** — not
+because the plan was wrong, but because it was written against a backtest that
+compounded position size. At sizes actually tradeable the book returns less than
+the planning figure and risks far less than the planning figure, which is the
+right direction to be wrong on both.
+
+### Why this number is trustworthy where the earlier ones were not
+
+- **Sizing is fixed and verified**: 2 / 2 / 2 / 1 / 3 contracts, flat in every
+  one of the eight years. The 22.8% is compounding *capital*, not inflating
+  *position size*. A parallel run that let sizing float reached $18.7M and an
+  85.3% CAGR with median 211-contract hedge positions and 79-contract QQQ Leaps
+  — the latter unfillable per the 2026-09-11 chain check. **Ignore any portfolio
+  backtest that doesn't fix sizing.**
+- **Drawdown comes from the portfolio CSV, which marks open positions daily.**
+  The trade log's closed-trade equity showed 9.0% on the same book. 37% of
+  trades carry overnight (Double Calendar 100%, Sell Puts 71%, QQQ Leap 100% at
+  a 135-day median), and the trade log is blind to all of it.
+
+### The book survived both crises for different reasons
+
+**COVID, 2020-02-19 → 03-23** — four of five strategies positive:
+
+| | trades | P/L |
+|---|---|---|
+| Double Calendar | 10 | **+$15,398** |
+| Long Put Hedge | 16 | +$6,338 |
+| QQQ Leap | 2 | +$2,833 |
+| Sell puts on rising SMA | 6 | +$839 |
+| CIC - AM | 15 | −$7,494 |
+
+Sell puts took only 6 trades — the documented "goes flat before dislocations"
+behaviour, and the reason 2020's worst drawdown was only −4.57%.
+
+**The deepest drawdown was Jan–Feb 2022, not COVID.** There the Hedge lost
+$8,924 while the Calendar made $8,880 — they offset. Worth knowing that the
+worst moment in seven years came from an ordinary index decline, not a crash.
+
+### Per-contract edge at fixed size, against the tripwires
+
+| strategy | trades | share | $/contract | alarm |
+|---|---|---|---|---|
+| Sell puts on rising SMA | 1,116 | 37.3% | +78 | 38 ✓ |
+| Double Calendar (MTW) | 879 | 24.6% | +98 | 65 ✓ |
+| CIC - AM | 1,575 | 18.8% | +42 | — |
+| QQQ Leap | 37 | 9.7% | +1,849 | 1,328 ✓ |
+| Long Put Hedge | 742 | 9.6% | +45 | 51 — see below |
+
+**The Hedge is not below alarm.** Its instrument launched 2022-05-11; split
+there it reads **−$22/contract before (n=315) and +$95 after (n=427)**. Only the
+post figure means anything. The blended number will keep looking like a trip
+every time the window reaches back past 2022 — do not act on it.
+
+**At fixed size the Hedge is 9.6% of P/L, not the 41.9% in the current book.**
+Share is a function of sizing, not merit; the per-contract figure is the honest
+read. Same correction applies to CIC - AM, which looked like 0.7% in the
+floating-size run purely because it is capped at 2 contracts while everything
+else scaled 25–100×.
+
+### Corrected: the Double Calendar stays
+
+An earlier read in this session called it dead weight — $46/contract, 0.7% of
+P/L, below its $65 alarm. **That was computed on a margin-starved run.** At
+$40k the book took **13 of 137 available Calendar signals in Q4 2024**, and the
+survivors were losers. At tradeable size it is **+$98/contract lifetime**,
+comfortably above alarm, and it was the single best performer through COVID.
+
+It is still the strategy to watch, because the year-by-year swing is enormous:
+
+```
+2019  2020  2021  2022  2023  2024  2025  2026
+ +14  +107   +98  +146   +45   +60  +269   -30
+```
+
+Two years below alarm (2023, 2024) and **2026 running at −$30/contract**. Keep
+it; track it as its own line rather than inside the total.
+
+### What is still thin
+
+- **7.36 years with one real bear**, and 2022 was mild at the index level.
+- **QQQ Leap contributes 9.7% on 37 trades** — 5/yr, and it does not trade at
+  all in 2022 or 2026. Thin evidence, and it should not be assumed to be a
+  steady contributor.
+- **None of `CIC - AM` has been traded live.** The live record belongs to the
+  two afternoon condors it replaces: +$8,105 on 602 real fills in 2026.
+- The IC is deliberately capped at **2 contracts** pending live experience.
+
+---
+
 ## 2026-09-26 — Iron condors, third attempt: measure the friction, then fix the carry
 
 The two previous attempts killed the condors. This one did not, and the reason
