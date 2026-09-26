@@ -62,6 +62,179 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-09-26 — Iron condors, third attempt: measure the friction, then fix the carry
+
+The two previous attempts killed the condors. This one did not, and the reason
+is that almost everything the earlier verdicts rested on turned out to be an
+input error rather than a finding. **Read the sequence, not just the final
+config** — four things had to be fixed in order, and each looked like the answer
+when it wasn't.
+
+### 1. The friction was assumed, and the assumptions were wrong
+
+Derived from 1,775 live leg-rows across a full year:
+
+| input | was set to | actually measured |
+|---|---|---|
+| Opening commission | 1.75 | **1.175** (1,118 of 1,150 rows exact) |
+| Closing commission | 1.75 | **1.22** (536 of 625 exact) |
+| Entry slippage | 0.20/leg | **0.035/leg** (n=174 matched legs) |
+
+The commission setting alone overstated costs **49%** — $5,362 modelled against
+$3,603 actually paid. Entry slippage was 6x too high. Against a strategy whose
+measured gross edge was $72,932 over 4.3 years, that is not a rounding error;
+it is most of the reason the second attempt read negative.
+
+**Wings fill better than OO's mid, shorts fill worse.** Short legs +0.035, long
+wings −0.027 per leg. OO takes the midpoint of a wide quote on cheap OTM
+options; a worked limit order gets inside it. Do not model a single blended
+slippage number across a condor's legs.
+
+**Exit slippage could not be measured and still hasn't been.** Matched
+stop-outs fire at different moments live and in the backtest, so the difference
+is exit timing, not spread cost — it came out *negative*, which is the tell.
+Stop-loss slippage is set to 0.05 as an assumption. It does not bind:
+**breakeven is 0.539/leg**, ten times the assumption.
+
+### 2. `Use 0-DTE Intra-Minute Stops` is conservative, not wrong
+
+Checked against 272 matched stop-outs (same strategy, date and entry minute):
+
+| | per contract |
+|---|---|
+| Live broker fills | −$78.7 |
+| OO with the setting ON | **−$129.2** |
+| OO is worse by | **+$50.6**  (t = 2.71) |
+
+Stop-loss slippage explains about $5 of that; the remaining ~$46 is the
+intra-minute model itself. OO fills at the worst price *inside* the minute; a
+resting broker stop triggers on a print and fills at the next available price.
+**Leave it ON** — the 2022 note stands (with it off, a $22k live year backtested
+at $90k), and every result below carries ~$50/contract of built-in pessimism on
+the ~28% of shorts that stop.
+
+### 3. Live and backtest were not the same strategy
+
+Three mismatches found by comparing the logs directly, none of them visible in
+the settings dialogs:
+
+- **`CIC - 3:10` ran live at 14:45 from January through August**, switching to
+  15:10 only in September. The backtest modelled 15:10 all year — so 252 of 257
+  live trades were a different strategy from the one being tested.
+- **Re-entry counts differ**: live averaged 1.91 entries per strategy-day
+  against the backtest's 2.24, reaching four entries on 9 days where the
+  backtest managed 71. The live trigger is gated by something OO does not model.
+- **Margin models differ.** Schwab holds **full spread width** ($5,000 on a
+  50-wide, confirmed by observation); OO holds **width minus credit** ($4,348).
+  Ratio **1.15x**. That closes the long-open `decisions.md` question about
+  whether an IRA holds full width — it does.
+
+After correcting friction, the matched live-vs-backtest gap fell from
+**+$64.9/contract (t=2.19, significant)** to **+$22.6 (t=1.24, not)**, with win
+rates converging to 49.0% live against 49.3% modelled. **The model is now
+validated on shared trades** — which it demonstrably was not before.
+
+### 4. The condors are not an income strategy, and that is fine
+
+In the original configuration, **52% of all P/L came from 23 days out of 1,086
+(2.1%)**, and a single day (2024-12-18, Fed day, SPX −203) was **29% of the
+entire 4.4-year total**. On those days the strategy enters 6.09 times against
+4.24 normally, accumulating cheap long puts as the market falls.
+
+The premium collected on quiet days is buying lottery tickets. The tickets are
+the P/L. That is coherent, but it is **long volatility wearing an income
+strategy's clothes**, and it defeats the "positive in every calendar year" bar —
+with that distribution, whether a year is positive depends on whether a tail day
+lands inside it.
+
+**Each ticket is EV-negative**: $53 cost, 1.4% hit rate, $2,304 average payout
+= **−$20.30 per set**. The wings lose money in aggregate, every year. The
+strategy works only because the carry exceeds the ticket cost. **More wings
+without more carry is strictly negative EV.**
+
+### The two levers that actually mattered
+
+**The carry is a knife edge on the stop rate.** At a 100% stop you keep the
+credit on winners and lose all of it on losers, so the entire carry is the thin
+margin by which wins exceed losses:
+
+| stop rate | carry per short |
+|---|---|
+| 47.8% | **+$41** |
+| 51.4% | +$11 |
+| 53.0% | **+$3** |
+
+A five-point move in stop rate removes 90% of the carry. Pulling the shorts out
+and taking the stop rate from ~52% to ~28% is what made everything else
+possible. **No wing setting can fix a broken carry.**
+
+**Fixed-point wing offsets drift as the index rises.** A ±100 offset was a
+3.09% tail at SPX 3,900 and a 1.61% tail at SPX 7,400 — nearly twice as close to
+the money, so ticket costs tripled from $29 to $94 while credit held flat.
+Credit/ticket collapsed from 21.6x to 6.6x. **Specify the wing by delta, not by
+points**, or it silently degrades every year the market goes up.
+
+One caution, learned the hard way: **spread width caps the payout as well as
+the margin.** A first attempt at fixing the drift used 1Δ wings, which came in
+*narrower* in the early years — tickets hit twice as often but each payout was
+halved, and total P/L fell from +$36,888 to +$25,118. Cheaper is not
+automatically better.
+
+### Where it landed — `CIC - AM`
+
+10:00 entry, SPX, one contract, no re-entry, delta-set wings, ~28% stop rate:
+
+| | carry | surplus | total | calendar yrs | margin |
+|---|---|---|---|---|---|
+| 100-wide fixed | +$71,883 | +$24,138 | +$67,145 | 3/5 | $9,203 |
+| 190-wide fixed | +$71,883 | +$49,823 | +$57,950 | **5/5** | $18,193 |
+| **CIC-AM (2)** | **+$78,530** | +$28,210 | **+$63,389** | **5/5** | **$11,443** |
+
+**CIC-AM (2) is the first configuration in three attempts to clear the standing
+bar** — positive in every calendar year, and carry covering ticket cost in every
+calendar year. Credit/ticket is flat at 12.5–14.9x across all five years, so the
+drift is genuinely fixed rather than deferred.
+
+**And the shape changed, which matters more than the total.** The wings lost
+money in four of five years and the strategy still made money in all five. Top
+5 days are 41% of P/L, down from 70%+; the biggest year is 34%, down from 52%.
+It is now a carry strategy that carries insurance, not a tail bet — which is a
+far more fundable thing.
+
+### What this costs and what is still open
+
+- **It fits the capital only on its own.** Alone: median $13,159 of concurrent
+  margin at Schwab's collateral, zero days over the ~$40k budget. Run alongside
+  the afternoon pair: median $33,603 and **58 of 184 days over budget**. Adopting
+  it means retiring or shrinking `CIC - 3:10` and `CIC - D 35/30`.
+- **XSP is not an escape hatch.** One SPX contract is the floor, and the
+  mini would have failed anyway: its bid-ask is **5.8x SPX's in relative terms**
+  while the credit is exactly one tenth, so friction eats **11.9% of credit
+  against a 9.1% carry** — underwater before it starts. Same mechanism that
+  killed the first attempt: friction scales with legs, not with credit. (OO
+  does not support XSP in any case.)
+- **It has never been traded.** Every number above is modelled. The live record
+  belongs to the afternoon pair it would replace: **+$8,105 on 602 real fills**
+  this year.
+- **2026 is thin at +$2,486** — positive, but the only year where the wings cost
+  real money ($9,373) with no payoff. That is the expected case for insurance,
+  not a malfunction, but it is the year to watch.
+
+### A data error worth reporting
+
+**OO priced a 0DTE call at $51.60 that was 36 points out of the money at the
+day's high** (2026-05-18, 7470C, SPX high 7,434.06). Black-Scholes at the day's
+best price with a generous 40% IV caps it at $1.96. That single row was −$5,000,
+or 22% of that run's entire 4.4-year P/L.
+
+Of 22 breaches beyond 3x credit, **20 were physically plausible** — blowing past
+a 100% stop is genuine behaviour for 0DTE shorts, since the stop is a trigger
+that becomes a market order and expiry-day gamma does the rest. Only two were
+impossible. **Check large breaches against the day's actual high/low before
+accepting them**, and report the bad ones — they may be contaminating other runs.
+
+---
+
 ## 2026-09-19 — Fidelity keeps the taxable side; the dividend sleeve is retired
 
 Two days of work on a fourth sleeve ended by killing it. The trigger was asking

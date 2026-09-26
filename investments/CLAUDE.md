@@ -223,6 +223,32 @@ were removed entirely in favour of Greek/VIX exits.
   15¢ → 35%, 25¢ → negative. **Under friction the book converges to QQQ Leap
   plus noise.** Measured entry slippage on 583 matched live pairs: **4.5–10¢/leg**
   at one contract.
+- **Iron condors: three attempts. The third (2026-09-26) cleared the bar.**
+  `CIC - AM` — 10:00 SPX entry, one contract, no re-entry, **delta-set wings**,
+  ~28% stop rate — is positive in all five calendar years *and* its carry covers
+  its ticket cost in all five. +$78,530 carry, +$63,389 total, ~$11,443 margin.
+  **The two levers that mattered: stop rate 52% → 28% (the carry is a knife edge
+  on it — 47.8% pays $41/short, 53.0% pays $3), and delta-set rather than
+  fixed-point wings (a ±100 offset was a 3.09% tail at SPX 3,900 and a 1.61%
+  tail at 7,400, tripling ticket costs).** Fits the capital only on its own —
+  running it alongside the afternoon pair puts 58 of 184 days over budget. Never
+  traded live. See the 2026-09-26 decisions entry for the full sequence; the
+  final config is half the value.
+- **Friction must be measured, not assumed.** Commissions are **1.175 open /
+  1.22 close** (not 1.75 — that overstated by 49%); entry slippage **0.035/leg**
+  on shorts and **−0.027** on wings (not 0.20). Exit slippage is still
+  unmeasured because matched stop-outs fire at different moments; 0.05 is an
+  assumption and does not bind (breakeven 0.539/leg).
+- **`Use 0-DTE Intra-Minute Stops` ON is conservative by ~$50/contract.**
+  Measured on 272 matched stop-outs: live fills −$78.7, OO −$129.2, t=2.71.
+  Leave it ON; every backtest result carries that pessimism.
+- **Schwab holds FULL spread width as collateral in the IRA** ($5,000 on a
+  50-wide); OO holds width-minus-credit ($4,348). Ratio **1.15x**. This closes
+  the long-open question.
+- **Check large stop breaches against the day's actual high/low.** OO priced a
+  0DTE call at $51.60 that was 36 points OTM at the session high (2026-05-18) —
+  −$5,000, 22% of that run's total. 20 of 22 breaches beyond 3x credit were
+  genuine; two were impossible.
 - **Iron condors were removed (Sept 2026), and re-tested in Sept 2026 with the same
   answer.** With honest settings the original book went from +$281k to −$32k over
   4.3 years, 53% drawdown, test terminated early. The re-test found the mechanism:
