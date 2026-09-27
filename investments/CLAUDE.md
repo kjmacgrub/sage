@@ -188,6 +188,17 @@ Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 | QQQ Leap | none | 9.7% | +1,849 | 37 trades in 7.4 yrs; absent entirely in 2022 and 2026 |
 | Long Put Hedge | none, 2% | 9.6% | +95 | 0 DTE, net credit. $95 is the **post-2022-05-11** figure; see the blended-figure trap below |
 
+> **LIVE BASELINE (2026-09-27).** What is actually being traded for the rest of
+> 2026 is a **three-strategy subset at $80k**: Sell puts (2 ctr) · CIC-AM (1) ·
+> Long Put Hedge (1). Backtested 2022-05-16 → 2026-09-25: **33.7% CAGR, worst
+> drawdown 5.5% of funded capital, structural bound 27%.** Dropping QQQ Leap and
+> the Double Calendar cost ~6 points of CAGR and cut worst drawdown **four-fold**
+> — both carry overnight and both saw margin/trade grow 5-6x with the index,
+> which is what made the five-strategy drawdown creep 6.4% → 23.7%.
+> **Plan for 5-6%, be solvent at 27%.** Full detail and the untested parts in the
+> 2026-09-27 decisions entry. The five-strategy figures below are the research
+> book, not the live one.
+
 **Measured 2019-05-16 → 2026-09-25 at FIXED sizing** (2/2/2/1/3 contracts, flat
 across eight years), from the **portfolio export**: $200k → **$904,622**,
 **22.8% CAGR**, **−5.50% max drawdown** marked daily with open positions
@@ -311,6 +322,17 @@ were removed entirely in favour of Greek/VIX exits.
   true intraday touch. **The gap-vs-move table in the 2026-09-12 decisions entry
   predates fixed sizing and is not a live comparison**; it was measured on $30M
   endings with floating position size.
+- **Fixed contracts is not fixed risk.** At flat 2/2/2/2/3 contracts the book's
+  total margin per session went **$4,796 (2017) → $27,866 (2026)** — strikes are
+  delta/percentage-based while SPX went 2,400 → 7,700. Caps still beat
+  percentages because index drift is slow and visible, but **the annual review
+  must read margin deployed, not contract count.**
+- **Raise contract counts once a year, on live evidence, never mid-drawdown.**
+  A percentage responds only to account equity — a lagging record of past P/L —
+  and cannot see whether the edge still works, whether fills have degraded, or
+  whether the strategy can absorb another contract (QQQ Leap: 12 contracts of
+  daily volume). It looks adaptive because it moves; it moves to the wrong
+  signal.
 - **Sizing is by CONTRACT CAP, not percentage allocation (2026-09-26).** Each
   strategy runs a fixed count — 2 / 2 / 2 / 1 / 3 for Puts, Calendar, CIC-AM,
   QQQ Leap, Hedge. A strategy's configured percentage (QQQ Leap still reads 5%)

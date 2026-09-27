@@ -62,6 +62,127 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-09-27 — THE LIVE BASELINE: three strategies, one contract, $80k
+
+**This is the configuration going live for the rest of 2026.** Recorded before
+trading so next year's comparison is a real test rather than a retrospective.
+
+| | |
+|---|---|
+| Strategies | **Sell puts on rising SMA · CIC - AM · Long Put Hedge** |
+| Contracts | **2 · 1 · 1** — fixed caps, not percentages |
+| Entry times | 10:35 · 10:00 · ~10:16 |
+| Margin/trade (median) | $660 · $6,388 · $965 |
+| Funding | **$80,000**, rising to ~$200,000 in 2027 |
+
+Backtested 2022-05-16 → 2026-09-25 (4.36 yrs) from the **portfolio export**:
+
+| | |
+|---|---|
+| $80,916 → $286,955 | **CAGR 33.7%** |
+| Max drawdown (reported) | −4.17% |
+| **Worst drawdown vs funded capital** | **5.5%** ($4,483) |
+| Structural bound (peak concurrent margin, Schwab collateral) | **27%** of $80,916 |
+
+| year | return | worst $ DD | vs $80k |
+|---|---|---|---|
+| 2022 | 35.9% | $4,467 | 5.5% |
+| 2023 | 35.4% | $3,616 | 4.5% |
+| 2024 | 35.6% | $3,748 | 4.6% |
+| 2025 | 30.2% | $4,483 | 5.5% |
+| 2026 | **10.4%** | $4,112 | 5.1% |
+
+Contribution: Sell puts **49.4%**, CIC - AM **30.6%**, Hedge **19.9%**.
+
+### Why three and not five
+
+Dropping **QQQ Leap** and the **Double Calendar** cost ~6 points of CAGR and cut
+the worst drawdown **four-fold**:
+
+| | CAGR | worst DD vs capital | MAR |
+|---|---|---|---|
+| five strategies, 1 contract | 40.3% | **24%** | ~1.7 |
+| **three strategies** | 33.7% | **5.5%** | **~6.1** |
+
+The mechanism is not diversification — it is *which* strategies were removed.
+Both were the ones that **carry overnight** and whose margin ballooned with the
+index (QQQ Leap $3,096 → $14,800/trade from 2017 to 2026; Double Calendar $1,040
+→ $6,280). In the five-strategy book the worst drawdown crept **6.4% → 23.7%**
+across the same five years. Here it is flat at 4.5–5.5%. **Removing them is what
+stopped the drift.**
+
+### Fixed contracts is not fixed risk — the refinement
+
+Contract caps beat percentage sizing (see 2026-09-26), but they are not constant
+risk either. At flat 2/2/2/2/3 contracts the book's **total margin per session
+went from $4,796 in 2017 to $27,866 in 2026** — roughly 5x — because strikes are
+delta- and percentage-based while SPX went from 2,400 to 7,700.
+
+**So the annual review should read margin deployed, not contract count.** "Two
+contracts" in 2028 will not mean what it means today. Index drift is slow and
+visible, which is why a cap still beats a percentage — but it is not zero.
+
+### The risk number to plan against
+
+Three different figures, easily confused:
+
+| | on $80,000 |
+|---|---|
+| Worst **observed** drawdown | **5.5%** |
+| Structural **bound** — every open position at max loss, same day | **27%** |
+| (five-strategy version, for contrast) | 24% observed / 31% bound |
+
+**Plan for 5–6%, be solvent at 27%.** The gap between observed and bound is the
+margin of safety, and it is wide here where the five-strategy book had nearly
+used it up. Defined-risk spreads cannot lose more than the margin held, so 27%
+is a genuine bound, not a forecast — and it requires every open position to go
+to maximum loss on the same day, which is structurally unlikely given the Hedge
+is long puts while the rest are short premium.
+
+### Expected income, and what it is not
+
+At one contract with the **ratchet** (profits withdrawn annually, account held
+near its funded size), dollar income does **not** compound the way the backtest
+shows. P/L per trade tracks the *index*, not the account:
+
+```
+year   trades   total P/L   P/L per trade
+2022      377     +34,666         +92
+2023      636     +45,120         +71
+2024      678     +70,834        +104
+2025      674    +102,967        +153
+2026      435     +18,688         +43     <- 9 months, worst of the five
+```
+
+(from the five-strategy 1-contract run). **The $102,967 year is not a run rate.**
+Expect roughly **$50–60k/yr on average with a $19k–$103k range**, and note the
+current year is running at the bottom of it.
+
+### What is untested
+
+- **CIC - AM is 30.6% of this book and has never had a live fill.** The live
+  record belongs to the two afternoon condors it replaces: +$8,105 on 602 fills
+  in 2026.
+- **Sell puts is 49.4% of P/L** — half the book in one strategy. Concentration
+  is the price of simplifying.
+- **2026 is +10.4% against 30–36% in prior years**, and every configuration
+  tested this week has had a weak 2026. Whether that is the market or decay
+  across the strategies is the first question live trading will answer.
+- 4.36 years, one mild bear (2022, −20% at the index), COVID seen only through
+  five sessions.
+
+### The rule this establishes
+
+**Contract counts are raised deliberately, once a year, on live evidence — never
+mechanically and never mid-drawdown.** The judgment a percentage cannot make:
+whether the edge still works, whether fills have degraded, whether the strategy
+can absorb another contract, and whether the regime still holds. A percentage
+responds only to account equity, which is a lagging record of past P/L and
+tells you none of those things. It looks adaptive because it moves; it is
+moving to the wrong signal.
+
+---
+
 ## 2026-09-26 — The rebuilt book, measured properly: 22.8% CAGR, −5.5% drawdown
 
 `CIC - AM` replaces both afternoon condors. Measured **2019-05-16 → 2026-09-25,
