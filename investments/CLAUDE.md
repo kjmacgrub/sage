@@ -281,10 +281,20 @@ were removed entirely in favour of Greek/VIX exits.
 - **OO logs an iron condor as three rows** — long wings, put side, call side —
   because `Exit - Puts` and `Exit - Calls` manage separately. Group by
   (Date Opened, Time Opened) or trade counts triple.
-- **Never size by contract cap alone.** Percentage sizing divides an allocation by
-  margin-per-contract, which collapses toward zero on degenerate calendars and
-  produced a 1,402-contract position. Pair it with a **minimum premium filter**
-  (`$1.00` debit).
+- **Never size by contract cap alone — *history, pre-cap era*.** Percentage sizing
+  divides an allocation by margin-per-contract, which collapses toward zero on
+  degenerate calendars and produced a 1,402-contract position. The fix then was a
+  **minimum premium filter** (`$1.00` debit). Contract caps removed that failure
+  mode entirely, so the filter now protects against nothing.
+- **The minimum-entry-premium filter is inert. Don't sweep it (checked
+  2026-09-28).** On the put seller it is set to `0.20` = $20/contract, while the
+  strategy's actual credit runs **$163–208 (p10–p90), minimum $48** across 2,179
+  trades — **it has never blocked a single entry.** Nor is there signal to
+  optimise toward: P/L is a flat **31–38% of credit collected** in every band
+  from $150 to $350+, and the 17 losers' credits (median $178) are
+  indistinguishable from the population (median $178). Harmless to keep as a
+  backstop if the delta ever changes; **credit it with nothing**, because any
+  result attributed to it is coming from somewhere else.
 - **Liquidity is per-order and per-tenor, not per-strategy.** A vertical is limited
   by its *thinner* leg — at SPX ~7,700 the 7600 put carried 8,778 OI and the 7595
   carried 125. **Width buys size:** the same dollar risk needs 1,850 contracts of a
