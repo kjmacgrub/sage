@@ -158,6 +158,73 @@ year   trades   total P/L   P/L per trade
 Expect roughly **$50–60k/yr on average with a $19k–$103k range**, and note the
 current year is running at the bottom of it.
 
+### The crash test that WAS available: the two-strategy core through COVID
+
+The portfolio cannot be backtested before **2022-05-11** because the Long Put
+Hedge's instrument (SPX Thursday expirations) did not exist. That caps the
+three-strategy record at 4.36 years containing one mild bear, and **no amount of
+work fixes it** — the missing evidence arrives with the next dislocation, live.
+
+But **CIC - AM and Sell puts both run back to 2019**, and that window contains
+COVID. Tested at live sizing (1 and 2 contracts), no hedge, 2019-01-02 →
+2026-09-25 (7.73 yrs):
+
+| | |
+|---|---|
+| $39,792 → $377,877 | **CAGR 33.8%** |
+| Max drawdown | **−10.26%** (2020-03-20) |
+| Worst drawdown vs funded capital | **13.8%** |
+| Calendar years positive | **8 of 8** |
+
+**The COVID crash barely touched it:**
+
+```
+2020-02-19 -> 03-23      CIC - AM    15 trades   -$3,747
+                         Sell puts   23 trades   +$3,226
+                         account  $71,216 -> $70,713   trough -2.9% from peak
+
+through 2020-06-30       CIC - AM    60 trades     -$899   (recovered)
+                         Sell puts   81 trades  +$14,037
+                         account  $71,216 -> $84,369
+```
+
+**The two short-premium strategies offset each other almost exactly** — the
+condor bled in the violence, the put seller made it back, and the account was
+flat across the fastest crash in the sample. By June the condor had recovered to
+−$899 while the put seller was up $14,037.
+
+Two things this corrects:
+
+- An earlier estimate in this session put CIC - AM's COVID cost at **−$7,494**,
+  taken from the five-strategy 2019 run. At live configuration it is **−$3,747**,
+  half that.
+- **Sell puts traded *through* COVID (23 trades), it did not go flat.** The
+  "goes flat before dislocations" behaviour in the older notes was the **SMA
+  filter** standing the strategy aside. With the filter removed it stays in — and
+  that is where the offset came from. Removing the filter improved crash
+  behaviour rather than degrading it.
+
+Also note **the worst drawdown in 7.7 years is 2019–20, not 2022** ($4,909 and
+$5,486 against $815–$4,434 in every later year). The longer window found worse,
+which is the reason to run it.
+
+**What this licenses:** the two-strategy core is not fragile in a fast crash, and
+it demonstrated that without the hedge present. **What it does not:** any
+statement about the hedge alongside them. Per the 2026-09-12 entry the hedge lost
+$8,924 in the Jan–Feb 2022 drawdown while making $6,338 through COVID — it is not
+reliably crash-positive on short windows. But if the core is roughly
+crash-neutral alone, the hedge's contribution is a **variance** question rather
+than a **solvency** one, which is a much smaller thing to be uncertain about.
+
+**The number to hold when a dislocation arrives:** the core was flat through
+COVID at −2.9% from peak. If the book is down 12–15% in a fast decline, that is
+the backtest behaving, not breaking. Knowing that in advance is most of what
+separates riding it out from closing at the bottom.
+
+*(One caveat on this run specifically: without the hedge, Sell puts is 80.4% of
+P/L against 61% in the live three-strategy book. The concentration belongs to the
+test, not to the live configuration.)*
+
 ### What is untested
 
 - **CIC - AM is 30.6% of this book and has never had a live fill.** The live
