@@ -332,6 +332,31 @@ were removed entirely in favour of Greek/VIX exits.
   true intraday touch. **The gap-vs-move table in the 2026-09-12 decisions entry
   predates fixed sizing and is not a live comparison**; it was measured on $30M
   endings with floating position size.
+- **The hedge's management exits are NOT dead weight — tested 2026-09-29, do not
+  retest.** They appear to cost $69,924 against $109,016 of expiry profit.
+  Removing them is **worse by $17,633**: the `Expired` average collapses from
+  +$973 (n=112) to +$46 (n=425), 112 trades reach the −$965 floor where none did
+  before, and 2024 flips negative. Confirmed standalone and at portfolio level.
+  **A conditional average cannot be extended to the population conditioned out** —
+  +$973 was a property of which trades survived to expiry, not of expiry.
+- **Entry filters and exits are different objects.** Removing the SMA filter, the
+  minimum premium and the QQQ RSI legs all cost nothing — a declined entry is
+  only a missed opportunity. An exit caps what is already open; removing one
+  hands you the left tail. Do not carry "filters are usually inert" across that
+  line.
+- **Put-seller DTE 60 vs 70 is noise (2026-09-29).** Headline says +$7,754 and
+  two fewer losers; paired on the 1,890 trades both runs took it is
+  **+$0.07/trade, t = 0.05**, and 48% of the gap is trades the other run never
+  took. Per-trade SD $59 means detecting $1/trade needs 12,342 paired trades.
+  Margin, hold and concurrency are identical. **Stop sweeping DTE.**
+- **`Use Resting Stop Market Order` must be ON for CIC - AM.** It was off on day
+  one (2026-09-28) when Schwab's API went down 10:06–10:38: the stop was breached
+  and could not execute for 38 minutes, finally filling at 9.00 against a 7.10
+  stop, logged as `MaxLoss`. With it off, stops are managed by OO over the API —
+  **no connection means no stop**, on $8,775 of defined risk per side. No
+  slippage setting models an API outage. The Long Put Hedge cannot use this (its
+  exit is `Below Delta`; a resting order is price-triggered and cannot express a
+  Greek) but its risk is ~$965/trade, so it matters far less.
 - **Fixed contracts is not fixed risk.** At flat 2/2/2/2/3 contracts the book's
   total margin per session went **$4,796 (2017) → $27,866 (2026)** — strikes are
   delta/percentage-based while SPX went 2,400 → 7,700. Caps still beat

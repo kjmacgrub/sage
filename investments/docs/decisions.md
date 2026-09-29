@@ -62,6 +62,111 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-09-29 — Day one live, and two things it settled
+
+### The hedge's management exits earn their keep — tested, keep them
+
+The hedge looks like it is bleeding money on exits: **302 management exits cost
+$69,924** while 112 expiries make $109,016. It is tempting to read that as a
+defect bolted onto a good strategy, and the record's own language encourages it
+(*"the hedge's every dollar comes from letting positions expire while its two
+management exits lose $4.66M"*).
+
+**It was tested. Removing them is worse by $17,633 — do not retest.**
+
+| | WITH exits | WITHOUT |
+|---|---|---|
+| Standalone, 2022-05-16 → 2026-09-25 | **+$39,092** | +$19,545 |
+| `Expired` bucket average | **+$973** (n=112) | **+$46** (n=425) |
+| Trades at/near the −$965 floor | 0 | **112** |
+| Worst single trade | −$462 | −$1,164 |
+| Calendar years positive | 5/5 | **4/5** (2024 negative) |
+
+Confirmed at portfolio level too — comparing **dollars gained** (the only valid
+measure when the two runs start at different capital):
+
+```
+2022  +35,681 -> +38,290   +2,609
+2023  +50,681 -> +51,069     +388
+2024  +62,307 -> +48,826  -13,481   <--
+2025  +71,075 -> +62,658   -8,417   <--
+2026  +40,446 -> +40,734     +288
+                            -17,633
+```
+
+**Three of five years the exits do nothing measurable; twice they save $13,481
+and $8,417.** That is what they are for.
+
+**Why the prior reasoning failed**, worth knowing because it is a general trap:
+
+- A model predicted break-even at 38% of managed trades expiring profitably, and
+  the observed 59% "SPX rose after exit" made that look easy. But **"the index
+  rose" is not "the trade would have expired profitably"** — the hedge is a call
+  spread plus a long put, so direction alone does not determine its outcome. A
+  directional proxy was substituted for a P/L proxy.
+- The +$973 expiry average was treated as a property of *expiry*. It is a
+  property of **which trades survived to expiry**. Adding 313 formerly-stopped
+  trades dropped it to +$46. **A conditional average cannot be extended to the
+  population that was conditioned out** — the same censoring trap recorded on
+  2026-09-12, walked into while quoting it.
+
+**And the distinction that generalises: entry filters and exits are different
+objects.** Removing the SMA filter, the minimum premium and the QQQ RSI legs all
+cost nothing, because a declined entry is only a missed opportunity. An exit caps
+what is already open — removing one hands you the left tail. Do not carry
+"filters are usually inert" across that line.
+
+### Put-seller DTE 60 → 70 is noise. Stop sweeping it.
+
+Looks better on every headline (+$7,754, 11 losers vs 13, 8 of 10 years). It is
+not real:
+
+- **Paired on the 1,890 trades both runs took: +$0.07/trade, t = 0.05**, 95% CI
+  [−$2.49, +$2.62]. Per-trade SD is $59; detecting a $1/trade edge needs
+  **12,342 paired trades**.
+- **48% of the headline comes from trades the other run never took** — different
+  DTE means different expirations available. Sampling, not edge.
+- Margin ($320), hold (2 days) and concurrency (median 2, capped at 8) are
+  **identical**. Not even a leverage dial.
+- On 2018 — the only year this strategy has ever lost money — 70 DTE was
+  **worse** by $2,283.
+
+### Day one live, 2026-09-28: −$938
+
+| | |
+|---|---|
+| CIC - AM put side stopped | −$665 |
+| Long Put Hedge, Below Delta | −$272 |
+| Against the backtest | a **1-in-38 day** (2.6% of sessions); worst modelled is −$1,921 |
+
+Nothing broke. The model expects **104 losing days a year**; one arrived first.
+
+**But it exposed a real gap.** Schwab's API went down 10:06–10:38 (confirmed
+platform-wide by OO). The condor's stop was breached and **could not execute for
+38 minutes** — eighteen `403 Forbidden` errors, then ten limit orders walked
+7.20 → 8.10 without filling, finally taking **9.00 against a 7.10 stop**. Exit
+reason logged as `MaxLoss`, not `Stop Loss`. Roughly **$180 of the $665** is
+attributable to the outage.
+
+Cause: **`Use Resting Stop Market Order` was OFF** on CIC - AM, both put and call.
+Stops were being managed by OO over the API rather than resting at the exchange —
+so no connection meant no stop, on a spread carrying **$8,775 of defined risk per
+side**. *(Toggled on 2026-09-29.)*
+
+Three things this establishes:
+
+- **The structural bound stops being theoretical when the stop cannot execute.**
+  No slippage setting in any backtest models an API outage.
+- **The Long Put Hedge cannot be protected this way and mostly does not need to
+  be.** Its exit is `Below Delta` — a resting broker order is *price*-triggered
+  and cannot express a Greek. But its defined risk is **~$965/trade** against the
+  condor's $8,775, so a stranded hedge position is a small problem.
+- **`Switch to market order after max attempts` fixes a different failure** — the
+  failed limit walk, not the outage. During a 403 no order can be sent at all.
+  Worth enabling; do not file it as outage protection.
+
+---
+
 ## 2026-09-27 — THE LIVE BASELINE: three strategies, one contract, $80k
 
 **This is the configuration going live for the rest of 2026.** Recorded before
