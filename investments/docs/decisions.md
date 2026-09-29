@@ -62,6 +62,114 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-09-29 — Margin mechanics: what actually moves it, and how collateral settles
+
+### Margin is the spread width. Nothing else.
+
+Intuition says a volatility spike raises margin because premiums are richer.
+**Wrong mechanism.** Measured across 1,093 CIC - AM trades:
+
+| correlation of margin with | |
+|---|---|
+| **spread width** | **+1.00** |
+| SPX level | +0.71 |
+| credit collected | +0.54 |
+| VIX | +0.26 |
+
+The chain is: **higher VIX → a 15Δ strike sits further from spot → a 1Δ wing
+further still → the spread between them is wider → margin is larger.** The
+premium is a passenger, not a cause. Under Schwab's convention (full width, no
+credit offset — confirmed by observation) the premium *cannot* affect margin at
+all; under OO's model (width minus credit) a richer premium slightly *reduces*
+it, the opposite of the intuition.
+
+| VIX band | n | credit | max width | margin |
+|---|---|---|---|---|
+| 0–14 | 160 | $352 | 47 pt | $4,416 |
+| 14–17 | 346 | $470 | 84 pt | $7,988 |
+| 17–20 | 265 | $577 | 89 pt | $8,366 |
+| 20–25 | 191 | $668 | **85 pt** | **$7,825** |
+| 25+ | 131 | $911 | 96 pt | $8,711 |
+
+Credit nearly triples across the range; margin roughly doubles and **is not
+monotonic** — the 20–25 band holds less than 17–20.
+
+**The index level matters far more than volatility.** SPX correlates +0.71
+against VIX's +0.26. A vol spike adds about 9% to margin (VIX 25+ vs 14–17); a
+new high in SPX moves it more, permanently. Same drift that broke the wing
+pricing — a delta-set distance is proportional to the index, so as SPX went
+2,400 → 7,700 the identical structure got mechanically wider in points.
+
+**Consequence: the thing that quietly erodes headroom is not a crisis, it is the
+market grinding upward while "2 contracts" keeps meaning more dollars.** Reinforces
+the standing rule — the annual review reads *margin deployed*, not contract count.
+
+### Peak concurrent margin: compute it on a continuous timeline
+
+An earlier figure in this session grouped positions by **open date**, so a Sell
+puts trade opened Monday and closed Wednesday counted only on Monday. Corrected
+to one continuous timeline across the whole backtest:
+
+| | median | p90 | max |
+|---|---|---|---|
+| grouped by open date (wrong) | $7,533 | $13,693 | $19,613 |
+| **continuous timeline** | $7,028 | $13,158 | **$20,343** |
+
+Only 4% higher, and the reason is instructive. At the true peak
+(2025-09-17 12:40, six positions open):
+
+```
+CIC - AM         1 open   $16,748   <- 82% of the total
+Sell puts        4 open   $ 2,640
+Long Put Hedge   1 open   $   955
+```
+
+**One condor is 82% of peak margin.** Carried-over positions are a rounding
+error, which is why the grouping mistake barely mattered — and it means the
+number to watch is the condor's spread width, not how many positions accumulate.
+
+2026 only, continuous: median **$11,913**, p90 $15,423, max **$19,113**
+(**$21,980** at Schwab's collateral).
+
+### Collateral releases at the open — it does not span sessions
+
+Checked across three account snapshots, 2026-09-28 pre-open through 2026-09-29
+9:30am:
+
+```
+                        4:26pm 9/28    9:30am 9/29     change
+Available Funds          $28,987.63     $37,518.15    +$8,530.52
+Cash & Sweep             $38,487.63     $38,518.15        +$30.52
+Intraday Buying Power     $8,046.40      $8,046.40         $0.00
+```
+
+The **$8,530 released** is the condor's 7745/7830 call spread — $8,500 of width
+held overnight pending settlement, freed by the open. And the remaining gap
+reconciles exactly:
+
+```
+Cash & Sweep          $38,518.15
+less open Sell puts    -$1,000.00   (7700/7695, 5 wide x 2)
+                      ───────────
+Available Funds       $37,518.15  ✓
+```
+
+Three things settled:
+
+- **Overnight collateral is a settlement artifact, not a second day's
+  commitment.** Effective margin per trade matches the backtest; no hidden
+  multiplier. This was the last unknown in the funding arithmetic.
+- **`Available Funds For Trading` = Cash − open-position collateral.** That is
+  the number that gates orders.
+- **`Intraday Buying Power` is dead.** $8,046.40 across three snapshots spanning
+  two days and a full round trip of positions — it never moved a cent. Ignore it
+  permanently; it is not the constraint it appears to be.
+
+At $37,518 available against a 2026 peak need of $21,980, the worst day uses
+**59%**. At $60k funding that falls to 37%.
+
+---
+
 ## 2026-09-29 — Day one live, and two things it settled
 
 ### The hedge's management exits earn their keep — tested, keep them

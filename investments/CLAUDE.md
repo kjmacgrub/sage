@@ -357,6 +357,21 @@ were removed entirely in favour of Greek/VIX exits.
   slippage setting models an API outage. The Long Put Hedge cannot use this (its
   exit is `Below Delta`; a resting order is price-triggered and cannot express a
   Greek) but its risk is ~$965/trade, so it matters far less.
+- **Margin is the spread width — not the premium (measured 2026-09-29).**
+  Correlation of margin with width **+1.00**, SPX level +0.71, credit +0.54,
+  VIX **+0.26**. A vol spike raises margin only because a 15Δ strike sits further
+  from spot, widening the spread; Schwab holds full width with no credit offset,
+  so the premium cannot affect it. **The index level matters ~3x more than
+  volatility** — a vol spike adds ~9%, a new SPX high adds permanently.
+- **Compute peak concurrent margin on a continuous timeline, not grouped by open
+  date** — Sell puts holds ~2 days, so grouping understates. True 2026 peak
+  $19,113 ($21,980 at Schwab). **One condor is 82% of peak margin**; carried
+  positions are a rounding error.
+- **Collateral releases at the open, not across sessions (confirmed
+  2026-09-29).** A condor's call-spread width is held overnight pending
+  settlement and freed at 9:30. `Available Funds For Trading` = Cash − open
+  collateral, and that is what gates orders. **`Intraday Buying Power` is dead**
+  — $8,046.40 unchanged across three snapshots and a full round trip.
 - **Fixed contracts is not fixed risk.** At flat 2/2/2/2/3 contracts the book's
   total margin per session went **$4,796 (2017) → $27,866 (2026)** — strikes are
   delta/percentage-based while SPX went 2,400 → 7,700. Caps still beat
