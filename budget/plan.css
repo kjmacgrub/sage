@@ -1,0 +1,159 @@
+/* ── Sage · Plan History ───────────────────────────────────────────────────── */
+
+/* Chart tokens — light values here, dark values under [data-theme="dark"].
+   Categorical hues validated with dataviz/validate_palette.js against the Sage
+   card surfaces (#fff light, #1a1d27 dark): all hard checks pass in both modes. */
+.viz-root {
+    --viz-surface: #ffffff;
+    --viz-text: #1d1d1f;
+    --viz-text-2: #6e6e73;
+    --viz-grid: #ececee;
+    --viz-axis: #c7c7cc;
+    --viz-wash: rgba(0, 0, 0, 0.045);
+    --viz-neutral: #b4b3ad;
+    --s1: #2a78d6;   /* blue    */
+    --s2: #eb6834;   /* orange  */
+    --s3: #1baf7a;   /* aqua    */
+    --s4: #eda100;   /* yellow  */
+    --div-pos: #2a78d6;
+    --div-neg: #e34948;
+}
+:root[data-theme="dark"] .viz-root {
+    --viz-surface: #1a1d27;
+    --viz-text: #e8eaf0;
+    --viz-text-2: #9aa0b8;
+    --viz-grid: #262a3a;
+    --viz-axis: #3f455e;
+    --viz-wash: rgba(255, 255, 255, 0.06);
+    --viz-neutral: #6a7090;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --s4: #c98500;
+    --div-pos: #3987e5;
+    --div-neg: #e66767;
+}
+
+/* Titlebar */
+.pl-titlebar { display: flex; align-items: baseline; gap: 0.6rem; margin: 0.5rem 0 0.25rem; }
+.pl-title { font-size: 1.6rem; font-weight: 700; color: var(--text-primary); margin: 0; }
+.pl-version {
+    font-size: 0.8rem; color: var(--text-secondary); background: var(--primary-light);
+    padding: 0.1rem 0.5rem; border-radius: 999px; cursor: default;
+}
+.pl-subtitle { color: var(--text-secondary); font-size: 0.92rem; max-width: 75ch; margin: 0 0 1.25rem; line-height: 1.5; }
+
+/* Stat tiles */
+.pl-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.pl-tile { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1rem 1.25rem; }
+.pl-tile-label { font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.pl-tile-value { font-size: 1.7rem; font-weight: 700; color: var(--text-primary); margin: 0.25rem 0 0.15rem; font-variant-numeric: tabular-nums; }
+.pl-tile-sub { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.4; }
+
+/* Cards */
+.pl-card { margin-bottom: 1rem; }
+.pl-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.pl-h { font-size: 1.05rem; font-weight: 650; color: var(--text-primary); margin: 0 0 0.2rem; }
+.pl-sub { font-size: 0.85rem; color: var(--text-secondary); margin: 0; max-width: 62ch; line-height: 1.45; }
+.pl-note { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin: 0.75rem 0 0; }
+.pl-foot { font-size: 0.78rem; color: var(--text-secondary); margin: 0.5rem 0 2rem; line-height: 1.5; }
+.pl-empty code { background: var(--primary-light); padding: 0.1rem 0.4rem; border-radius: 4px; }
+
+/* Controls */
+.pl-controls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.pl-seg { display: inline-flex; border: 1.5px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.pl-seg-btn, .pl-tbl-btn {
+    font-family: var(--font); font-size: 0.82rem; padding: 0.4rem 0.8rem; cursor: pointer;
+    background: transparent; color: var(--text-secondary); border: 0;
+}
+.pl-tbl-btn { border: 1.5px solid var(--border); border-radius: var(--radius-sm); }
+.pl-seg-btn + .pl-seg-btn { border-left: 1.5px solid var(--border); }
+.pl-seg-btn.active, .pl-tbl-btn[aria-pressed="true"] { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+.pl-seg-btn:hover, .pl-tbl-btn:hover { color: var(--text-primary); }
+
+/* Chart surface */
+.pl-chart { position: relative; width: 100%; }
+.pl-chart svg { display: block; overflow: visible; }
+.pl-chart text { font-family: var(--font); fill: var(--viz-text-2); font-size: 11px; font-variant-numeric: tabular-nums; }
+.pl-chart .pl-total { fill: var(--viz-text); font-weight: 600; }
+.pl-chart .pl-grid { stroke: var(--viz-grid); stroke-width: 1; }
+.pl-chart .pl-axis { stroke: var(--viz-axis); stroke-width: 1; }
+.pl-chart .pl-hit { fill: transparent; cursor: default; }
+.pl-chart .pl-hit.on { fill: var(--viz-wash); }
+.pl-chart .pl-disc { fill: var(--viz-surface); stroke: var(--viz-text-2); stroke-width: 1.25; }
+.pl-chart .pl-disc-n { fill: var(--viz-text); font-size: 10px; font-weight: 600; text-anchor: middle; }
+.pl-chart .pl-cross { stroke: var(--viz-axis); stroke-width: 1; }
+
+/* Legend */
+.pl-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; margin-top: 0.6rem; font-size: 0.82rem; color: var(--text-primary); }
+.pl-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.pl-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+/* Notes under charts */
+.pl-notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.6rem 1.25rem; margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border-light); }
+.pl-notes-item { display: flex; gap: 0.6rem; font-size: 0.82rem; line-height: 1.45; color: var(--text-secondary); }
+.pl-notes-item b { color: var(--text-primary); font-weight: 600; display: block; }
+.pl-notes-n {
+    flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.25px solid var(--text-secondary);
+    color: var(--text-primary); font-size: 0.68rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; margin-top: 1px;
+}
+
+/* Table view */
+.pl-tablewrap { overflow-x: auto; margin-top: 0.5rem; }
+.pl-tablewrap table { border-collapse: collapse; width: 100%; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.pl-tablewrap th, .pl-tablewrap td { padding: 0.4rem 0.7rem; text-align: right; border-bottom: 1px solid var(--border-light); white-space: nowrap; }
+.pl-tablewrap th:first-child, .pl-tablewrap td:first-child { text-align: left; }
+.pl-tablewrap th { color: var(--text-secondary); font-weight: 600; }
+.pl-tablewrap td { color: var(--text-primary); }
+
+/* Tooltip */
+.pl-tip {
+    position: fixed; z-index: 50; pointer-events: none; max-width: 300px;
+    background: var(--surface); color: var(--text-primary); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); padding: 0.55rem 0.75rem;
+    font-size: 0.8rem; line-height: 1.45;
+}
+.pl-tip-title { font-weight: 650; margin-bottom: 0.25rem; }
+.pl-tip-row { display: flex; align-items: center; gap: 0.45rem; justify-content: space-between; }
+.pl-tip-row > span:first-child { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-secondary); }
+.pl-tip-row b { font-variant-numeric: tabular-nums; font-weight: 600; margin-left: 1rem; }
+.pl-tip-total { border-top: 1px solid var(--border-light); margin-top: 0.25rem; padding-top: 0.25rem; }
+.pl-tip-note { margin-top: 0.4rem; color: var(--text-secondary); font-size: 0.76rem; }
+
+@media (max-width: 640px) {
+    .container.viz-root { padding: 1rem 16px; }
+    .section-card.pl-card { padding: 1rem; }
+    .pl-tile-value { font-size: 1.4rem; }
+}
+
+/* ── Forecast vs reality ───────────────────────────────────────────────────── */
+/* Forecast vintages: one blue hue stepped light→dark (older→newer) on light, dark→light on dark. */
+.viz-root {
+    --v0: #86b6ef; --v1: #6da7ec; --v2: #5598e7; --v3: #3987e5; --v4: #2a78d6; --v5: #256abf; --v6: #1c5cab; --v7: #184f95;
+}
+:root[data-theme="dark"] .viz-root {
+    --v0: #245da8; --v1: #2a78d6; --v2: #3987e5; --v3: #5598e7; --v4: #6da7ec; --v5: #86b6ef; --v6: #9ec5f4; --v7: #b7d3f6;
+}
+.pl-tiles-sm { margin: 0.25rem 0 1rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.pl-tiles-sm .pl-tile { box-shadow: none; border: 1px solid var(--border-light); padding: 0.75rem 1rem; }
+.pl-tiles-sm .pl-tile-value { font-size: 1.35rem; }
+.pl-subhead { margin-top: 1.5rem; padding-top: 1.1rem; border-top: 1px solid var(--border-light); }
+.pl-h2 { font-size: 0.95rem; font-weight: 650; color: var(--text-primary); margin: 0 0 0.2rem; }
+.pl-grad { display: inline-block; width: 70px; height: 10px; border-radius: 3px; }
+.pl-mark { display: inline-block; width: 10px; height: 10px; border-radius: 50%; box-sizing: border-box; }
+.pl-mark.solid { background: var(--viz-text); }
+.pl-mark.hollow { border: 2px solid var(--viz-text); background: var(--viz-surface); }
+.pl-chart .pl-actual { fill: none; stroke: var(--viz-text); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.pl-chart .pl-adj { fill: none; stroke: var(--viz-text); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.pl-chart .pl-dot { fill: var(--viz-text); stroke: var(--viz-surface); stroke-width: 2; }
+.pl-chart .pl-dot-h { fill: var(--viz-surface); stroke: var(--viz-text); stroke-width: 2; }
+.pl-chart .pl-vline { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.pl-chart .pl-lbl { fill: var(--viz-text); font-weight: 600; }
+
+/* Error grid */
+.pl-matrix table { min-width: 620px; }
+.pl-matrix th { font-size: 0.74rem; }
+.pl-matrix td { text-align: center; padding: 0.35rem 0.4rem; font-weight: 600; border-bottom: 2px solid var(--surface); border-right: 2px solid var(--surface); }
+.pl-matrix td.blank { color: var(--text-secondary); font-weight: 400; opacity: 0.5; }
+.pl-matrix td.rowhead, .pl-matrix th:first-child { text-align: left; font-weight: 600; background: transparent; }
+.pl-matrix td.avg { color: var(--text-secondary); font-weight: 500; }

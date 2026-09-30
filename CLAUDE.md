@@ -16,6 +16,7 @@ python3 api.py
 # → http://localhost:5050/
 # → http://localhost:5050/dashboard.html
 # → http://localhost:5050/tax.html
+# → http://localhost:5050/plan.html   (needs plan_history.json — see Key Files)
 ```
 
 **Investments:**
@@ -41,6 +42,9 @@ python3 -m uvicorn cef.api.app:create_app --factory --host 0.0.0.0 --port 8000 -
 - `db.py` — SQLite helpers
 - `budget.db` — SQLite database (not committed)
 - `category_map.json` — Quicken category → Budget Planner category mapping
+
+- `plan.html` + `plan.js` + `plan.css` — Plan History: trend charts plus a forecast-vs-actual check (each report's projection judged against later reports and Quicken spending), from the Fidelity/eMoney annual-review PDFs (SVG, no deps)
+- `build_plan_history.py` — reads the PDFs (needs `pypdf`) and writes `plan_history.json`; the JSON is personal data and **git-ignored** — regenerate locally: `python3 budget/build_plan_history.py ~/Downloads`. Add each new report's filename to `REPORTS` in the script.
 
 ### investments/
 - `cef/static/` — frontend (HTML/JS/CSS)

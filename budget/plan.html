@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sage — Plan History</title>
+    <link rel="icon" type="image/svg+xml" href="/sage-favicon.svg">
+    <script>(function(){var p=new URLSearchParams(location.search),t=p.get('theme')||localStorage.getItem('sage-theme')||'dark';if(p.get('theme'))localStorage.setItem('sage-theme',t);document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="plan.css">
+</head>
+<body>
+    <nav class="tab-nav">
+        <img src="/sage-logo.svg" class="nav-logo" alt="Sage">
+        <a href="http://localhost:5050/" class="tab-link">Planner</a>
+        <a href="http://localhost:5050/dashboard.html" class="tab-link">Cash Flow</a>
+        <a href="http://localhost:5050/tax.html" class="tab-link">Tax</a>
+        <a href="http://localhost:5050/realestate.html" class="tab-link">Real Estate</a>
+        <a href="http://localhost:5050/plan.html" class="tab-link active">Plan</a>
+        <a href="http://localhost:8000/" class="tab-link">Investments</a>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme"></button>
+    </nav>
+
+    <div class="container viz-root">
+
+        <div class="pl-titlebar">
+            <h1 class="pl-title">Plan History</h1>
+            <span class="pl-version" id="versionLabel" title="">v1.0</span>
+        </div>
+        <p class="pl-subtitle" id="plSubtitle">Trends across the Fidelity annual reviews. Projections are Fidelity's hypothetical scenarios, not forecasts.</p>
+
+        <div class="section-card pl-empty" id="plEmpty" hidden>
+            <h3 class="pl-h">No data yet</h3>
+            <p class="pl-note">Couldn't load <code>plan_history.json</code>. Generate it from the report PDFs:</p>
+            <p><code>python3 budget/build_plan_history.py ~/Downloads</code></p>
+        </div>
+
+        <div id="plMain" hidden>
+
+            <div class="pl-tiles" id="plTiles"></div>
+
+            <!-- ── Forecast vs reality ─────────────────────────────── -->
+            <div class="section-card pl-card">
+                <div class="pl-card-head">
+                    <div>
+                        <h3 class="pl-h">Did the forecasts come true?</h3>
+                        <p class="pl-sub">Every report projected your portfolio forward. Each pale-to-dark line is one report's forecast; the dots are what later reports show you actually had.</p>
+                    </div>
+                    <div class="pl-controls">
+                        <button class="pl-tbl-btn" data-table="fc" aria-pressed="false">Table</button>
+                    </div>
+                </div>
+                <div class="pl-tiles pl-tiles-sm" id="fcTiles"></div>
+                <div class="pl-chart" id="chartFC"></div>
+                <div class="pl-legend" id="legendFC"></div>
+                <div class="pl-tablewrap" id="tableFC" hidden></div>
+
+                <div class="pl-card-head pl-subhead">
+                    <div>
+                        <h4 class="pl-h2">How far off was each forecast?</h4>
+                        <p class="pl-sub">Rows are the report that made the forecast; columns are the later report it's judged against. <b>+</b> means reality beat the forecast, <b>−</b> means it fell short.</p>
+                    </div>
+                    <div class="pl-controls">
+                        <div class="pl-seg" role="group" aria-label="Annuity adjustment">
+                            <button class="pl-seg-btn active" data-adj="1">Adjusted for annuity</button>
+                            <button class="pl-seg-btn" data-adj="0">As reported</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="pl-tablewrap pl-matrix" id="matrixFC"></div>
+                <div class="pl-notes" id="notesFC2"></div>
+            </div>
+
+            <div class="section-card pl-card">
+                <div class="pl-card-head">
+                    <div>
+                        <h3 class="pl-h">Spending: plan vs Quicken</h3>
+                        <p class="pl-sub">The plan's yearly living-expense assumption next to what Quicken recorded. Approximate — see the note below.</p>
+                    </div>
+                    <div class="pl-controls">
+                        <button class="pl-tbl-btn" data-table="lv" aria-pressed="false">Table</button>
+                    </div>
+                </div>
+                <div class="pl-chart" id="chartLV"></div>
+                <div class="pl-legend" id="legendLV"></div>
+                <div class="pl-tablewrap" id="tableLV" hidden></div>
+                <p class="pl-note" id="lvNote"></p>
+            </div>
+
+            <!-- ── Net worth by asset type ─────────────────────────── -->
+            <div class="section-card pl-card">
+                <div class="pl-card-head">
+                    <div>
+                        <h3 class="pl-h">Net worth by asset type</h3>
+                        <p class="pl-sub">One column per report. The Aug 2025 dip is the inherited IRA becoming annuity income — see notes.</p>
+                    </div>
+                    <div class="pl-controls">
+                        <div class="pl-seg" role="group" aria-label="Assets shown">
+                            <button class="pl-seg-btn active" data-scope="all">All assets</button>
+                            <button class="pl-seg-btn" data-scope="fin">Excluding real estate</button>
+                        </div>
+                        <button class="pl-tbl-btn" data-table="nw" aria-pressed="false">Table</button>
+                    </div>
+                </div>
+                <div class="pl-chart" id="chartNW"></div>
+                <div class="pl-legend" id="legendNW"></div>
+                <div class="pl-tablewrap" id="tableNW" hidden></div>
+                <div class="pl-notes" id="notesNW"></div>
+            </div>
+
+            <!-- ── Modeled spending ────────────────────────────────── -->
+            <div class="section-card pl-card">
+                <div class="pl-card-head">
+                    <div>
+                        <h3 class="pl-h">Modeled first-year outflows</h3>
+                        <p class="pl-sub">What each report assumed you'd spend in its first plan year. Long-term care premiums start in the Aug 2025 report.</p>
+                    </div>
+                    <div class="pl-controls">
+                        <button class="pl-tbl-btn" data-table="sp" aria-pressed="false">Table</button>
+                    </div>
+                </div>
+                <div class="pl-chart" id="chartSP"></div>
+                <div class="pl-legend" id="legendSP"></div>
+                <div class="pl-tablewrap" id="tableSP" hidden></div>
+            </div>
+
+            <!-- ── Projection ──────────────────────────────────────── -->
+            <div class="section-card pl-card">
+                <div class="pl-card-head">
+                    <div>
+                        <h3 class="pl-h">Projected portfolio — Aug 2026 plan</h3>
+                        <p class="pl-sub" id="subPJ">Fidelity's deterministic projection in nominal dollars.</p>
+                    </div>
+                    <div class="pl-controls">
+                        <button class="pl-tbl-btn" data-table="pj" aria-pressed="false">Table</button>
+                    </div>
+                </div>
+                <div class="pl-chart" id="chartPJ"></div>
+                <div class="pl-tablewrap" id="tablePJ" hidden></div>
+                <p class="pl-note" id="mcNote"></p>
+            </div>
+
+            <div class="section-card pl-card">
+                <div class="pl-card-head">
+                    <div>
+                        <h3 class="pl-h">Net cash flow by year</h3>
+                        <p class="pl-sub">Inflows minus outflows, before drawing on the portfolio.</p>
+                    </div>
+                    <div class="pl-controls">
+                        <button class="pl-tbl-btn" data-table="cf" aria-pressed="false">Table</button>
+                    </div>
+                </div>
+                <div class="pl-chart" id="chartCF"></div>
+                <div class="pl-legend" id="legendCF"></div>
+                <div class="pl-tablewrap" id="tableCF" hidden></div>
+                <div class="pl-notes" id="notesCF"></div>
+            </div>
+
+            <p class="pl-foot" id="plFoot"></p>
+        </div>
+    </div>
+
+    <div class="pl-tip" id="plTip" role="tooltip" hidden></div>
+
+    <script src="plan.js"></script>
+    <script>
+        (function() {
+            var btn = document.getElementById('themeToggle');
+            function sync() { btn.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '☾'; }
+            btn.addEventListener('click', function() {
+                var t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', t);
+                localStorage.setItem('sage-theme', t);
+                sync();
+            });
+            document.querySelectorAll('.tab-link').forEach(function(a) {
+                a.addEventListener('click', function() {
+                    var t = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var u = new URL(a.href); u.searchParams.set('theme', t); a.href = u.toString();
+                });
+            });
+            sync();
+        })();
+    </script>
+</body>
+</html>

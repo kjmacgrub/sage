@@ -8,3 +8,4 @@ venv/
 *.egg-info/
 .claude/
 simulation_result.json
+budget/plan_history.json
