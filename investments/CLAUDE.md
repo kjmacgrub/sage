@@ -349,6 +349,13 @@ were removed entirely in favour of Greek/VIX exits.
   **+$0.07/trade, t = 0.05**, and 48% of the gap is trades the other run never
   took. Per-trade SD $59 means detecting $1/trade needs 12,342 paired trades.
   Margin, hold and concurrency are identical. **Stop sweeping DTE.**
+- **`Use Resting Stop Market Order` CONFIRMED WORKING (2026-09-30).** First live
+  stop-out under it fired at 16:00 on expiry day — worst possible gamma — and
+  overshot the 3x stop level by only **0.70**, against 1.10 in the backtest's own
+  intra-minute model and 1.89 on the API-outage day. **It executes better than
+  the model assumes.** On that trade it also converted a −$1,558 expiry outcome
+  into −$650 (SPX settled 18.48 inside the short strike). A stop that looks like
+  it destroyed a position is usually the reason the loss was bounded.
 - **`Use Resting Stop Market Order` must be ON for CIC - AM.** It was off on day
   one (2026-09-28) when Schwab's API went down 10:06–10:38: the stop was breached
   and could not execute for 38 minutes, finally filling at 9.00 against a 7.10

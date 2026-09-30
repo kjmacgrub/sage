@@ -62,6 +62,82 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-09-30 — The resting stop is confirmed, and it beats the model
+
+Day three produced the test the live setup most needed. The CIC - AM short put
+stopped out **at 16:00 on expiry day** — the worst possible moment for gamma —
+under the `Use Resting Stop Market Order` setting toggled on the previous day.
+
+```
+SPX 15:41   7,686.74      16 pts above the 7670 short
+    15:54   7,666.19      first cross below the strike
+    15:59   7,653.56
+    16:00   7,651.54      -43 pts on the day, closing on the low
+```
+
+Six minutes of warning; most of the damage in the final ninety seconds.
+
+### It filled tighter than either previous stop-out, and tighter than the backtest
+
+| | overshoot past the 3× stop level |
+|---|---|
+| Day 1 — OO-managed, Schwab API down | **1.89** ($189) |
+| Day 1 — backtest, intra-minute stops ON | 1.10 ($110) |
+| **Day 3 — resting stop market order** | **0.70 ($70)** |
+
+Credit 2.90, stop level 8.70, **filled 9.40**. Best of the three, achieved at the
+single worst moment of the session. **The mechanism works, and it executes better
+than the model assumes.**
+
+### And it converted a −$1,558 outcome into −$650
+
+```
+SPX settled                       7,651.54
+7670 put intrinsic at expiry         18.48   = $1,848
+actually closed at                    9.40   = $  940
+```
+
+Letting it expire would have cost **−$1,558** against the $290 credit. The stop
+took it out at **−$650**. *The stop saved $860 on this trade* — which is the
+opposite of how the day feels, and worth remembering the next time a stop looks
+like it destroyed a good position.
+
+### What this closes
+
+The resting stop was the **largest untested component of the live setup** —
+flagged 2026-09-28 when the API outage exposed that CIC - AM's stops were being
+managed over the API rather than resting at the exchange, on a spread carrying
+$8,775 of defined risk per side. Three days later it is confirmed under the
+hardest conditions available.
+
+**Cost of the confirmation: $650, on a day the trade was going to lose anyway.**
+
+### A note on the temptation it created
+
+The position was showing nearly full credit late in the session and was almost
+closed manually to bank it. Closing early would have been right *today*.
+
+It would also have been right on **every day the condor expires worthless — 45%
+of them, averaging +$593.** There is no way to take that selectively without
+knowing which day you are in, which is the entire reason the exits are mechanical.
+Do not generalise from a day where discretion would have won.
+
+### Three days live
+
+| day | P/L | percentile of modelled days |
+|---|---|---|
+| 09-28 | −$938 | 3rd |
+| 09-29 | +$263 | 52nd |
+| 09-30 | −$416 | ~13th |
+| **total** | **−$1,091** | |
+
+Two bad draws out of three, an API outage survived, and the stop mechanism
+proven. Nothing outside the distribution — the model expects **104 losing days a
+year** — just front-loaded. Modelled mean is +$237/day, so three days "should"
+have been +$711.
+
+---
+
 ## 2026-09-29 — Margin mechanics: what actually moves it, and how collateral settles
 
 ### Margin is the spread width. Nothing else.
