@@ -112,15 +112,46 @@ hardest conditions available.
 
 **Cost of the confirmation: $650, on a day the trade was going to lose anyway.**
 
-### A note on the temptation it created
+### The temptation it created, and what the data actually says
 
 The position was showing nearly full credit late in the session and was almost
 closed manually to bank it. Closing early would have been right *today*.
 
-It would also have been right on **every day the condor expires worthless — 45%
-of them, averaging +$593.** There is no way to take that selectively without
-knowing which day you are in, which is the entire reason the exits are mechanical.
-Do not generalise from a day where discretion would have won.
+**An earlier draft of this entry claimed it would also have been right on the 45%
+of days that expire worthless. That is backwards** — on those days closing early
+costs you the remaining credit. The real trade-off:
+
+```
+CIC - AM stop-out timing, 613 stops
+   10:00-10:59   231  (37.7%)
+   11:00-11:59   131  (21.4%)
+   12:00-12:59    78  (12.7%)
+   13:00-13:59    62  (10.1%)
+   14:00-14:59    59  ( 9.6%)
+   15:00-15:29    29  ( 4.7%)
+   15:30-15:49    11  ( 1.8%)
+   15:50-16:00    12  ( 2.0%)
+```
+
+**Stops cluster early — 59% before noon. Only 3.8% fire after 15:30.** A
+"close at 15:30" rule would avoid 23 late stop-outs averaging −$588 (≈$13,500
+over 4.4 years) at the cost of the last 30 minutes of time value on 1,573
+expiring legs. **Break-even is about $8.60 per expiring leg** — genuinely close,
+and not decidable without a re-run.
+
+**The distinction that matters:**
+
+- **Yesterday's impulse was not information.** SPX was 16 points above the short
+  at 15:41 — the ordinary state of a winning condor. Nothing was known that the
+  model did not know. Acting on that feeling is a coin flip, and 96% of the time
+  the coin says hold.
+- **"Close every day at 15:30" is a testable rule**, and the numbers above put it
+  near break-even rather than obviously wrong. That is a parameter question, not
+  discretion.
+
+So the defensible position is not "never deviate." It is: **convert the impulse
+into a rule and test it, or do not act on it.** Worth running as a sweep —
+15:00 / 15:30 / 15:45 close — since the data does not rule it out.
 
 ### Three days live
 
