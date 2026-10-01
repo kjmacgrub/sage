@@ -40,6 +40,11 @@ EVENTS = [
      "title": "Long-term care premiums begin",
      "text": "Each spouse bought an LTC policy, paid over 10 years and then stopping. "
              "The plan models $17,811/yr of premiums through 2033."},
+    {"date": "2026-08-05",
+     "title": "Condo under contract at $1.44M",
+     "text": "An offer of $1,440,000 on 190 E7 has been accepted, with closing expected within a month — a market-proven price $240K above the "
+             "$1.2M the reports carry (before selling costs and taxes). The proceeds will move from real estate into the portfolio, "
+             "which none of the earlier forecasts assumed."},
 ]
 
 # Milestones in the latest report's projection (read off its cash-flow tables).
@@ -74,7 +79,7 @@ SPENDING_NOTE = ("Actual = Quicken spending excluding insurance, education, taxe
                  "(checking starts Mar 2020, the Fidelity card Aug 2025) and 2025 looks unusually low, so treat this as a rough check. "
                  "Through Sep 4, 2026 Quicken shows $94K spent against a $94.5K assumption for the whole year.")
 
-HOUSEHOLD = {"annuity_monthly_after_tax": 3714}
+HOUSEHOLD = {"annuity_monthly_after_tax": 3714, "condo_carried": 1200000, "condo_offer": 1440000}
 
 TYPES = ["Cash Equivalents", "Taxable Investments", "Qualified Retirement",
          "Roth IRAs", "Annuities", "Real Estate", "Personal Property"]

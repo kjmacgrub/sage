@@ -485,7 +485,8 @@ function renderTiles() {
     const dNW = last.net_worth - prev.net_worth, dFin = fin(last) - fin(prev);
     const y1 = last.year1;
     $('plTiles').innerHTML = [
-        ['Net worth · ' + last.label, full(last.net_worth), `${signed(dNW)} since ${prev.label}`],
+        ['Net worth · ' + last.label, full(last.net_worth), `${signed(dNW)} since ${prev.label}` + (DATA.household.condo_offer
+            ? ` · ${money(last.net_worth + DATA.household.condo_offer - DATA.household.condo_carried)} with the condo at its ${money(DATA.household.condo_offer)} sale price (before selling costs)` : '')],
         ['Financial assets (excl. real estate)', full(fin(last)), `${signed(dFin)} (${(dFin / fin(prev) * 100).toFixed(1)}%) since ${prev.label}`],
         ['Annuity income', full(DATA.household.annuity_monthly_after_tax) + ' / mo',
             `after tax · modeled at ${full(last.annuity_income)}/yr gross, replacing the inherited IRA`],
