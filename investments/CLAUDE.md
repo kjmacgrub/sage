@@ -349,6 +349,14 @@ were removed entirely in favour of Greek/VIX exits.
   **+$0.07/trade, t = 0.05**, and 48% of the gap is trades the other run never
   took. Per-trade SD $59 means detecting $1/trade needs 12,342 paired trades.
   Margin, hold and concurrency are identical. **Stop sweeping DTE.**
+- **CLOSED: do not re-test closing the IC early (2026-10-03).** Late stops are
+  **1.05% of short legs at −$603**; break-even residual is **$6**, so holding to
+  expiry is +EV almost always. Stops cluster early — 59% before noon, only 3.8%
+  after 15:30. Time-close (15:00/15:30/15:45) and profit-target have both been
+  tested and rejected. A *conditional* close (only if ≥80% captured) is not
+  expressible in OO **and would not help**: it fires in the safe states and skips
+  the dangerous ones. PineScript cannot execute options; a custom Schwab-API
+  engine means owning the outage risk yourself.
 - **`Use Resting Stop Market Order` CONFIRMED WORKING (2026-09-30).** First live
   stop-out under it fired at 16:00 on expiry day — worst possible gamma — and
   overshot the 3x stop level by only **0.70**, against 1.10 in the backtest's own

@@ -62,6 +62,66 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-03 — CLOSED QUESTION: closing the IC early. Three approaches, all rejected.
+
+The instinct: *"if we get to 3:30 and most of the premium is collected, the rest
+isn't worth the risk."* It arises after any late stop-out and it is **empirically
+backwards.** Recorded so it stops being re-tested.
+
+### What holding the last thirty minutes actually risks
+
+| | |
+|---|---|
+| Short legs, 2022-05 → 2026-09 | 2,186 |
+| Stopped at any time | 613 (28%) |
+| **Stopped after 15:30** | **23 — 1.05% of all legs** |
+| Average loss when it happens | **−$603** |
+| **Break-even residual premium** | **$6** |
+
+**Above a $6 residual, holding is +EV.** The forgone premium is collected 99% of
+the time; the tail is too rare to insure against. On 2026-10-02 the residual at
+15:43 was **$7/leg** — so even on a day sitting 33 points clear of the strike,
+closing early cost $14 and holding was the better call.
+
+Stops also cluster early, which is the deeper reason: **59% fire before noon,
+only 3.8% after 15:30.** By mid-afternoon the dangerous part of the session is
+behind you.
+
+### The three approaches, and why each fails
+
+| approach | status |
+|---|---|
+| Unconditional time close (15:00 / 15:30 / 15:45) | **tested — nothing beats expiration** |
+| Profit target (e.g. 80%) | **tested — "horrible"** |
+| Conditional: close at 15:30 *only if* ≥80% captured | not expressible in OO, **and would not help** |
+
+**The conditional version has a structural flaw, not an engineering one.** The
+1.05% figure is unconditional. A rule that fires only when you are *already* at
+80% capture selects for the safe states, where late-stop probability is lower
+still — while doing nothing in the unsafe states where an exit would actually
+help. **The rule skips exactly the cases it was invented for.**
+
+### On building it outside OO
+
+**PineScript cannot do this.** TradingView is charting; it has no path to place
+or manage options orders at a broker. The real alternative is a custom script
+against Schwab's API — i.e. owning order routing, fill handling, stop management
+and reconnection logic yourself. The 2026-09-28 outage is a preview of what that
+responsibility looks like, except with nobody else watching the API or posting
+when it breaks.
+
+### Why the instinct keeps returning
+
+On **2026-09-30** SPX fell 35 points in the final ninety seconds and the short
+put stopped for −$650. Vivid, recent, and one instance against 2,163 quiet ones.
+On **2026-10-02** the same decision point arrived, nothing happened, and closing
+early cost $14 — which leaves no impression at all.
+
+**The answer is settled: let them expire.** If the urge returns, re-read this
+rather than re-running the tests.
+
+---
+
 ## 2026-09-30 — The resting stop is confirmed, and it beats the model
 
 Day three produced the test the live setup most needed. The CIC - AM short put
