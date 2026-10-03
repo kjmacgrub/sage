@@ -103,12 +103,21 @@ help. **The rule skips exactly the cases it was invented for.**
 
 ### On building it outside OO
 
-**PineScript cannot do this.** TradingView is charting; it has no path to place
-or manage options orders at a broker. The real alternative is a custom script
-against Schwab's API — i.e. owning order routing, fill handling, stop management
-and reconnection logic yourself. The 2026-09-28 outage is a preview of what that
-responsibility looks like, except with nobody else watching the API or posting
-when it breaks.
+**thinkScript cannot do this** (thinkorswim's language — not PineScript, which is
+TradingView). thinkScript computes values, plots studies, drives scans and fires
+alerts. **It has no order-placement capability** — a script can tell you a
+condition is met; it cannot act on it. You would still be in the loop manually,
+which is where you already are.
+
+thinkorswim's *conditional orders* can trigger on price or study values, but for
+this rule that reduces to a resting buy-back at 20% of credit — **which is a
+profit target, already tested and poor.** Every buildable version collapses into
+one of the three rejected approaches.
+
+The only genuine alternative is a custom script against Schwab's API — owning
+order routing, fill handling, stop management and reconnection logic yourself.
+The 2026-09-28 outage is a preview of that responsibility, except with nobody
+else watching the API or posting when it breaks.
 
 ### Why the instinct keeps returning
 

@@ -355,8 +355,10 @@ were removed entirely in favour of Greek/VIX exits.
   after 15:30. Time-close (15:00/15:30/15:45) and profit-target have both been
   tested and rejected. A *conditional* close (only if ≥80% captured) is not
   expressible in OO **and would not help**: it fires in the safe states and skips
-  the dangerous ones. PineScript cannot execute options; a custom Schwab-API
-  engine means owning the outage risk yourself.
+  the dangerous ones. **thinkScript** (thinkorswim's language — not
+  PineScript) computes studies and fires alerts but **cannot place orders**, and
+  TOS conditional orders reduce this rule to a profit target, already rejected.
+  A custom Schwab-API engine means owning the outage risk yourself.
 - **`Use Resting Stop Market Order` CONFIRMED WORKING (2026-09-30).** First live
   stop-out under it fired at 16:00 on expiry day — worst possible gamma — and
   overshot the 3x stop level by only **0.70**, against 1.10 in the backtest's own
