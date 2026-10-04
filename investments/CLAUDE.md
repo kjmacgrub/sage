@@ -298,9 +298,18 @@ were removed entirely in favour of Greek/VIX exits.
 - **`Use 0-DTE Intra-Minute Stops` ON is conservative by ~$50/contract.**
   Measured on 272 matched stop-outs: live fills −$78.7, OO −$129.2, t=2.71.
   Leave it ON; every backtest result carries that pessimism.
-- **Schwab holds FULL spread width as collateral in the IRA** ($5,000 on a
-  50-wide); OO holds width-minus-credit ($4,348). Ratio **1.15x**. This closes
-  the long-open question.
+- **Schwab holds FULL spread width as collateral in the IRA**; OO holds
+  width-minus-credit. **Ratio 1.073x — corrected 2026-10-04** from measuring 1,852
+  condors (median width $6,000 vs max loss $5,355); the old 1.15x came from a
+  single observation ($5,000 / $4,348) and overstates collateral by ~7%.
+- **`Margin Req.` IS the theoretical max loss, and it is a hard cap (2026-10-04).**
+  Margin / (width - credit) = **1.001** across 1,852 condors, p10 1.000, p90 1.001
+  — and it already reflects that only one side of a condor can lose. Realized loss
+  never exceeded it: worst case 43% of margin at the 200% stop, and exactly 1.00x
+  (plus ~$11 commissions) with no stop. **So the collateral figure doubles as the
+  disaster number — read margin as what you lose if the stop fails completely**,
+  which is the 2026-09-28 API-outage scenario and the reason the resting stop
+  (which rests at the exchange) matters. No separate risk calculation is needed.
 - **Check large stop breaches against the day's actual high/low.** OO priced a
   0DTE call at $51.60 that was 36 points OTM at the session high (2026-05-18) —
   −$5,000, 22% of that run's total. 20 of 22 breaches beyond 3x credit were

@@ -175,6 +175,49 @@ two years**, so a position that just fits today will not fit next year.
 **$60k buys one of the two, not both. Both need ~$70k.** The sequencing instinct
 was right; the threshold was wrong.
 
+### Margin IS max loss — the collateral figure doubles as the disaster number
+
+Measured on 1,852 complete condors, 2017-2026:
+
+| | Median |
+|---|---|
+| Wider spread width | $6,000 |
+| Net credit | $415 |
+| **width - credit (theoretical max loss)** | **$5,355** |
+| **OO `Margin Req.`** | **$5,358** |
+
+**Margin / (width - credit) = 1.001** (p10 1.000, p90 1.001). OO's margin is the
+theoretical max loss exactly, and it already accounts for only one side of a
+condor being able to lose — it is the *wider* spread's width minus credit, not
+the sum of both sides.
+
+**It is a hard cap, never breached:**
+
+| Run | Worst net loss | Margin that day | Breaches |
+|---|---|---|---|
+| 200% (live) | -$4,746 | $10,923 (**43%**) | 0 |
+| 250% | -$9,106 | $10,408 (87%) | 0 |
+| no stop | -$14,354 | $14,343 (**100%**) | 16, all at 1.00x |
+
+The 16 are margin plus ~$11 of commissions. So: **read margin as what you lose if
+the stop fails completely.** That is not hypothetical — 2026-09-28 was exactly
+that (Schwab API down 38 minutes with a breached stop). It is also why
+`Use Resting Stop Market Order` matters: the order rests at the exchange and
+survives the connection dying. **With the stop working you never come close — the
+worst condor in nine years used 43% of its margin.**
+
+Two refinements:
+
+- **Portfolio peak margin as "max simultaneous loss" is conservative**, because it
+  assumes every position maxes out together. The Long Put Hedge gains in the move
+  that hurts the condor's put side. Good as an upper bound, which is what
+  collateral should be.
+- **The Schwab ratio is 1.073, not 1.15.** Schwab holds full width ($6,000 median)
+  against a max loss of width - credit ($5,355), so collateral exceeds max loss by
+  the credit. The recorded 1.15x came from a single observation. 2026 peak
+  collateral is therefore ~$23,266 and **58% of $40k**, not $24,935 and 62%. Every
+  Schwab figure in the entries above is conservative by ~7%.
+
 ### Decided 2026-10-04
 
 - **The 2:30 condor is deferred.** Not because the trade is weak — it adds
