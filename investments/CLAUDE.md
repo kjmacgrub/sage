@@ -419,6 +419,14 @@ were removed entirely in favour of Greek/VIX exits.
   slippage setting models an API outage. The Long Put Hedge cannot use this (its
   exit is `Below Delta`; a resting order is price-triggered and cannot express a
   Greek) but its risk is ~$965/trade, so it matters far less.
+- **Margin grows on its own, and vol moves it harder than the correlations imply
+  (2026-10-04).** Delta-set strikes sit further from spot when EITHER the index or
+  implied vol rises, so width — and margin — rise with both. CIC-AM median
+  per-trade margin ran **SPX +36% against margin +107%** over 2024 -> 2026. The
+  margin/SPX ratio is ~1.0 in calm years and **~1.5-1.6 in volatile ones**. The
+  "+0.71 SPX vs +0.26 VIX" correlation below measures *consistency*, not
+  magnitude. **Size against next year's peak, and assume a volatile year costs
+  ~1.5x a calm one at the same index level.**
 - **Margin is the spread width — not the premium (measured 2026-09-29).**
   Correlation of margin with width **+1.00**, SPX level +0.71, credit +0.54,
   VIX **+0.26**. A vol spike raises margin only because a 15Δ strike sits further

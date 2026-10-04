@@ -192,10 +192,23 @@ was right; the threshold was wrong.
   three-sleeve structure stops constraining anything.
 
 **Standing rule from this: size against NEXT year's peak margin, not this year's.**
-Strikes are delta-set, so spread width tracks SPX, and the index drifts up. Peak
-margin went $16,888 (2024) -> $17,853 (2025) -> $21,683 (2026), **+28% in two
-years, with no change to contract counts.** A position that just fits today is a
-position that will not fit.
+Portfolio peak margin went $16,888 (2024) -> $17,853 (2025) -> $21,683 (2026),
+**+28% in two years with no change to contract counts.** A position that just fits
+today is a position that will not fit.
+
+**Corrected 2026-10-04: that growth is NOT mostly index drift.** Both the index
+level and implied vol push a 15Delta strike further from spot in percentage terms,
+widening the spread and the margin with it. Measured on CIC-AM's median per-trade
+margin, 2024 -> 2026 ran **SPX +36% against margin +107%** — three times faster.
+The margin/SPX ratio is plainly regime-dependent: ~1.0 in calm years (2017 0.75,
+2019 0.99, 2024 1.01) and ~1.5-1.6 in volatile ones (2020 1.59, 2022 1.48, 2025
+1.61, 2026 1.54).
+
+**This qualifies the recorded "index level matters ~3x more than volatility"**,
+which came from correlations. Correlation measures consistency, not magnitude —
+SPX drifts smoothly and monotonically so it correlates tightly, while vol is spiky
+but moves margin far harder when it moves. **For sizing, assume a volatile year
+needs ~1.5x the margin of a calm one at the same index level.**
 
 ---
 
