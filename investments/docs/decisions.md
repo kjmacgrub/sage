@@ -62,6 +62,119 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-04 — CLOSED QUESTION: the IC stop level. Swept both directions; 200% is the peak.
+
+Prompted by a different idea — *"instead of closing early, close the shorts if
+price or volatility surges"* — which turned out to be the wrong question but
+surfaced the right one. **Both are now closed. Stop re-testing the stop.**
+
+### The surge-exit idea is structurally void
+
+OO's `Exit Conditions` offer VIX move, VIX9D move, VIX9D/VIX ratio, underlying
+IV, HV/IV ratio and underlying price movement. **None of them can help here, and
+the reason is the strike selection.**
+
+The shorts are **delta-selected, not strike-selected.** A 15Δ strike is by
+construction ~15% likely to be touched *regardless of VIX* — when vol is high,
+OO places it further out. Strike selection is already a volatility normalizer,
+so "VIX surged" does not mean "my short is in more danger." Exiting on it
+double-counts. Same mechanism that made delta-set wings beat a fixed ±100 offset.
+
+Measured on 3,789 short legs, binning by the day's adverse SPX move:
+
+| Adverse move | Legs | Stopped | $/leg |
+|---|---|---|---|
+| favorable | 1,894 | 25.7% | +70 |
+| 0-10 pts | 1,166 | 28.3% | +40 |
+| 10-20 | 438 | 31.1% | +35 |
+| 20-35 | 214 | 34.6% | **-40** |
+| 35-50 | 61 | 21.3% | **+147** |
+| >50 | 16 | 31.2% | **+201** |
+
+Non-monotonic and it **inverts at the top** — the biggest adverse days are not
+the losing days. There is no threshold to sweep toward; any cut is fitted to the
+-40 bucket, 5.6% of legs.
+
+**More fundamentally: the 200% stop is already a price-and-volatility trigger.**
+The option's price integrates spot and IV movement weighted by the position's
+actual greeks. VIX is one input, unweighted, measured on the index rather than
+on the short. Every surge exit is a noisier proxy for what the stop measures
+directly — it fires on false positives and misses what the stop catches.
+
+### The stop sweep — nine runs, isolated, 2017-09-05 -> 2026-10-02, $200k, 1 contract
+
+| Stop | Stop rate | P/L | ex 2025-04-09 | ex Apr-2025 | Max DD |
+|---|---|---|---|---|---|
+| 100% | 43.5% | 30,188 | 18,543 | 22,828 | -5.03% |
+| 125% | 37.6% | 43,329 | 31,684 | 36,115 | -4.36% |
+| 150% | 33.6% | 54,369 | 42,724 | 45,586 | -4.09% |
+| 175% | 30.6% | 56,519 | 45,399 | 47,579 | -4.52% |
+| **200% (live)** | **27.8%** | **65,936** | **54,816** | **57,734** | **-4.13%** |
+| 250% | 24.1% | 32,319 | 41,208 | 44,616 | -7.82% |
+| 300% | 20.8% | 38,660 | 47,550 | 50,980 | -8.41% |
+| 400% | 16.5% | 41,900 | 50,790 | 57,084 | -10.58% |
+| none | 0% | **-207** | 12,186 | 14,025 | **-30.75%** |
+
+**200% is the peak in every exclusion column.** Leave it alone.
+
+**The two sides are different kinds of evidence.** The tight side is a clean
+monotonic gradient in all four columns — systematic, and the mechanism is
+understood (below). The loose side is **crisis-dominated**: strip April 2025 and
+the ordering scrambles (400 > 300 > 250) and 400% comes within $650 of 200%.
+What is unambiguous on the loose side is **drawdown**, monotonic from -4.13% to
+-30.75%. Treat "don't loosen" as a risk result, not a P/L result.
+
+**No stop at all earns -$207 over nine years at -30.75% drawdown.** The stop is
+defending essentially the entire carry, not trimming a tail.
+
+### Why tightening loses — a 3:1 payoff asymmetry
+
+Paired on 3,703 matched legs, 200% vs 125%:
+
+| Transition | Legs | @200% | @125% | Delta |
+|---|---|---|---|---|
+| stopped at both | 1,031 | -542,572 | -346,822 | **+195,750** |
+| expired@200 -> stopped@125 | 359 | +89,642 | -127,695 | **-217,337** |
+| expired at both | 2,313 | +549,775 | +549,775 | 0 |
+
+The saving on genuine losers is real and large. It is swamped by the 359 legs
+the tighter stop kills, **347 of which (97%) were profitable when left alone.**
+
+The arithmetic, which should have been done before any run: moving the stop from
+S to S' costs `S'-S` on a leg that stops either way and gains `S+100` on one that
+recovers to full credit, so the **break-even recovery rate is `(S'-S)/(S'+100)`**.
+Tightening 200 -> 125 needs recovery below **25.0%**; observed recovery among
+legs touching -125% is **25.8%**. A hair the wrong side, which is why the curve
+is monotonic — tightening further only worsens the ratio.
+
+For loosening, the same formula wanted 25.0% at 300% and 40.0% at 400%. Both
+**over**-predicted: loosening lost on the full sample at every level. The missing
+term is the gap — the formula assumes you exit *at* the trigger, and on the loose
+side the rare failure fills far past it (2025-04-09 below).
+
+### 2025-04-09 is a real print, and it is worth 65% of the 200-vs-250 gap
+
+The worst single leg, -$22,535, appears identically in the 250/300/400 runs. It
+is **not** an OO artifact: the short 5185 call settled at $271.90, and
+5185 + 271.90 = **5456.90**, exactly where SPX actually closed on the tariff-pause
+day (+9.5%).
+
+The timing is the whole story. **The 200% stop exited at 13:20 for -$2,525; the
+250% stop was still holding at 13:22 and filled at -$22,535.** The announcement
+hit at 13:18. That is luck, not edge — hence the exclusion columns above. The
+conclusion survives removing it; the *magnitude* does not (the 200-vs-250 gap
+falls from $33,617 to $13,607).
+
+### Calendar-year positivity is a qualification gate, not an optimizer
+
+At 1 contract from 2017, 200% reads 8/10 positive years while 125% and 150% read
+9/10 — but 200% makes $11.5k to $22.6k more. Two of 200%'s negatives are **-$305
+and -$471 on $200k** (0.15%, 0.24%), and 2017 is a four-month stub. The standing
+bar exists to decide whether a strategy may enter the book. **Do not rank
+parameters by it.**
+
+---
+
 ## 2026-10-03 — CLOSED QUESTION: closing the IC early. Three approaches, all rejected.
 
 The instinct: *"if we get to 3:30 and most of the premium is collected, the rest

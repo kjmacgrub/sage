@@ -228,6 +228,17 @@ were removed entirely in favour of Greek/VIX exits.
 - **A conditional distribution cannot tell you what changing the condition does.**
   `Max Profit` is censored by the exit being assessed; exit-reason P/L is negative
   *because* that bucket collects the losers. Both misled. Only a re-run answers it.
+- **`Max Loss` in the trade log is COARSER than the stop engine — you cannot
+  simulate a tighter stop from it (2026-10-04).** With `Use 0-DTE Intra-Minute
+  Stops` ON the stop sees intra-minute ticks; the logged MAE does not. Simulating
+  a 125% stop off the 200% log **under-fired by 95 of 1,390 legs**, and because
+  those legs swing from profit to full stop the error was **-$57,407** — the
+  entire gap between a simulation that said *+$67k, change it* and an OO re-run
+  that said *-$22.6k, don't*. One leg logs -19.9% MAE and trips a 125% stop.
+- **A calibration that doesn't exercise the model is not a calibration.** The
+  same simulation "validated" at X=200 where its own guard (`if X<200`) meant
+  nothing fired — it compared the baseline to itself and reported 2% error.
+  **Check that the model actually fires at the calibration point.**
 
 #### The parts worth not rediscovering
 
@@ -254,6 +265,31 @@ were removed entirely in favour of Greek/VIX exits.
   running it alongside the afternoon pair puts 58 of 184 days over budget. Never
   traded live. See the 2026-09-26 decisions entry for the full sequence; the
   final config is half the value.
+- **CLOSED: the IC stop level is swept in BOTH directions; 200% is the peak
+  (2026-10-04).** Nine isolated runs, 2017-09-05 -> 2026-10-02, $200k, 1 ctr:
+  100/125/150/175% earn 30.2/43.3/54.4/56.5k, **200% earns 65.9k**, 250/300/400%
+  earn 32.3/38.7/41.9k, no stop earns **-$0.2k at -30.75% drawdown**. 200% is the
+  peak in every crisis-exclusion column. **The tight side is systematic** (clean
+  gradient, mechanism below); **the loose side is crisis-dominated** — strip April
+  2025 and the ordering scrambles — but its **drawdown is monotonic** (-4.13% ->
+  -30.75%), so "don't loosen" is a risk result, not a P/L one.
+  **Mechanism: break-even recovery rate for moving the stop S -> S' is
+  `(S'-S)/(S'+100)`.** Tightening 200 -> 125 needs recovery below 25.0%; observed
+  is 25.8%, and 97% of the legs a 125% stop kills were profitable when left alone.
+  Loosening fails because the formula assumes you exit *at* the trigger and the
+  rare failure gaps far past it.
+- **Exits on VIX, VIX9D, IV or underlying price movement cannot work on a
+  delta-selected short.** A 15Δ strike is ~15% likely to be touched regardless of
+  VIX — OO places it further out when vol is high, so strike selection is already
+  a vol normalizer and a surge exit double-counts. Binned by the day's adverse SPX
+  move, $/leg goes +70 / +40 / +35 / **-40** / **+147** / **+201** — non-monotonic
+  and inverting at the top. **The 200% stop is itself a price-and-volatility
+  trigger**, greek-weighted on the actual position; VIX is one unweighted input
+  measured on the index. Every surge exit is a noisier proxy for it.
+- **Calendar-year positivity is a qualification gate, not a parameter optimizer.**
+  At 1 ctr from 2017, 125%/150% read 9/10 positive years against 200%'s 8/10 while
+  earning $11.5-22.6k less; two of 200%'s negatives are -$305 and -$471 on $200k.
+  Use the bar to decide whether a strategy enters the book, never to rank configs.
 - **Friction must be measured, not assumed.** Commissions are **1.175 open /
   1.22 close** (not 1.75 — that overstated by 49%); entry slippage **0.035/leg**
   on shorts and **−0.027** on wings (not 0.20). Exit slippage is still
