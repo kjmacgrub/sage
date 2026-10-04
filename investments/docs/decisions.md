@@ -175,6 +175,28 @@ two years**, so a position that just fits today will not fit next year.
 **$60k buys one of the two, not both. Both need ~$70k.** The sequencing instinct
 was right; the threshold was wrong.
 
+### Decided 2026-10-04
+
+- **The 2:30 condor is deferred.** Not because the trade is weak — it adds
+  $42,078 over 7.4 years and leaves the 10:00 book untouched — but because at $40k
+  it runs peak collateral above the balance, and that failure **does not error.**
+  It silently skips entries, and the skipped ones are not a random sample (a
+  starved run once made a strategy read $46/contract where at tradeable size it was
+  +$98).
+- **QQQ Leap is deferred to ~$28k of spare cash**, not to a market view. It is
+  legged in at 1 contract when the money exists.
+- **Selling CEFs to cover a margin need is a sleeve reallocation, not a funding
+  fix.** It belongs to the annual ratchet, which is deliberate and scheduled — not
+  to an opportunistic decision taken because a trade looks attractive this week.
+  The moment the options sleeve can requisition from the Roth on demand, the
+  three-sleeve structure stops constraining anything.
+
+**Standing rule from this: size against NEXT year's peak margin, not this year's.**
+Strikes are delta-set, so spread width tracks SPX, and the index drifts up. Peak
+margin went $16,888 (2024) -> $17,853 (2025) -> $21,683 (2026), **+28% in two
+years, with no change to contract counts.** A position that just fits today is a
+position that will not fit.
+
 ---
 
 ## 2026-10-04 — CLOSED QUESTION: the IC stop level. Swept both directions; 200% is the peak.
