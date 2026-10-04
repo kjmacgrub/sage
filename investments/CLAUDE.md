@@ -316,7 +316,16 @@ were removed entirely in favour of Greek/VIX exits.
   with flags set (best found: 4 of 5). See the 2026-09-18 decisions entry.
 - **OO logs an iron condor as three rows** — long wings, put side, call side —
   because `Exit - Puts` and `Exit - Calls` manage separately. Group by
-  (Date Opened, Time Opened) or trade counts triple.
+  (Date Opened, Time Opened) or trade counts triple. **`Margin Req.` is carried on
+  every one of those rows and is per-TRADE, not per-row** — summing it across open
+  rows inflated 2026 peak margin from $21,683 to $50,129 (2.3x) and nearly drove a
+  live funding decision. Group first, then sum.
+- **Never read a CAGR or a drawdown off a backtest funded differently from the
+  account you trade.** The live book at $200k reads 13.40% CAGR / -3.14% DD and
+  looks like it merely matches SPX; the identical trades at the $40k actually
+  committed read **31.10% / -10.66%**. Mean utilisation was 3.9% of net liquidity.
+  Since contracts are fixed, dollar P/L is constant — re-express the curve at real
+  funding before judging anything. See the 2026-10-04 decisions entry.
 - **Never size by contract cap alone — *history, pre-cap era*.** Percentage sizing
   divides an allocation by margin-per-contract, which collapses toward zero on
   degenerate calendars and produced a 1,402-contract position. The fix then was a

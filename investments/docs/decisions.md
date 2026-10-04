@@ -62,6 +62,121 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-04 — The book does not underperform SPX. It is under-deployed, and the two sizing decisions that follow.
+
+Ran the live three-strategy book (CIC-AM 1 ctr · Sell puts 2 · Long Put Hedge 1)
+at 200% stop, 2017-09-05 -> 2026-10-02, funded at $200k. It returned **13.40%
+CAGR at -3.14% drawdown** and looked like it merely matched the index. **Both
+figures are denominator artifacts.**
+
+| | CAGR | Max DD | Return/DD |
+|---|---|---|---|
+| SPX price only | 13.40% | -32.6% | 0.41 |
+| SPX + ~1.8% divs | 15.20% | -32.6% | 0.47 |
+| the book @ $200k | 13.40% | -3.1% | **4.27** |
+
+**Mean utilisation was 3.9% of net liquidity.** Worst dollar drawdown was
+**-$9,223** against peak concurrent margin of $50,129 — 18.4% of capital actually
+at risk, not 3.1%. Return on margin ran **73-188% a year**.
+
+Because contracts are fixed, dollar P/L is identical at any funding level, so the
+same run re-expressed:
+
+| Funded at | Ends | CAGR | Max DD |
+|---|---|---|---|
+| $200,000 | $626,463 | 13.42% | -3.14% |
+| $80,000 | $506,463 | 22.56% | -6.67% |
+| **$40,000** (the options half) | $466,463 | **31.10%** | **-10.66%** |
+
+31.1% over a window including 2018 and 2020 reconciles with the recorded 33.7%
+live baseline on the clean 2022-05 window. **Never read a CAGR off a backtest
+funded differently from the account you trade.** Caveat: the hedge's instrument
+launched 2022-05-11, so roughly half this window is fictional for it; the true
+figure sits between these two.
+
+Also worth knowing before the next round of tuning: **Sell puts is 78% of the
+P/L** ($333,545 of $426,463). CIC-AM is 15% ($62,072), the hedge 7% ($30,846).
+
+### Why contract caps stay, in Ken's words
+
+> *"A percentage model just blasts off into the stratosphere and becomes useless
+> to me now. I don't live in those numbers and can't think about them. So I
+> sacrifice one model that flies off the rails in 5 or 10 years for something
+> that needs to be coddled but provides a firm hold on the tracks."*
+
+**A model you cannot think in is a model you will not override when it is wrong.**
+That is the load-bearing reason, alongside the recorded one (a percentage responds
+only to account equity, a lagging record of past P/L, and cannot see whether fills
+have degraded or whether the strategy can absorb another contract).
+
+Two consequences:
+
+- **Sizing up never requires a re-run.** Margin is spread width x contracts and
+  P/L scales with it. Proven accidentally this session: the 2-contract CIC-AM run
+  came in at $131,872 against the 1-contract run's $65,936 — within 2% of exactly
+  double. **The annual review is arithmetic, not modelling.**
+- **The failure mode is drift, not lag.** Caps don't fail by moving too slowly;
+  they fail by never moving. Any week that feels good to add is a week you just
+  made money and don't want to disturb; any week you hesitate is a drawdown.
+  "Once a year, on live evidence, never mid-drawdown" exists to make the decision
+  scheduled rather than discretionary.
+
+### QQQ Leap: the gate already does the market-timing, and the funding number
+
+The plan was to switch it on discretionarily, "once the market backs off the
+AI-driven overpricing." **The strategy already does this mechanically.** Entries
+per year at 1 contract: 2019: 3 · 2020: 12 · 2021: 7 · **2022: 0** · 2023: 4 ·
+2024: 7 · 2025: 4 · **2026: 0**. The rising-SMA200 gate took it out of the bear
+and has kept it out this year without anyone forming a view.
+
+A discretionary overlay is strictly worse: it duplicates the gate, runs the
+opposite direction (the rule buys a 1.75% intraday drop; the instinct waits until
+after the recovery), and **has no exit condition** — nothing observable says the
+bubble is over, so in practice it gets switched on after a rally or never.
+
+**The legitimate caution is correlation, not valuation.** Everything outside the
+Roth is a 66/34 Fidelity equity book, and QQQ Leap is long QQQ — the part of this
+sleeve that is *not* crash-positive. "Am I doubling my equity beta?" is a better
+gate than "is the bubble over": it has an answer and it is checkable annually.
+
+Measured at 1 contract, current config (37 trades, 2019-08 -> 2025-12):
+
+| | |
+|---|---|
+| Entries | 5.8/yr, median hold **105 days** |
+| Max concurrent | **3** (the 10 in the record came from the floating-size run) |
+| Peak capital | $19,704 at historical prices, **~$27,800 at today's ~$9,264/contract** |
+| Days with something open | **86%** |
+| P/L | $68,431 over 6.4 yrs = **$10,746/yr** |
+
+**It consumes cash, not margin.** A long LEAP is paid in full and stays paid for
+~105 days. It does not release at 9:30 like condor collateral, so it competes with
+the account balance rather than with margin headroom — the only strategy in the
+book that works that way.
+
+### The 2:30 condor and QQQ Leap do not both fit at $60k
+
+Current book, 2026, margin counted **once per position**:
+median $13,158 · p90 $16,383 · peak **$21,683** (OO) = **$24,935 at Schwab**.
+On $40k that is 62% peak utilisation.
+
+| | Peak capital needed |
+|---|---|
+| Current book | $24,935 |
+| + 2:30 condor | ~$41,291 |
+| + QQQ Leap | **~$69,083** |
+
+**Do not add the 2:30 entry at $40k.** A second condor adds another CIC-AM-sized
+block (~$16,356 at Schwab) and takes peak above the balance — the margin-starvation
+condition that silently skips entries and selects losers. And margin drifts up with
+the index: 2026 peak $21,683 against 2025's $17,853 and 2024's $16,888, **+28% in
+two years**, so a position that just fits today will not fit next year.
+
+**$60k buys one of the two, not both. Both need ~$70k.** The sequencing instinct
+was right; the threshold was wrong.
+
+---
+
 ## 2026-10-04 — CLOSED QUESTION: the IC stop level. Swept both directions; 200% is the peak.
 
 Prompted by a different idea — *"instead of closing early, close the shorts if
