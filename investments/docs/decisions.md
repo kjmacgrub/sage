@@ -62,6 +62,103 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-05 — Succession: the sleeve already reverts to cash on its own, and why
+
+The requirement: everything must be explainable and runnable by family if Ken dies
+or is incapacitated. **The options sleeve already satisfies it** — not by design,
+as a side effect of running short-dated defined-risk structures. Recorded because
+it is the property that would quietly break if the book's composition changed.
+
+### The dead-man's switch is real and already installed
+
+**Schwab's API requires re-authentication roughly weekly.** If nobody re-auths,
+order routing stops by itself. **That is the switch — nothing needs building.**
+
+### Wind-down, measured across the live book
+
+| Strategy | Positions | Median hold | Max hold |
+|---|---|---|---|
+| CIC - AM | 1,852 | **0d** | **0d** |
+| Long Put Hedge | 922 | 0d | 1d |
+| Sell puts | 1,981 | 2d | **74d** |
+
+**Stop entries and the book is flat in 74 days with no decision required.** Two of
+three are 0 DTE and flat at 16:00 the same afternoon; only the put seller carries
+overnight at all.
+
+**Whole sequence: ~7 days to entries stopping, ~74 days to fully flat.** Eleven
+weeks from the last re-auth to an account holding nothing but cash.
+
+**The family's action is "stop entries," never "close positions."** One switch, no
+options knowledge, no judgment.
+
+### Stranded exposure is bounded and small
+
+| | Median | Peak |
+|---|---|---|
+| Overnight exposure (OO) | $2,480 | $8,050 |
+| At Schwab, full width | $2,661 | **$8,638** |
+
+Because **margin is max loss** (see the entry above), $8,638 is the genuine worst
+case with nothing managed at all: the spreads run to expiry, lose at most their
+width, and close themselves. ~22% of a $40k sleeve, on the single worst day.
+**The condor contributes zero** — flat every night, so it cannot be stranded.
+
+### The invariant: it scales by COMPOSITION, not by size
+
+Stranded exposure is **35% of peak collateral**, and that ratio is structural — it
+is simply the share of the book that holds overnight. Everything is linear in
+contracts, so scaling up moves the dollars and not the ratio.
+
+**So the succession number to watch is overnight margin as a share of the sleeve
+(today ~22%), not contract count.** At 4 contracts on a $160k sleeve nothing has
+changed about what the family inherits except the zeros.
+
+Two consequences, and they agree with every other argument reached this week:
+
+- **Adding the 2:30 condor (0 DTE) IMPROVES this** — raises peak margin while
+  adding zero overnight exposure, so the stranded fraction falls.
+- **Adding QQQ Leap degrades it sharply** — 100% overnight, and it stretches the
+  74-day wind-down to **434 days**. The family would inherit long calls whose
+  correct action is usually "wait", which is the hardest instruction to leave
+  behind. **Sixth independent argument against it.**
+
+### On the taxable side, and why no self-managed index sleeve
+
+The managed Fidelity book is staying: fees reasonable, harvesting handled,
+performance average, requires no attention. **A parallel robo account as a
+benchmark was considered and rejected on measurement grounds.**
+
+Two broad equity portfolios are highly correlated, so the *difference* between
+them is tiny relative to its own noise:
+
+| Correlation | SD of annual difference | Years to detect 1%/yr | 2%/yr | 3%/yr |
+|---|---|---|---|---|
+| 0.90 | 6.7% | 353 | 88 | 39 |
+| 0.95 | 4.7% | 176 | 44 | 20 |
+| 0.98 | 3.0% | 71 | 18 | 8 |
+
+A managed account's plausible edge or drag versus a robo is fees + harvesting +
+allocation drift, maybe 0.3-1%/yr. **At rho 0.95, detecting 0.5%/yr needs 706
+years.** A second account would add a noisy estimate of something already
+disclosed.
+
+**The components are individually observable where the net difference is not:**
+fees (exact, day one), harvested losses (annual 1099), holdings and allocation
+(disclosed), benchmark-relative return (reported). Read them off the statement
+rather than inferring them from a return gap.
+
+**Same lesson as the QQQ Leap entry signal** (+2.3 pts at t=1.59): comparing two
+things that are 95% the same is the hardest measurement there is. Isolate the
+variable instead of comparing the outcomes.
+
+What *is* measurable on a short horizon is the options sleeve's **correlation and
+drawdown behaviour** — the property it was built for. One quarter with equities
+down 15% is informative, because the effect is large relative to its noise. That
+is what the tripwires already track.
+
+---
+
 ## 2026-10-05 — CLOSED: QQQ Leap tuning. One real win (80% target), everything else is sizing.
 
 Swept the whole strategy after Ken caught the gate error. **Net result: raise the

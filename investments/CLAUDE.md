@@ -435,6 +435,25 @@ were removed entirely in favour of Greek/VIX exits.
   slippage setting models an API outage. The Long Put Hedge cannot use this (its
   exit is `Below Delta`; a resting order is price-triggered and cannot express a
   Greek) but its risk is ~$965/trade, so it matters far less.
+- **SUCCESSION: the sleeve already reverts to cash by itself (2026-10-05).**
+  Schwab's API needs re-auth **weekly**, so entries stop on their own if nobody
+  shows up — **the dead-man's switch is already installed.** Max hold across the
+  live book is **74 days** (CIC-AM and the hedge are 0 DTE and flat at 16:00;
+  only Sell puts carries overnight), so **~7 days to entries stopping, ~74 days to
+  fully flat.** Stranded exposure peaks at **$8,638** at Schwab — and since margin
+  IS max loss, that is the true worst case with nothing managed. **The family's
+  action is "stop entries", never "close positions."**
+  **This scales by COMPOSITION, not size:** stranded exposure is a structural
+  **35% of peak collateral** (the overnight share of the book), so contracts move
+  the dollars and not the ratio. **Watch overnight margin as a share of the sleeve
+  (~22% today), not contract count.** 0-DTE additions improve it; QQQ Leap would
+  stretch the wind-down to **434 days**.
+- **A parallel robo account cannot benchmark the managed sleeve (2026-10-05).**
+  Two broad equity books are ~0.95 correlated, so the SD of the annual *difference*
+  is ~4.7% and **detecting 0.5%/yr takes 706 years** (1%/yr: 176). **Measure the
+  components instead — fees, harvested losses, holdings, benchmark-relative return
+  are all disclosed.** Same lesson as the QQQ Leap entry signal: isolate the
+  variable, never compare two nearly-identical outcomes.
 - **CLOSED: QQQ Leap tuning (2026-10-05). Raise the profit target to 80%; change
   nothing else.** Paired on 52 matched entries: **+$686/ctr, t = 12.67**, 47 of 52
   improved. **Rejected, all tested:** removing the target entirely (leverage not
