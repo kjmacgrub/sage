@@ -62,6 +62,107 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-05 — CLOSED: QQQ Leap tuning. One real win (80% target), everything else is sizing.
+
+Swept the whole strategy after Ken caught the gate error. **Net result: raise the
+profit target to 80%, change nothing else, and control risk with contract count.**
+
+### The one genuine improvement: profit target 60% -> 80%
+
+**Paired on 52 matched entries: +$686/contract, SD $391, t = 12.67, 47 improved /
+4 unchanged / 1 worse.** Per-contract total goes $88,339 -> $172,950 uncapped.
+
+**I had said this sweep was pointless and I was wrong, in an instructive way.**
+The power calculation used the SD of *P/L* ($2,113) when the right figure is the
+SD of the *paired difference* ($397) — 5.3x smaller, because pairing cancels the
+entry-selection variance that dominates this strategy. **With n=37 an unpaired
+sweep really can detect nothing; a paired one detects a $686 effect at t=12.67.**
+Same tool that killed the DTE 60/70 headline confirms this one. **Always pair.**
+
+### What does NOT work, all tested
+
+- **Removing the profit target entirely.** Headline looks spectacular
+  ($311,722/ctr) and is **leverage, not edge**: return on peak capital only goes
+  3.26x -> 3.75x, while max concurrency goes 4 -> **24** and peak capital
+  $27,104 -> $83,190 (**~$216,000 at today's prices — five times the account**).
+  Holds go to 396 days median, drawdown doubles, and the sample truncates 11
+  months early because a 396-day hold cannot complete in the window.
+  **A profit target on a long LEAP is a capital-turnover mechanism, not a P/L
+  optimizer.** Taking 80% and redeploying beats holding for 548% in a position
+  you cannot afford to hold.
+- **Any stop loss.** MAE runs median -34%, p25 -73%, **p10 -89%** — LEAPs go most
+  of the way to zero and come back, which is what buying time *is*. A 25% stop
+  fires 26 times and **21 of those (81%) recovered to profit**, taking total P/L
+  $93,898 -> $8,521. Every level tested is worse than no stop.
+- **IV / premium richness at entry.** Debit-as-%-of-spot bands show no pattern
+  (94% / 77% / 90% win rates), and the four 2022 losers came in at 12.8, 11.8,
+  11.4 and 12.1% — straddling the 11.5% median. They were not expensive entries.
+- **Any further technical indicator.** All four 2022 losers had **MAE -100% and
+  MFE of 23%, 3%, 2%, 21%** — they went down in week one and never came back.
+  There is nothing for an oscillator to catch. They passed the SMA gate, their IV
+  was ordinary, and no exit improves a trade already at total loss. **The only
+  thing distinguishing them is that they were bought in the six weeks before a
+  twelve-month bear, which is knowable afterward and not before.**
+
+### `Max Open Positions` is the capital dial, and it is expensive
+
+Capping at 3 refused 12 entries, every one of them with **exactly 3 already open
+and capital at 2-7% utilisation** — a hard cap, not starvation. It cost
+**$22,322/contract, 25% of the strategy**, reproducing the recorded "pausing at
+three open costs 42%". Capping at 4 costs **46%** (69 trades -> 40).
+
+But uncapped needs ~$70,000 at one contract today, so **capping is not optional —
+only the level is.** At ~$8,760/contract: cap 3 ~$26,280 · cap 4 ~$35,040 ·
+cap 5 ~$43,800 · uncapped ~$70,079.
+
+### The gate: keep `above SMA200`, and know what it does not do
+
+The original intent was "wait until the index is clearly low, then buy the
+rebound." **The rule implements the opposite** — buy dips inside an uptrend.
+Ken spotted this; it is a real mismatch between intent and implementation.
+
+Testing the intent (270-day horizon, peak gain reached, signals = 1.75% drop):
+
+| Entry zone | n | Median peak | Reached +15% | Worst trough |
+|---|---|---|---|---|
+| 15%+ below SMA200 | 28 | 36.8% | **96%** | **-15.9%** |
+| 10%+ below | 58 | 39.9% | 86% | -21.0% |
+| above, within 5% | 25 | 35.0% | 88% | -31.1% |
+| above by >10% | 57 | **40.0%** | **96%** | -33.9% |
+| *any amount above (live gate)* | 128 | 31.8% | 87% | -34.4% |
+
+**Both extremes work; the lukewarm middle does not** — and all four 2022 losers
+sat at +6.0 to +9.5% vs SMA200, in exactly that weak band. Tempting, but n=57 and
+n=28 in a sample with one bear, and a filter drawn to exclude four trades is
+fitted by construction. **Not adopted.**
+
+Also note **"deeply below" fires about once per market cycle** — one entry at -10%
+or worse in nine years. That is a decision you make every few years, not a
+standing allocation. The instinct is sound; it is not this strategy.
+
+A `below SMA50` variant was also tested and is **near-inert**: 64% of all drop
+days are already below the 50-day, so it blocks only 36% of signals, and the
+median entry sits -3.8% vs SMA50 — which is just a description of what a 1.75%
+drop looks like. All four 2022 losers passed it.
+
+### Settled config and what remains unmeasured
+
+**`Move Down >= 1.75%` at 15:30, above SMA200, strike ~0.975 x spot, 362-448 DTE,
+80% profit target, exit at 3 DTE, no stop, contract cap set by capital.**
+
+The 3-DTE exit is a **safety rail, not a parameter — do not sweep it.** Assignment
+is impossible (you are long; only shorts are assigned), but **auto-exercise is
+real**: OCC exercises anything $0.01 ITM, delivering 100 shares per contract —
+**~$75,000 against a $40k account.** A backtest models this as a close at
+intrinsic and will report that removing the exit is free. **It cannot see the
+margin call.** Never let a backtest adjudicate a settlement-mechanics question.
+
+**Still unmeasured: peak capital for `above SMA200` + 80% + a chosen cap.** The
+cap-4 figure of ~$35,040 comes from the below-SMA50 run; the above-SMA200 version
+may differ. Measure before funding.
+
+---
+
 ## 2026-10-04 — The book does not underperform SPX. It is under-deployed, and the two sizing decisions that follow.
 
 Ran the live three-strategy book (CIC-AM 1 ctr · Sell puts 2 · Long Put Hedge 1)

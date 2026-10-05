@@ -435,6 +435,25 @@ were removed entirely in favour of Greek/VIX exits.
   slippage setting models an API outage. The Long Put Hedge cannot use this (its
   exit is `Below Delta`; a resting order is price-triggered and cannot express a
   Greek) but its risk is ~$965/trade, so it matters far less.
+- **CLOSED: QQQ Leap tuning (2026-10-05). Raise the profit target to 80%; change
+  nothing else.** Paired on 52 matched entries: **+$686/ctr, t = 12.67**, 47 of 52
+  improved. **Rejected, all tested:** removing the target entirely (leverage not
+  edge — return on peak capital 3.26x -> 3.75x while concurrency goes 4 -> 24 and
+  capital to ~$216k at today's prices); **any stop** (MAE p10 is **-89%**, and a
+  25% stop catches 26 trades of which **21 recovered to profit**, cutting P/L
+  $93,898 -> $8,521); IV at entry; any further indicator. The four 2022 losers had
+  **MAE -100% and MFE ~0** — nothing to catch. **The lever is contract count, not
+  selection.**
+- **Pair every sweep, or the power calculation lies.** I called a QQQ Leap sweep
+  pointless using the SD of P/L ($2,113); the right figure is the SD of the paired
+  difference ($397), 5.3x smaller because pairing cancels entry-selection variance.
+  **Unpaired at n=37 detects nothing; paired it detects $686 at t=12.67.**
+- **QQQ Leap's 3-DTE exit is a SAFETY RAIL — never sweep it.** Assignment is
+  impossible (long options are never assigned), but **auto-exercise is**: OCC
+  exercises anything $0.01 ITM and delivers 100 shares/contract, **~$75,000 against
+  a $40k account**. OO models expiry as a close at intrinsic and will report that
+  removing the exit is free. **It cannot see the margin call.** Never let a
+  backtest decide a settlement-mechanics question.
 - **Margin grows on its own, and vol moves it harder than the correlations imply
   (2026-10-04).** Delta-set strikes sit further from spot when EITHER the index or
   implied vol rises, so width — and margin — rise with both. CIC-AM median
