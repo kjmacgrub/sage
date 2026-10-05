@@ -121,25 +121,50 @@ Two consequences:
   "Once a year, on live evidence, never mid-drawdown" exists to make the decision
   scheduled rather than discretionary.
 
-### QQQ Leap: the gate already does the market-timing, and the funding number
+### QQQ Leap: what the gate does and does not protect against, and the funding number
 
-The plan was to switch it on discretionarily, "once the market backs off the
-AI-driven overpricing." **The strategy already does this mechanically.** Entries
-per year at 1 contract: 2019: 3 · 2020: 12 · 2021: 7 · **2022: 0** · 2023: 4 ·
-2024: 7 · 2025: 4 · **2026: 0**. The rising-SMA200 gate took it out of the bear
-and has kept it out this year without anyone forming a view.
+**CORRECTED 2026-10-05.** The first version of this entry said the entry gate is a
+*rising* 200-day SMA and that the strategy was absent in both 2022 and 2026.
+**Both were wrong.**
 
-A discretionary overlay is strictly worse: it duplicates the gate, runs the
-opposite direction (the rule buys a 1.75% intraday drop; the instinct waits until
-after the recovery), and **has no exit condition** — nothing observable says the
-bubble is over, so in practice it gets switched on after a rally or never.
+**The gate is `above` the 200-day SMA, not `rising`.** Verified against all 37
+entries: above = **37/37**, rising = 36/37. **2023-02-09 entered with the SMA200
+falling** on both a 1-day and 20-day measure, which a rising gate would have
+blocked. (This does not say what the earlier 78.1%-vs-70.3% study tested; it says
+what the live config does.)
 
-**The legitimate caution is correlation, not valuation.** Everything outside the
-Roth is a 66/34 Fidelity equity book, and QQQ Leap is long QQQ — the part of this
-sleeve that is *not* crash-positive. "Am I doubling my equity beta?" is a better
-gate than "is the bubble over": it has an answer and it is checkable annually.
+**The strategy was NOT absent in 2026.** That claim came from a trade log ending
+**2025-12-17** — absence of data read as data of absence. Fixed-size logs show
+2026 entries on 01-20, 02-03, 02-27, 03-02, 03-03, 03-06, 04-02, 06-09, 06-23,
+06-26, 07-07, 07-13, 07-17, 07-23 and 09-01.
 
-Measured at 1 contract, current config (37 trades, 2019-08 -> 2025-12):
+| Year | Days above SMA200 | Days with >=1.75% drop | Both |
+|---|---|---|---|
+| **2022** | **16 of 251 (6%)** | 66 | **3** |
+| 2023 | 232 of 250 (93%) | 13 | 10 |
+| 2024 | 252 of 252 (100%) | 21 | 21 |
+| 2025 | 204 of 250 (82%) | 23 | 13 |
+| **2026** | **177 of 189 (94%)** | 16 | **14** |
+
+**So the gate works in a broken trend and not otherwise.** In 2022 it blocked
+nearly everything. In 2026 it is wide open and the strategy has traded all year.
+
+**This reverses the advice originally given here.** The claim was that a
+discretionary "wait until the AI overpricing backs off" overlay is redundant
+because the gate already does it. **It is not redundant in the current regime.** A
+200-day average turns defensive only *after* price falls through it, which in a
+bubble deflation is after the loss, not before. Ken's caution is about a state the
+gate cannot see.
+
+What stands unchanged: a discretionary overlay still **has no exit condition** —
+nothing observable says the overpricing is over — so in practice it gets switched
+on after a rally or never. **The better gate remains correlation, not valuation.**
+Everything outside the Roth is a 66/34 Fidelity equity book and QQQ Leap is long
+QQQ, the part of this sleeve that is not crash-positive. "Am I doubling my equity
+beta?" has an answer and is checkable annually; "is the bubble over" does not.
+
+Measured at 1 contract (37 trades, 2019-08-05 -> 2025-12-17 — note this log
+stops at the end of 2025 and says nothing about 2026):
 
 | | |
 |---|---|

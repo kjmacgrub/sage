@@ -185,7 +185,7 @@ Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 | Sell puts on rising SMA | 100 | 37.3% | +78 | 65 DTE credit put spread, goes flat before dislocations. Filter is `Compare SMA, 10 > 20` — a **crossover**, despite the name; no RSI leg |
 | Double Calendar (MTW) | 50 | 24.6% | +98 | 2/7 DTE, Mon/Tue/Wed only. Lifetime fine but **−$30/ctr in 2026** — track it separately |
 | **CIC - AM** | **2** | 18.8% | +42 | 10:00 SPX 0DTE condor, 15Δ shorts / ~1Δ wings, 200% stop. Replaced both afternoon condors. **Never traded live** |
-| QQQ Leap | none | 9.7% | +1,849 | 37 trades in 7.4 yrs; absent entirely in 2022 and 2026 |
+| QQQ Leap | none | 9.7% | +1,849 | 37 trades in 7.4 yrs; absent in 2022 (gate). **NOT absent in 2026** — corrected 2026-10-05, that came from a log ending 2025-12-17 |
 | Long Put Hedge | none, 2% | 9.6% | +95 | 0 DTE, net credit. $95 is the **post-2022-05-11** figure; see the blended-figure trap below |
 
 > **LIVE BASELINE (2026-09-27).** What is actually being traded for the rest of
@@ -370,15 +370,22 @@ were removed entirely in favour of Greek/VIX exits.
   **That is history, not the live config — see the entry rule below.** The warning
   against tuning still stands for *fitted* filters — the one that removes the six
   2022 losers gives up $723k to save $24k, and the 2022 pattern reverses over 27
-  years — but a **rising-SMA200 trend gate is not that**: it holds in both eras
-  (78.1% pre-2017 against a 70.3% baseline) and is now part of the settled config.
+  years — but an **SMA200 trend gate is not that**: it holds in both eras
+  (78.1% pre-2017 against a 70.3% baseline) and is part of the settled config.
+  **That study described a *rising* gate; the live config tests *above* — see the
+  correction above. Don't cite the 78.1% figure for the live rule.**
   Threshold and delta sweeps remain a leverage dial, not an edge parameter. Full
   working in the 2026-09-12 decisions entry.
 - **This book wants room.** A wider profit target beat a narrower one; the deep put
   stop (90) beat 70/80; the hedge's every dollar comes from letting positions expire
   while its two management exits lose $4.66M. Defined-risk structures recover.
-- **QQQ Leap's live entry is `Move Down ≥ 1.75%` at a 15:30 entry, above a
-  rising 200-day SMA** — profit target 60%, exit at 3 DTE, round strike to 5.
+- **QQQ Leap's live entry is `Move Down ≥ 1.75%` at a 15:30 entry, ABOVE the
+  200-day SMA** — *above*, not *rising* (**corrected 2026-10-05**: verified on all
+  37 entries, above 37/37 vs rising 36/37; **2023-02-09 entered with SMA200
+  falling**). **The distinction matters: a level gate only turns defensive after
+  price has already fallen through the average**, so it protects in a broken trend
+  (2022: QQQ above SMA200 on 6% of days, entries blocked) and not in an extended
+  one (2026: above on 94% of days, trading all year). It is not a bubble detector. — profit target 60%, exit at 3 DTE, round strike to 5.
   Verified against all 37 entries in the 2019–2026 run: Movement median −2.29%,
   every entry qualifying, while **only 3 of 37 would have passed `gap ≤ −1.5%`**.
   A late entry widens OO's `Move` window to most of the session, so this is an
