@@ -176,44 +176,72 @@ is why the concentration stayed invisible with a category column on screen.
 ### Options sleeve (backtested in Option Omega, not tracked in `cef.db`)
 
 Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
-`docs/decisions.md` (entries 2026-09-08 through 2026-09-12).
+`docs/decisions.md` (entries 2026-09-08 through 2026-10-08).
 
-**Current book** — rebuilt Sept 2026, backtested 2017-05-16 → 2026-09-08 on $200k:
+> **THE BOOK (2026-10-08).** CIC-10am (1 ctr) · Long Put Hedge (1) · QQQ Leap
+> (1, cap 2), funded at **$80k**. Measured 2017 → 2026-10-07 at fixed contracts,
+> read in three windows because they are three different books:
+>
+> | Window | Condor | Hedge | QQQ Leap | Total | Worst $ DD |
+> |---|---|---|---|---|---|
+> | 2017-01 → 2022-05 | +$6.4k | −$16.7k (other instrument) | +$24.9k | +$14.6k | −$17.6k |
+> | **2022-05 → 2026-02** | +$66.4k | +$36.3k | +$43.8k | **+$146.5k** | −$14.0k |
+> | 2026-03 → today | **−$8.7k** | +$4.1k | blank (data) | −$4.6k | −$13.6k |
+>
+> **Plan for ~$38k/yr in a 2023–25 regime, ~$3k/yr in a 2017–21 one. Drawdown
+> $15–18k (18–22% of $80k) in any regime. Solvent at ~$32k (40%).** Peak
+> deployment ~$31k at Schwab. **Nothing is raised until the condor has a positive
+> live year.** QQQ Leap stays at cap 2 until the account passes ~$120k.
+> Per-trade benchmarks for the live record: condor $70, hedge $97, QQQ ~$2,900.
+
+**Sell puts is RETIRED (2026-10-08) — its backtest was quote noise.** The 25%
+profit target on a 5-wide ATM spread fired 792 times with SPX at or below entry
+(46% of its P/L); measured with an index-move exit it earned $45,866 instead of
+$351,570, negative in 2018, 2022 and 2026. It was 66% of the old live baseline's
+P/L. The honest trade is equity drift with a cap on it. No new entries; open
+positions run to their exits. **The 2026-09-27 "LIVE BASELINE" (33.7% CAGR / 5.5%
+DD / solvent at 27%) and the 2019–2026 fixed-sizing figures (22.8% CAGR, 8 of 8
+years) are void** — both had the put seller inside. Full working in the
+2026-10-08 decisions entry.
+
+**CIC-AM is negative in 2026** — −$5.8k YTD, −$30/trade since March at one
+contract, in three independent runs. Any claim that it is positive in every
+calendar year is wrong for 2026. 2022–25 per trade: $62 / $39 / $64 / $86.
+
+**QQQ Leap is blank after 2026-02-12 in OO** — no usable long-dated QQQ chain
+for new entries (isolated test: May–Oct 2026, no filters, zero entries).
+Positions already held mark and close normally. Read 2026 as missing data, not
+as absence. The list of 2026 entry dates in the 2026-10-05 entry is unverified.
+
+**Research book, superseded** — the five-strategy table below is kept for the
+per-contract figures and the traps; its shares and totals include the put seller.
 
 | Strategy | Cap | Share | $/ctr | Notes |
 |---|---|---|---|---|
-| Sell puts on rising SMA | 100 | 37.3% | +78 | 65 DTE credit put spread, goes flat before dislocations. Filter is `Compare SMA, 10 > 20` — a **crossover**, despite the name; no RSI leg |
-| Double Calendar (MTW) | 50 | 24.6% | +98 | 2/7 DTE, Mon/Tue/Wed only. Lifetime fine but **−$30/ctr in 2026** — track it separately |
-| **CIC - AM** | **2** | 18.8% | +42 | 10:00 SPX 0DTE condor, 15Δ shorts / ~1Δ wings, 200% stop. Replaced both afternoon condors. **Never traded live** |
-| QQQ Leap | none | 9.7% | +1,849 | 37 trades in 7.4 yrs; absent in 2022 (gate). **NOT absent in 2026** — corrected 2026-10-05, that came from a log ending 2025-12-17 |
-| Long Put Hedge | none, 2% | 9.6% | +95 | 0 DTE, net credit. $95 is the **post-2022-05-11** figure; see the blended-figure trap below |
-
-> **LIVE BASELINE (2026-09-27).** What is actually being traded for the rest of
-> 2026 is a **three-strategy subset at $80k**: Sell puts (2 ctr) · CIC-AM (1) ·
-> Long Put Hedge (1). Backtested 2022-05-16 → 2026-09-25: **33.7% CAGR, worst
-> drawdown 5.5% of funded capital, structural bound 27%.** Dropping QQQ Leap and
-> the Double Calendar cost ~6 points of CAGR and cut worst drawdown **four-fold**
-> — both carry overnight and both saw margin/trade grow 5-6x with the index,
-> which is what made the five-strategy drawdown creep 6.4% → 23.7%.
-> **Plan for 5-6%, be solvent at 27%.** Full detail and the untested parts in the
-> 2026-09-27 decisions entry. The five-strategy figures below are the research
-> book, not the live one.
-
-**Measured 2019-05-16 → 2026-09-25 at FIXED sizing** (2/2/2/1/3 contracts, flat
-across eight years), from the **portfolio export**: $200k → **$904,622**,
-**22.8% CAGR**, **−5.50% max drawdown** marked daily with open positions
-included, **positive in 8 of 8 calendar years**, zero days worse than −10% in
-1,851 sessions. **Plan against 20% CAGR and 10% drawdown** — this supersedes the
-old 30%/20% figures, which came from a run that compounded position size.
-
-Shares here are not comparable to the pre-2026-09-26 table, where floating
-sizing put the Hedge at 41.9% and QQQ Leap at 20.9%.
+| ~~Sell puts~~ | — | — | — | Retired 2026-10-08, see above. The live config had **no SMA filter** |
+| Double Calendar (MTW) | 50 | 24.6% | +98 | 2/7 DTE, Mon/Tue/Wed only. Not live. Tight target on a cheap structure — **audit for wrong-way exits before trusting** |
+| **CIC - AM** | **1** | — | +70 (2022–26) | 10:00 SPX 0DTE condor, 15Δ shorts / ~1Δ wings, 200% stop. Live since 2026-09-28 |
+| CIC - 2:30pm | 1 | — | +34 (2022–26) | Live on trial since 2026-10-05, **not in the planned book**: half the 10am's edge for +$14k collateral |
+| QQQ Leap | cap 2 | — | +2,368 | Buy 60Δ call ~360 DTE, 15:30, above SMA200, move down ≥1.75%, 80% target, exit 7 DTE. 29 trades 2017–2025, 3 losers |
+| Long Put Hedge | 1 | — | +97 (2022–26) | 0 DTE, net credit. Figures before 2022-05-11 are a different instrument |
 
 **Daily Calendar 14/16 was cut** — $13/contract across 2,143 trades. Stop losses
 were removed entirely in favour of Greek/VIX exits.
 
 #### Measurement rules — read these before analysing any export
 
+- **For every exit triggered by an option price, count the early closes where
+  the underlying moved the wrong way. The honest answer is zero (2026-10-08).**
+  OO fills at the one-minute mid; a profit target with no stop harvests every
+  downward wobble of the mark and ignores every upward one, and a narrow spread
+  of expensive options wobbles by more than the target. The put seller closed
+  792 trades "for profit" with SPX at or below entry, one of them 329 points
+  inside the short strike in February 2020. Settlement and stop exits are
+  immune; tight targets on narrow or cheap structures are not. `Require Two
+  Consecutive Hits at Profit Target` is **test-only** — leave it off or the
+  backtest models an exit live cannot execute. Workaround for a narrow spread:
+  an underlying-move exit. A 99% win rate on a directional trade is the symptom,
+  not the result.
 - **Use the portfolio CSV for every risk number.** The trade log's `Funds at
   Close` only updates when a trade closes, so open-position marks never appear
   and drawdown is understated **2–3×** (3.6% vs the real 11.01%).
@@ -255,8 +283,10 @@ were removed entirely in favour of Greek/VIX exits.
   at one contract.
 - **Iron condors: three attempts. The third (2026-09-26) cleared the bar.**
   `CIC - AM` — 10:00 SPX entry, 0 DTE, one contract, no re-entry, **15Δ shorts /
-  ~1Δ wings, 200% stop** — is positive in all five calendar years *and* its carry covers
-  its ticket cost in all five. +$78,530 carry, +$63,389 total, ~$11,443 margin.
+  ~1Δ wings, 200% stop** — was positive in all five calendar years *and* its carry covered
+  its ticket cost in all five, as of a run ending 2026-09-26. **Not any more: 2026
+  is −$5.8k at one contract through 2026-10-07, confirmed in three runs
+  (2026-10-08).** +$78,530 carry, +$63,389 total, ~$11,443 margin.
   **The two levers that mattered: stop rate 52% → 28% — which took BOTH pulling
   the shorts from 20Δ/30Δ out to 15Δ/15Δ AND widening the stop from 100% to 200%
   (the carry is a knife edge on it — 47.8% pays $41/short, 53.0% pays $3) — and
@@ -437,17 +467,17 @@ were removed entirely in favour of Greek/VIX exits.
   Greek) but its risk is ~$965/trade, so it matters far less.
 - **SUCCESSION: the sleeve already reverts to cash by itself (2026-10-05).**
   Schwab's API needs re-auth **weekly**, so entries stop on their own if nobody
-  shows up — **the dead-man's switch is already installed.** Max hold across the
-  live book is **74 days** (CIC-AM and the hedge are 0 DTE and flat at 16:00;
-  only Sell puts carries overnight), so **~7 days to entries stopping, ~74 days to
-  fully flat.** Stranded exposure peaks at **$8,638** at Schwab — and since margin
-  IS max loss, that is the true worst case with nothing managed. **The family's
-  action is "stop entries", never "close positions."**
-  **This scales by COMPOSITION, not size:** stranded exposure is a structural
-  **35% of peak collateral** (the overnight share of the book), so contracts move
-  the dollars and not the ratio. **Watch overnight margin as a share of the sleeve
-  (~22% today), not contract count.** 0-DTE additions improve it; QQQ Leap would
-  stretch the wind-down to **434 days**.
+  shows up — **the dead-man's switch is already installed.** **Updated
+  2026-10-08 for the current book:** the condor and the hedge are 0 DTE and flat
+  at 16:00; the put seller (the 74-day hold) is retired; **QQQ Leap holds up to
+  434 days and is paid in full**, so the stranded exposure is now **the premium of
+  up to two open LEAPs, ~$15k at today's prices, and it is a long option** — worst
+  case it expires worthless, nothing is ever owed, and the correct family action
+  is still "stop entries", never "close positions". Note the auto-exercise rail:
+  a LEAP left to expire $0.01 ITM delivers 100 shares; the 7-DTE exit prevents
+  that only while OO is running. **Watch the overnight share of the sleeve, not
+  contract count.** The old figures ($8,638 stranded, 35% of collateral, 74 days)
+  described the book with the put seller in it.
 - **A parallel robo account cannot benchmark the managed sleeve (2026-10-05).**
   Two broad equity books are ~0.95 correlated, so the SD of the annual *difference*
   is ~4.7% and **detecting 0.5%/yr takes 706 years** (1%/yr: 176). **Measure the
@@ -585,11 +615,13 @@ stopped applying. The one cap that still binds is **Double Calendar's 50 at $624
 about 7.8 years out**.
 
 **Tripwires** (options sleeve only, absolute, never relative to the other sleeves):
-fill slippage >15¢/leg · per-contract edge <50% of backtest (Hedge $101.83 ·
-Calendar $130.51 · Puts $76.76 · QQQ $2,655.51) · drawdown >20% · MTW win rate ~52%
-in 2027 · two consecutive losing years. **One = investigate, two = stop adding.**
-The first two are the fast detectors — track fill-versus-mid and per-contract edge
-by strategy from day one.
+fill slippage >15¢/leg · per-contract edge <50% of the honest backtest (**condor
+$35 · hedge $48 · QQQ Leap ~$1,450**, from the 2022–26 figures of $70 / $97 /
+~$2,900; the old table's Puts $76.76 and Calendar $130.51 are void, see
+2026-10-08) · drawdown >$18k on $80k (22%) · two consecutive losing years.
+**One = investigate, two = stop adding.** The condor is the only fast detector —
+250 trades a year; the hedge needs a year, QQQ Leap has no detector at all.
+Track fill-versus-mid and per-contract edge by strategy from day one.
 
 **A tripwire is now a portfolio event, not a sleeve event.** Everything outside
 the Roth is a 66/34 Fidelity book with no drawdown defence of its own, so this

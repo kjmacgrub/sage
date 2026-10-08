@@ -42,6 +42,13 @@ $1M gross from selling the current condo — jointly owned, so **~$500k is the
 share that lands here** — funds rent until a future purchase; roughly two years
 of rent to money market, the rest to direct indexing.
 
+**Under review as of 2026-10-08.** The lump-sum → Roth → options plan rested on
+a put-seller backtest that turned out to be an artefact, and the CEF sleeve
+measured as 0.85-correlated to SPY with a 51% drawdown in March 2020. The
+alternative on the table is the pension annuity plus managed accounts, with the
+options sleeve capped at what it has. See that entry; nothing above has been
+rewritten yet because the allocation decisions have not been made.
+
 **The record starts January 2026.** Anything earlier was a different portfolio —
 see the 2026-08-22 entry. Don't average across that boundary.
 
@@ -59,6 +66,209 @@ Two mechanics worth not forgetting:
 - **Wash sales cross into the Roth, and there the loss is permanently
   disallowed**, not deferred. Direct indexing sells hundreds of individual
   names; keep individual stocks out of the Roth and tell Fidelity it exists.
+
+---
+
+## 2026-10-08 — The put seller was a backtest artefact; the book is condor + hedge + QQQ Leap
+
+Work of 2026-10-05 → 10-08. Started as a question about spread width and ended
+with the strategy that supplied two-thirds of the live baseline's P/L removed,
+because its backtest was measuring quote noise. Everything below was found by
+pairing runs on identical entries and checking exits against the index.
+
+### The finding: a profit target on a narrow spread harvests mark noise
+
+The live put seller is an **at-the-money 5-wide SPX put spread, 60 DTE, 10:35
+entry, 25% profit target, no stop, cap 8, 2 contracts.** Its backtest reads
+$351,570 on $80k from 2017, 18.8% CAGR, −5.1% max drawdown, **99.4% win rate**.
+
+**792 of its 2,094 profit-target closes fired with SPX at or below the entry
+price — $162,713, 46% of the strategy's P/L.** A put spread cannot be worth less
+when the index is lower, and with the index flat its value drifts *up* toward 50%
+of width, so none of those is a price. The clearest single case: **2020-02-19**,
+sold the 3385/3380 for 1.85; **2020-02-27 at 09:57, SPX 3,056**, bought back at
+1.32 for a 27% profit, 329 points inside the short strike on a spread worth its
+full 5.00. Jan–Jun 2022: 112 trades, 65 closed "for profit" with SPX lower, zero
+losers, in a half-year the index fell 20%.
+
+Mechanism: OO marks each leg at the one-minute mid and treats a touch as a fill.
+A 5-wide is the difference of two ~$150 options whose mids each wander ±0.50, so
+the spread's mark crosses a 0.46 target routinely in both directions regardless
+of SPX. A target with no stop collects every downward wobble and ignores every
+upward one. **The equity line is smooth because the exit is not reading the
+market.** Live confirms it: the Oct 1 entry took four days to close at 1.35
+where the backtest closed it next morning at 1.32; the Sep 29 and Sep 30 entries
+were still open on Oct 5 while the backtest closed both at 10:00 on Oct 1 at
+**0.07**, 30–50 points inside the strikes.
+
+### Measured honestly — three runs, same entries
+
+| Exit | Trades | P/L | Per entry | Losers | Negative years |
+|---|---|---|---|---|---|
+| 25% target (as traded) | 2,107 | $351,570 | $167 | 13 | none |
+| **SPX +1.5% from entry** (what a real 25% capture needs) | 1,077 | **$45,866** | $43 | 105 | 2018, 2022, 2026 |
+| No exit, hold to expiry | 399 | $70,015 | $179 | 84 | 2018, 2022 |
+
+- The index-move run is the honest version of the live config: all 954 early
+  closes with SPX up 1.5–1.8%, capture median 26%, **zero wrong-way exits.**
+  Paired on the 1,063 shared entries: target run $172,802, honest exit $45,694.
+  **The backtest overstated the strategy 7.7×.**
+- Hold-to-expiry vs target **on the same 377 entries: $179 vs $166, t = 0.56.**
+  The target adds nothing per trade; everything it appeared to add was turnover,
+  and the turnover was phantom closes recycling slots under the cap of 8.
+- 119 of those paired entries were "profit targets" with SPX at or below entry,
+  booking $24,411. Held to expiry the same entries made $4,599.
+- **Width is a leverage dial, confirmed clean.** 1 × 10-wide with the honest exit:
+  $97,863 = 2.13 × the 5-wide's $45,866, same losers, same years. Credit is 0.36
+  per point of width at every width, because the short strike is at the money
+  and a 5- or 10-point spread is ~1–2% of a one-sigma 65-day move. The original
+  question — 2×5 vs 1×10 — is a friction choice only, and it is moot.
+
+### What the trade actually is, and why it is retired
+
+SPX finished higher on **78% of these 65-day windows, 2017–2026**; a 2-lot earns
+~$357 four times in five and loses ~$643 the fifth. That is equity drift with an
+SMA filter, not an options edge — both legs carry the same IV, so the volatility
+risk premium cancels between the strikes. Honest return at 2 contracts: **$5–9k a
+year on $80k, negative in 2018, 2022 and 2026**, losses landing in the years the
+rest of the portfolio is also down, and it is the book's only overnight
+exposure. Holding SPX in the Roth gives the same thing without management.
+
+**Decided: no new put-seller entries; open positions run to their exits.** The
+nearest structure with a documented edge — OTM puts at 10–30Δ, 30–45 DTE, wide
+or no long leg, held to expiry (CBOE PUT index shape) — delivers index-like
+return with lower volatility and is still long the market in a crash. It adds a
+fourth long-equity sleeve. Not pursued.
+
+### Contamination elsewhere in the record
+
+- **The live baseline (2026-09-27, 33.7% CAGR / 5.5% DD) had Sell puts as 66% of
+  its P/L** ($159k of $242k), and 419 of its 1,004 target closes were wrong-way.
+  The three-strategy-vs-five comparison in that entry is void on its CAGR side;
+  the drawdown-drift argument (overnight carry, margin growth) stands.
+- **The "per-contract edge" tripwire for the put seller ($76.76) was phantom.**
+  Live would have tripped it immediately against a number that never existed.
+- The 2026-09-10 "Sell puts on rising SMA — added" entry, the 2026-09-29 DTE
+  sweep and the 2026-09-28 minimum-premium check all measured this artefact. The
+  conclusions about *filters* (inert) happen to hold; the P/L figures do not.
+- **The live config has no SMA filter.** The Entry card shows 10:35, Mon–Fri, 5%
+  allocation, cap 8, 2 contracts, min premium 0.2, and nothing else. The
+  "rising SMA" in the strategy's name describes a leg that was removed.
+
+### MEASUREMENT RULE — for every exit triggered by an option price
+
+**Count the early closes where the underlying moved the wrong way for the
+position. The honest answer is zero.** One line on any trade log. Settlement
+and stop exits are structurally immune (the condors and the hedge's expiries
+settle; stops were already checked against the day's range, 2026-09-28). Profit
+targets on narrow or cheap structures are not. The bias follows whichever exit
+you give the engine: intra-minute stops run conservative (~$50/contract), tight
+targets run generous. OO's `Require Two Consecutive Hits at Profit Target` is a
+**test-only** setting with no live counterpart — leave it off, or the backtest
+models an exit the live engine cannot execute. For a narrow spread, the
+workaround is an underlying-move exit.
+
+### The 2:30 condor — activated 2026-10-05, tested, not in the planned book
+
+Turned on live at $40k as a controlled trial, against the 2026-10-04 deferral,
+with capital available in CEFs. Tested at 1 contract in the 2022-05 → 2026-02
+window: **$31,933 on 941 condors, $34/trade** (the 10am: $70), **+$14k peak
+collateral**, no change to drawdown. 2025 $5.4k, first two months of 2026
+−$2.2k. Weakest strategy in the book and fading. It improves succession (0 DTE)
+and the live record will settle it faster than another run; it is not in the
+planning numbers below.
+
+### QQQ Leap — back at cap 2, and what OO cannot see
+
+Re-added because the reasons for dropping it (2026-09-27) were drawdown drift,
+cash, correlation and succession — never edge — and the first of those was
+computed with the put seller inside. Standalone at the 80% target: **41 trades,
+$94,691 at cap 3; 58 trades, $137,015 at cap 5**, identical per-trade. The extra
+cap-5 entries include the two January 2022 entries that went to −100% before the
+200-day broke; cap 3 missed them only by being full.
+
+**Cap 2 is the setting.** In the portfolio it costs $12k of P/L over 2022–26,
+takes the worst drawdown from $19.2k to **$14.0k**, and peak cash from ~$22k to
+**~$15k at today's prices**. The third slot was the April 2025 drawdown.
+
+**OO has no usable QQQ long-dated chain for new entries after 2026-02-12.**
+Isolated test: 2026-05-01 → 10-07, buy 60Δ / 360 DTE at 15:30, no SMA, min move
+0.5%, cap 10, 100% allocation → **zero entries**, including 2026-06-05 (−3.4%
+intraday, above the 200-day, nothing open, Jun '27 at 377 DTE). Positions already
+held were marked and closed normally through May. **Treat QQQ Leap as blank from
+March 2026 in every run**, not idle and not losing. The list of fifteen 2026
+entry dates in the 2026-10-05 entry is **unverified**: Jan 20 is on it and fell
+0.4% open-to-close; the run correctly did not enter. The live config's early
+exit is 7 DTE, not 3; same rail, safer side.
+
+**The gate is `above` SMA200 plus `Min Move Down 1.75%` at 15:30.** The legs that
+were found useless on 2026-09-12 were `SMA 10 > 20` and the RSI cap. The 200-day
+gate is kept: it is what held 2022 to three entries.
+
+### The book, measured 2017 → 2026-10-07, 1 contract each, QQQ cap 2, $100k
+
+| Window | Condor | Hedge | QQQ Leap | Total | Worst $ DD |
+|---|---|---|---|---|---|
+| 2017-01 → 2022-05 (5.4 yrs) | +$6.4k | −$16.7k ¹ | +$24.9k | +$14.6k | −$17.6k |
+| **2022-05 → 2026-02** (3.8 yrs) | +$66.4k | +$36.3k | +$43.8k | **+$146.5k** | −$14.0k |
+| 2026-03 → today (7 mo) | **−$8.7k** | +$4.1k | blank ² | −$4.6k | −$13.6k |
+
+¹ Different instrument before 2022-05-11; the sign is not informative.
+² Data, see above.
+
+Condors traded three days a week before May 2022 on an index a third the size;
+the pre-2022 window is the bad-regime proxy, not the live book's history.
+
+**The dollar drawdown is $14–18k in all three regimes.** It is roughly the
+condor's collateral plus one LEAP, and it does not depend on the market being
+kind. Peak deployment ~$29k OO / **~$31k at Schwab**, which with QQQ cash at cap
+2 is **~$32k everything-fails-at-once** — margin is max loss, a LEAP can go to
+zero.
+
+**CIC-AM is negative in 2026: −$5.8k for the year, −$8.7k since March, −$30 a
+trade over 192 condors, at one contract. Confirmed in three independent runs.**
+The "positive in all five calendar years" claim in `CLAUDE.md` and the
+2026-09-26 entry is wrong for 2026, whatever run it came from. 2022–25 per trade:
+$62 / $39 / $64 / $86.
+
+### Decided
+
+- **Book: CIC-10am (1) · Long Put Hedge (1) · QQQ Leap (1, cap 2). Put seller
+  out. 2:30 condor live on trial, not in the plan.**
+- **Funded at $80k**, moved from CEFs — the sleeve reallocation named 2026-10-04.
+  At $40k the same book is a 35–48% drawdown on a 9% event and does not belong.
+- **Plan against:** ~$38k/yr in a 2023–25 regime, ~$3k/yr in a 2017–21 one,
+  currently the condor losing ~$1,200/month with the hedge covering half.
+  **Drawdown $15–18k (18–22%) in any year. Solvent at ~$32k (40%).**
+- **Ratchet: nothing is raised until the condor has a positive live year.** It
+  trades 250 times a year and is the one strategy with a fast live detector; it
+  is also the one currently not working. QQQ Leap stays at cap 2 until the
+  account passes ~$120k.
+- **Per-trade benchmarks for the live record** (2022–26, honest): condor $70,
+  hedge $97, QQQ Leap ~$2,900. The old tripwire table is void for the put seller
+  and unchanged in form for the rest.
+- **Not run, deliberately:** 2 contracts at $200k (linear — Monday's 2-contract
+  run is this one doubled), width sweeps, a replacement put seller, any stop on
+  QQQ Leap, any sweep of closed items.
+
+### Portfolio-level, pending
+
+Measured 2026-10-06 on the 14 current CEF/BDC holdings at today's weights, total
+return, weekly: **−51% in March 2020** (every holding −38% to −86%), −21% in Q4
+2018 and 2022, **0.85 correlation to SPY**, 8.7%/yr since Jun 2021 against SPY's
+13.5%, price −10% over the same span. It is a high-beta income sleeve, not a
+backbone; the 8% is yield paid partly from principal. All three sleeves are long
+equity, and the CEFs were the planned backstop for the options sleeve — the
+asset that halves at the moment the condors are stopping out.
+
+The pension Monte Carlo (`pension/annuity_vs_lumpsum.py`) assumed the lump sum
+earns 12.2% in CEFs. At the measured 8.7%, or a managed 6.5%, the **$2,100/mo
+annuity wins at the median and dominates the bad tail.** The lump-sum → Roth →
+options plan is dropped. Annuity vs lump-sum-in-managed, Social Security timing
+(each year of delay past FRA is ~8%/yr real for life — the only fairly priced
+COLA annuity available), partial Roth conversions as a bracket question, and the
+cash buffer (2–3 years of the gap, not one year of rent) are open. They are
+allocation decisions and are not made here.
 
 ---
 
