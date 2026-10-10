@@ -38,6 +38,10 @@
 - `docs/backtest-autopsy.html` — options sleeve: the four Option Omega settings that
   inflated every backtest, why the iron condors came out, and where the rebuilt
   portfolio landed. Snapshot — the live copy is a published Artifact.
+- `docs/trade-log-pivot.html` — options sleeve: pivot of an Option Omega trade log by
+  strategy › year › open date, with upload/merge of further logs. Groups the three
+  rows OO writes per condor into one trade. Snapshot — the live copy is a published
+  Artifact (Trade Log Pivot). Open with `file://`, no server.
 - `mae_check.py` — audits an Option Omega trade-log export for stop-outs the backtest
   skipped. Run on any new strategy before trusting its P/L.
 - `cef.db` — production database (never commit, never modify directly during dev)
