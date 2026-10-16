@@ -53,6 +53,8 @@ Raw grid in `leap_exit_grid.csv`. Highlights (CAGR / max DD / closed trades):
 
 ## Note on the saved model
 
-The saved leap has **Max Open Trades = 3**. The live intent recorded on 2026-10-15 was no
-open-position cap, with exposure building through concurrent positions. One of the two
-should change so the model describes what is traded.
+The saved leap has **Max Open Trades = 3**, and that is deliberate: Ken found that
+anything above 3 exposed the whole portfolio too much (three open leaps marked down
+85-90% in a crash is already the portfolio's largest single drawdown source). The cap
+is a sizing control, not an exit rule, and it stays. The live Trade tab should carry
+Max Open Positions = 3 to match.
