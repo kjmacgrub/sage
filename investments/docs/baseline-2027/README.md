@@ -25,3 +25,33 @@ Files: equity_2027_baseline.csv (daily net liquidity, P/L, drawdown of this base
 equity_2027_80k_uncapped.csv (same portfolio with percentage sizing and no caps, for
 reference), equity_2027_compare.html (chart of both), make_chart.py (regenerates it:
 `python3 make_chart.py out.html "Label=file.csv" ...`).
+
+## Leap sizing rule
+
+The leap's drawdown is set by the premium at risk when a crash hits:
+
+    open positions (typically 3) x contracts x premium (~$5-7k), marked down 85-90%
+
+Keep that at roughly 8-10% of equity, which works out to about one contract per
+$180-200k of equity. Sweep with everything else at baseline (2026-10-15):
+
+| Leap cap | CAGR | Max DD | Apr 2025 DD | Leap profit | Ending |
+|---|---|---|---|---|---|
+| 1 (saved) | 56.9% | -12.1% | -11.4% | $61k | $589k |
+| 2 | 60.3% | -12.5% | -12.5% | $122k | $650k |
+| 3 | 63.4% | -15.0% | -15.0% | $183k | $711k |
+
+At cap 2 the April 2025 exposure was 6 contracts, ~$33k on $390k of equity (8.5%).
+The backtest flatters early leap size because the crash arrived when equity was
+large; a 2025-style crash with 2 contracts at ~$100k would have cost closer to 30%.
+Use the exposure rule for timing, not the table.
+
+Review points (leap stays on Fixed Quantity; each step is a review of live data):
+
+| Equity | Leap contracts |
+|---|---|
+| under ~$200k | 1 |
+| ~$200k to $400k | 2 |
+| ~$400k and up | 3 |
+
+Max drawdown comfort line: ~12%.
