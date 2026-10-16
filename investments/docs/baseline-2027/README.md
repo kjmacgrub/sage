@@ -6,10 +6,10 @@ Range 2022-05-16 to 2026-10-14, $80,000 starting funds, open trades left open.
 | Strategy | Capital Per Contract | Max contracts |
 |---|---|---|
 | CIC - 10am | $29,000 | 6 |
-| Long Put Hedge | $50,000 | none |
+| Long Put Hedge | $40,000 | none |
 | QQQ Leap'' | $42,000 | 1 |
 
-Result: ending $741,309, CAGR 65.3%, max DD -11.51% (2022-11-04), MAR 5.67, Sharpe 1.68, Sortino 4.05.
+Result: ending $844,140, CAGR 70.3%, max DD -12.20% (2022-11-04), MAR 5.76, Sharpe 1.65, Sortino 4.30.
 
 Why caps on the CIC and leap: uncapped Capital Per Contract keeps risk a constant
 share of equity, so late-year drawdowns stay 12-15%; caps de-lever as the account
@@ -20,13 +20,15 @@ to Fixed Quantity on the CIC.
 Why the hedge is uncapped: it pays in selloffs, so more hedge contracts cushion the
 drawdowns the CIC and leap create. Its worst loss is ~$462 per contract, so 20
 contracts on $1M is a ~1% worst entry. With CIC and leap at baseline: hedge cap 3 =
-CAGR 56.9% / DD -12.12%; hedge $32k uncapped = 75.8% / -12.90%; hedge $50k uncapped
-= 65.3% / -11.51% (chosen: more return AND less drawdown than the cap, and no live
-switch). Example: 2026-06-05, SPX -1.6% after the 11:23 entry, the 0DTE 7430 put
+CAGR 56.9% / DD -12.12%; $50k uncapped = 65.3% / -11.51%; $40k uncapped = 70.3% /
+-12.20% (chosen: starts at 2 contracts on $80k, no live switch; the extra drawdown
+vs $50k is all in 2022, later years are shallower); $35k = 73.5% / -12.47%; $32k =
+75.8% / -12.90%. Example: 2026-06-05, SPX -1.6% after the 11:23 entry, the 0DTE 7430 put
 went from $0.90 to ~$46; ~$5,170 per contract.
 
 Live equivalents: Leap = Fixed Quantity 1 from day one. Hedge = Capital Per Contract
-$50k, set once, never switched (1 contract at $80k, 2 at $100k, 10 at $500k, 20 at $1M).
+$40k, set once, never switched (2 contracts at $80k, 3 at $120k, 5 at $200k, 12 at $500k,
+25 at $1M).
 CIC = Capital Per Contract $29k, switch to Fixed Quantity 6 at ~$203k equity (treat as a
 review of live data, not a mechanical flip).
 
