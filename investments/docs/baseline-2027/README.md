@@ -34,7 +34,9 @@ review of live data, not a mechanical flip).
 
 Files: equity_2027_baseline.csv (daily net liquidity, P/L, drawdown of this baseline),
 equity_2027_80k_uncapped.csv (same portfolio with percentage sizing and no caps, for
-reference), equity_2027_compare.html (chart of both), make_chart.py (regenerates it:
+reference), spx_80k.csv (SPX buy-and-hold benchmark, price only, no dividends, built
+from the SPX levels in the CIC trade log: $80k -> $154k, CAGR 16.1%, max DD -18.9%),
+equity_2027_compare.html (chart of all three), make_chart.py (regenerates it:
 `python3 make_chart.py out.html "Label=file.csv" ...`).
 
 ## Leap sizing rule

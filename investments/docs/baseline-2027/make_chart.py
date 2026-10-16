@@ -25,11 +25,11 @@ html = r"""<!doctype html>
 <title>__TITLE__</title>
 <style>
 :root{color-scheme:light;--surface:#fcfcfb;--panel:#ffffff;--text-1:#0b0b0b;--text-2:#52514e;--text-3:#8a8984;
- --grid:#e6e5e1;--axis:#c9c8c2;--s1:#2a78d6;--s2:#eb6834;--neg:#e34948;--tip:#ffffff;--tipb:#d6d5d0}
+ --grid:#e6e5e1;--axis:#c9c8c2;--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--neg:#e34948;--tip:#ffffff;--tipb:#d6d5d0}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--surface:#1a1a19;--panel:#222221;--text-1:#f0efec;--text-2:#c3c2b7;--text-3:#8f8e87;
- --grid:#2f2f2d;--axis:#45453f;--s1:#3987e5;--s2:#d95926;--neg:#e66767;--tip:#2a2a28;--tipb:#45453f}}
+ --grid:#2f2f2d;--axis:#45453f;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--neg:#e66767;--tip:#2a2a28;--tipb:#45453f}}
 :root[data-theme="dark"]{color-scheme:dark;--surface:#1a1a19;--panel:#222221;--text-1:#f0efec;--text-2:#c3c2b7;--text-3:#8f8e87;
- --grid:#2f2f2d;--axis:#45453f;--s1:#3987e5;--s2:#d95926;--neg:#e66767;--tip:#2a2a28;--tipb:#45453f}
+ --grid:#2f2f2d;--axis:#45453f;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--neg:#e66767;--tip:#2a2a28;--tipb:#45453f}
 *{box-sizing:border-box}
 body{margin:0;background:var(--surface);color:var(--text-1);font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",Helvetica,Arial,sans-serif;padding:24px 16px}
 h1{font-size:20px;font-weight:600;margin:0 0 4px}
@@ -54,6 +54,7 @@ table{border-collapse:collapse;font-size:12px;margin-top:8px;width:100%}
 th,td{text-align:right;padding:4px 8px;border-bottom:1px solid var(--grid)}th:first-child,td:first-child{text-align:left}
 details{margin-top:8px;color:var(--text-2)}summary{cursor:pointer}
 .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px}
+.stat .k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:700px){.stats{grid-template-columns:repeat(3,1fr)}}
 .stat{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:10px 12px}
 .stat .k{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em}
@@ -69,7 +70,7 @@ details{margin-top:8px;color:var(--text-2)}summary{cursor:pointer}
 </div>
 <script>
 const SERIES=__DATA__;
-const COLORS=['var(--s1)','var(--s2)'];
+const COLORS=['var(--s1)','var(--s2)','var(--s3)'];
 const fmt$=v=>v>=1e6?'$'+(v/1e6).toFixed(2)+'M':v>=1e3?'$'+Math.round(v/1e3)+'k':'$'+Math.round(v);
 const fmtF=v=>(v<0?'-':'')+'$'+Math.abs(Math.round(v)).toLocaleString();
 const W=1100,H1=380,H2=180,ML=60,MR=70,MT=10,MB=28;
