@@ -609,7 +609,7 @@ const CP_DEFAULTS = {
     // The plan
     ken_amt: 50000, ken_start: 2027,
     hil_2026: 80000, hil_amt: 50000,
-    plan_through: 2036,
+    plan_through: 2046,
     contrib_limit: 8600,
     // IRMAA line
     irmaa_limit: 218000, irmaa_margin: 8000, inflation: 2.5,
@@ -642,6 +642,7 @@ function cpInit() {
         const el = document.getElementById('cp_' + k);
         if (el) el.value = (k in saved) ? saved[k] : def;
     }
+    if (saved.plan_through === 2036) document.getElementById('cp_plan_through').value = CP_DEFAULTS.plan_through;
     for (const [k, def] of Object.entries(CP_SELECTS)) {
         const el = document.getElementById('cp_' + k);
         if (el) el.value = saved[k] || def;
@@ -691,6 +692,17 @@ function cpResetOverrides() {
     cpOnInput();
 }
 
+// ── Required minimum distributions ──────────────────────────
+// Uniform Lifetime Table divisors; RMDs start at 75 for anyone born 1960+.
+const CP_RMD_DIVISOR = { 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1, 80: 20.2, 81: 19.4, 82: 18.5,
+                         83: 17.7, 84: 16.8, 85: 16.0, 86: 15.2, 87: 14.4, 88: 13.7, 89: 12.9, 90: 12.2,
+                         91: 11.5, 92: 10.8, 93: 10.1, 94: 9.5, 95: 8.9 };
+function cpRmd(balance, age) {
+    if (age < 75 || balance <= 0) return 0;
+    const div = CP_RMD_DIVISOR[Math.min(age, 95)];
+    return balance / div;
+}
+
 // ── Income by year ──────────────────────────────────────────
 
 function cpYearIncome(yr) {
@@ -730,7 +742,7 @@ function cpYearIncome(yr) {
 
     const age = yr - cpVal('birth_year');
 
-    return { yr, k, inf, age, wages, kenPension, ssKen, ssHil, annuity, invOrd, invPref, taxExempt, capLossDed };
+    return { yr, k, inf, age, wages, kenPension, ssKen, ssHil, annuity, invOrd, invPref, taxExempt, capLossDed, rmdKen: 0, rmdHil: 0 };
 }
 
 // ── Tax engine for one year ─────────────────────────────────
@@ -741,7 +753,7 @@ function cpYearIncome(yr) {
 function cpTax(inc, convKen, convHil, stateMode) {
     const ssTaxable = (inc.ssKen + inc.ssHil) * SS_TAXABLE_PCT;
     const ordinary  = inc.wages + inc.annuity + inc.kenPension + inc.invOrd + ssTaxable
-                    + convKen + convHil - inc.capLossDed;
+                    + inc.rmdKen + inc.rmdHil + convKen + convHil - inc.capLossDed;
     const pref      = inc.invPref;
     const agi       = ordinary + pref;
     const magi      = agi + inc.taxExempt;
@@ -761,8 +773,8 @@ function cpTax(inc, convKen, convHil, stateMode) {
 
     let nyTax = 0, nycTax = 0;
     if (stateMode === 'nyc' || stateMode === 'ny') {
-        const exclHil  = Math.min(NY_PENSION_EXCL, inc.annuity + convHil);
-        const exclKen  = Math.min(NY_PENSION_EXCL, inc.kenPension + convKen);
+        const exclHil  = Math.min(NY_PENSION_EXCL, inc.annuity + inc.rmdHil + convHil);
+        const exclKen  = Math.min(NY_PENSION_EXCL, inc.kenPension + inc.rmdKen + convKen);
         const nyTaxable = Math.max(0, agi - exclHil - exclKen - Math.round(NY_STD_DEDUCTION * inc.inf));
         nyTax = calcBracketTax(nyTaxable, inflateBrackets(NY_BRACKETS, inc.inf));
         if (stateMode === 'nyc') nycTax = calcBracketTax(nyTaxable, NYC_BRACKETS);
@@ -792,6 +804,10 @@ function cpCompute() {
     for (let yr = 2026; yr <= through; yr++) {
         const inc = cpYearIncome(yr);
         if (yr === cpVal('ken_lump_year')) kenIra += cpVal('ken_lump');
+        inc.rmdKen = cpRmd(kenIra, inc.age);
+        inc.rmdHil = cpRmd(hilIra, inc.age);
+        const kenAvail = Math.max(0, kenIra - inc.rmdKen);
+        const hilAvail = Math.max(0, hilIra - inc.rmdHil);
 
         const line = Math.round(cpVal('irmaa_limit') * inc.inf) - cpVal('irmaa_margin');
         const base = cpTax(inc, 0, 0, stateMode);
@@ -800,7 +816,7 @@ function cpCompute() {
         let convKen = 0;
         if (yr >= cpVal('ken_start')) convKen = cpVal('ken_amt');
         if (yr in _cpOverrides.ken) convKen = _cpOverrides.ken[yr];
-        convKen = Math.round(Math.min(convKen, Math.max(0, kenIra)));
+        convKen = Math.round(Math.min(convKen, kenAvail));
 
         // Hilary: 2026 is its own number; afterwards fixed or fill-to-line
         let convHil, hilAuto = false;
@@ -810,7 +826,7 @@ function cpCompute() {
             hilAuto = true;
         } else convHil = cpVal('hil_amt');
         if (!hilAuto && yr in _cpOverrides.hil) convHil = _cpOverrides.hil[yr];
-        convHil = Math.round(Math.min(convHil, Math.max(0, hilIra)));
+        convHil = Math.round(Math.min(convHil, hilAvail));
 
         const withC = cpTax(inc, convKen, convHil, stateMode);
         const convTax = withC.total - base.total;
@@ -826,8 +842,8 @@ function cpCompute() {
 
         // Balances at year end
         const kenIraStart = kenIra, hilIraStart = hilIra;
-        kenIra  = (kenIra - convKen) * (1 + iraG);
-        hilIra  = (hilIra - convHil) * (1 + iraG);
+        kenIra  = (kenIra - inc.rmdKen - convKen) * (1 + iraG);
+        hilIra  = (hilIra - inc.rmdHil - convHil) * (1 + iraG);
         kenRoth = (kenRoth + convKen + contribKen) * (1 + kenRothG);
         hilRoth = (hilRoth + convHil + contribHil) * (1 + hilRothG);
 
@@ -837,7 +853,7 @@ function cpCompute() {
 
         rows.push({
             yr, age: inc.age, inc, line,
-            baseMagi: base.magi, magi: withC.magi, room,
+            rmd: inc.rmdKen + inc.rmdHil, baseMagi: base.magi, magi: withC.magi, room,
             convKen, convHil, hilAuto, kenOverride: yr in _cpOverrides.ken, hilOverride: !hilAuto && yr in _cpOverrides.hil,
             contribKen, contribHil,
             totalTax: withC.total, fedTax: withC.fedTax, stateTax: withC.nyTax + withC.nycTax,
@@ -893,6 +909,7 @@ function cpRenderTable(d) {
         return `<tr>
             <td>${row.yr}</td>
             <td class="num">${row.age}</td>
+            ${r(row.rmd > 0 ? fmt(row.rmd) : '—')}
             ${r(fmt(row.baseMagi))}
             ${cell('ken', row, row.convKen, false, row.kenOverride)}
             ${cell('hil', row, row.convHil, row.hilAuto, row.hilOverride)}
@@ -912,7 +929,7 @@ function cpRenderTable(d) {
     if (foot) {
         const conv = d.tot.convKen + d.tot.convHil;
         foot.innerHTML = `<tr class="cp-total">
-            <td colspan="3">Total</td>
+            <td colspan="4">Total</td>
             <td class="num">${fmt(d.tot.convKen)}</td>
             <td class="num">${fmt(d.tot.convHil)}</td>
             <td></td>

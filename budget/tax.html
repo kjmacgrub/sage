@@ -239,13 +239,14 @@
             <!-- Year table -->
             <div class="section-card">
                 <h3 class="section-heading">Year by Year</h3>
-                <p class="tax-hint">Base MAGI is household income before any conversion. Room is how far the year sits under the IRMAA line after conversions; red means over. Roth contributions are after-tax and do not move MAGI. Ken's IRA is the PSFC lump sum once it arrives.</p>
+                <p class="tax-hint">Base MAGI is household income before any conversion, including RMDs once they start at 75; an RMD comes out first and cannot be converted. Room is how far the year sits under the IRMAA line after conversions; red means over. Roth contributions are after-tax and do not move MAGI. Ken's IRA is the PSFC lump sum once it arrives.</p>
                 <div class="cp-table-wrap">
                     <table class="data-table" id="cpTable">
                         <thead>
                             <tr>
                                 <th>Year</th>
                                 <th class="num">Age</th>
+                                <th class="num">RMD</th>
                                 <th class="num">Base MAGI</th>
                                 <th class="num">Ken Conv.</th>
                                 <th class="num">Hilary Conv.</th>
@@ -323,7 +324,7 @@
                     <li>Take that away from this year's IRMAA line (hover the Room cell to see it). What is left is Hilary's conversion for the year, after Ken's.</li>
                     <li>Type the real numbers into the Ken and Hilary cells for that year. Hand-entered years are outlined; clear a cell to return to the plan.</li>
                 </ol>
-                <p class="tax-hint">Medicare looks back two years: this year's MAGI sets premiums two years from now. Crossing the line by one dollar costs the whole first-tier surcharge for a year. Federal brackets and deductions are the 2026 figures indexed; the $6,000 senior deduction applies 2027 and 2028 and phases out at these incomes. NY exempts the first $20,000 of each person's pension, annuity or IRA money, so Ken's first $20,000 of conversions is the cheapest dollar in the plan. Social Security is taken as 85% taxable. RMDs start after this horizon, at 75.</p>
+                <p class="tax-hint">Medicare looks back two years: this year's MAGI sets premiums two years from now. Crossing the line by one dollar costs the whole first-tier surcharge for a year. Federal brackets and deductions are the 2026 figures indexed; the $6,000 senior deduction applies 2027 and 2028 and phases out at these incomes. NY exempts the first $20,000 of each person's pension, annuity or IRA money, so Ken's first $20,000 of conversions is the cheapest dollar in the plan. Social Security is taken as 85% taxable. RMDs start at 75, in 2037, from the Uniform Lifetime Table.</p>
             </div>
 
         </div><!-- /planView -->
