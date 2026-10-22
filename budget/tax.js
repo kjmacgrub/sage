@@ -142,10 +142,10 @@ async function init() {
                 stateSel.innerHTML += `<option value="${code}">${s.name}${s.rate === 0 ? ' (no tax)' : ''}</option>`;
             });
 
+        cpInit();
         _config = await GET('/api/tax/config');
         applyConfig();
         await loadTaxData();
-        rpInit();
         hideError();
     } catch(e) {
         showError();
@@ -504,10 +504,35 @@ function showError() { document.getElementById('errorBanner').classList.add('vis
 function hideError() { document.getElementById('errorBanner').classList.remove('visible'); }
 
 // ============================================================
-// Roth Conversion Planner
+// Conversion Plan — two people, ten years, under the IRMAA line
 // ============================================================
+// Replaces the old fill-the-bracket Roth Planner (removed 2026-10-22).
+// The plan is a steady ~$50K a year each, sized so household MAGI
+// stays under the first IRMAA tier. Nominal dollars; federal
+// parameters are 2026 (OBBBA) indexed by the inflation input.
 
-// ── NY State brackets (2025 MFJ) ────────────────────────────
+// ── 2026 Federal parameters (MFJ) ───────────────────────────
+
+const CP_FED_BRACKETS = [
+    { limit: 24800,    rate: 0.10 },
+    { limit: 100800,   rate: 0.12 },
+    { limit: 211400,   rate: 0.22 },
+    { limit: 403550,   rate: 0.24 },
+    { limit: 512450,   rate: 0.32 },
+    { limit: 768700,   rate: 0.35 },
+    { limit: Infinity, rate: 0.37 },
+];
+const CP_LTCG_BRACKETS = [
+    { limit: 98900,    rate: 0.00 },
+    { limit: 613700,   rate: 0.15 },
+    { limit: Infinity, rate: 0.20 },
+];
+const CP_STD_DED        = 32200;   // MFJ
+const CP_AGE65_EXTRA    = 1650;    // per person, 65+
+const CP_SENIOR_BONUS   = 6000;    // per person 65+, tax years 2025-2028, phased out 6% of MAGI over $150K MFJ
+const CP_SENIOR_PHASE   = 150000;
+
+// ── NY State brackets (MFJ) ─────────────────────────────────
 
 const NY_BRACKETS = [
     { limit: 17150,    rate: 0.04   },
@@ -519,17 +544,14 @@ const NY_BRACKETS = [
     { limit: 5000000,  rate: 0.0965 },
     { limit: Infinity, rate: 0.109  },
 ];
-
-// NYC resident tax brackets (2025)
 const NYC_BRACKETS = [
     { limit: 12000,    rate: 0.03078 },
     { limit: 25000,    rate: 0.03762 },
     { limit: 50000,    rate: 0.03819 },
     { limit: Infinity, rate: 0.03876 },
 ];
-
 const NY_STD_DEDUCTION = 16050;
-const NY_PENSION_EXCL  = 20000; // per person, for pension/IRA/annuity income
+const NY_PENSION_EXCL  = 20000; // per person 59½+, covers pension, annuity and IRA money incl. conversions
 
 // ── Generic bracket helpers ─────────────────────────────────
 
@@ -543,423 +565,15 @@ function calcBracketTax(income, brackets) {
     return tax;
 }
 
-function findMarginalRate(income, brackets) {
-    for (const b of brackets) {
-        if (income <= b.limit) return b.rate;
-    }
-    return brackets[brackets.length - 1].rate;
-}
-
-function fmtK(n) {
-    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-    if (n >= 1000) return Math.round(n / 1000) + 'K';
-    return n.toString();
-}
-
-// ── View toggle ─────────────────────────────────────────────
-
-function setView(view) {
-    document.querySelectorAll('.view-btn').forEach(b =>
-        b.classList.toggle('active', b.dataset.view === view));
-    document.getElementById('trackerView').style.display = view === 'tracker' ? '' : 'none';
-    document.getElementById('plannerView').style.display = view === 'planner' ? '' : 'none';
-    if (view === 'planner') rpRender();
-}
-
-// ── Planner init / save ─────────────────────────────────────
-
-const RP_KEYS = [
-    'wages','annuity','pension','interest','div_nonqual','div_qual','cg_dist',
-    'ss_self','ss_spouse','cap_loss_co','extra_ded','conversion',
-    'fed_withheld','state_withheld',
-    'ira_balance','other_deferred','taxable_balance','growth_rate','inflation','withdraw_years',
-    'heir_rate',
-];
-
-const RP_DEFAULTS = {
-    wages: 58500, annuity: 50649, pension: 30305, interest: 600,
-    div_nonqual: 7475, div_qual: 5353, cg_dist: 4428,
-    ss_self: 0, ss_spouse: 0, cap_loss_co: 36355, extra_ded: 0,
-    conversion: 0, fed_withheld: 15000, state_withheld: 7000,
-    ira_balance: 742000, other_deferred: 400000, taxable_balance: 600000,
-    growth_rate: 5, inflation: 2.5, withdraw_years: 10,
-    heir_rate: 25,
-};
-
-function rpInit() {
-    const saved = JSON.parse(localStorage.getItem('sage-roth-planner') || '{}');
-    const vals = { ...RP_DEFAULTS, ...saved };
-    for (const [key, val] of Object.entries(vals)) {
-        const el = document.getElementById('rp_' + key);
-        if (el) el.value = val;
-    }
-    const slider = document.getElementById('rp_slider');
-    if (slider) slider.value = Math.min(300000, vals.conversion || 0);
-    // Restore target bracket select
-    const tbSel = document.getElementById('rp_target_bracket');
-    if (tbSel && saved.target_bracket) tbSel.value = saved.target_bracket;
-    // Restore gift controls
-    const giftOn = document.getElementById('rp_gift_on');
-    if (giftOn && saved.gift_on) giftOn.checked = true;
-    const giftPri = document.getElementById('rp_gift_priority');
-    if (giftPri && saved.gift_priority) giftPri.value = saved.gift_priority;
-    rpToggleGiftFields();
-}
-
-function rpSave() {
-    const data = {};
-    for (const k of RP_KEYS) {
-        const el = document.getElementById('rp_' + k);
-        if (el) data[k] = parseFloat(el.value) || 0;
-    }
-    const tbSel = document.getElementById('rp_target_bracket');
-    if (tbSel) data.target_bracket = tbSel.value;
-    const giftOn = document.getElementById('rp_gift_on');
-    if (giftOn) data.gift_on = giftOn.checked;
-    const giftPri = document.getElementById('rp_gift_priority');
-    if (giftPri) data.gift_priority = giftPri.value;
-    localStorage.setItem('sage-roth-planner', JSON.stringify(data));
-}
-
-function rpVal(id) {
-    return parseFloat(document.getElementById(id)?.value) || 0;
-}
-
-function rpOnInput() { rpToggleGiftFields(); rpSave(); rpRender(); }
-
-function rpToggleGiftFields() {
-    const on = document.getElementById('rp_gift_on')?.checked;
-    document.querySelectorAll('.rp-gift-field').forEach(el => {
-        el.style.display = on ? '' : 'none';
-    });
-}
-
-function rpSyncSlider(fromSlider) {
-    const slider = document.getElementById('rp_slider');
-    const input  = document.getElementById('rp_conversion');
-    if (fromSlider) input.value = slider.value;
-    else slider.value = Math.min(300000, parseInt(input.value) || 0);
-    rpOnInput();
-}
-
-function rpFillBracket(targetRate) {
-    const status   = 'mfj';
-    const brackets = BRACKETS[status];
-    const stdDed   = STANDARD_DEDUCTION[status];
-
-    // Base ordinary income (no conversion)
-    const ssTaxable  = (rpVal('rp_ss_self') + rpVal('rp_ss_spouse')) * SS_TAXABLE_PCT;
-    const capLossDed = Math.min(3000, rpVal('rp_cap_loss_co'));
-    const baseOrd    = rpVal('rp_wages') + rpVal('rp_annuity') + rpVal('rp_pension')
-                     + rpVal('rp_interest') + rpVal('rp_div_nonqual') + ssTaxable - capLossDed;
-    const baseTaxOrd = Math.max(0, baseOrd - stdDed - rpVal('rp_extra_ded'));
-
-    let targetTop = 0;
-    for (const b of brackets) {
-        if (b.rate === targetRate) { targetTop = b.limit; break; }
-        if (b.rate > targetRate) break;
-    }
-    if (!targetTop || targetTop === Infinity) return;
-
-    const fillAmt = Math.max(0, targetTop - baseTaxOrd);
-    document.getElementById('rp_conversion').value = Math.round(fillAmt);
-    document.getElementById('rp_slider').value = Math.min(300000, Math.round(fillAmt));
-    rpOnInput();
-}
-
-// ── Planner compute ─────────────────────────────────────────
-
-function rpCompute() {
-    const status = 'mfj';
-    const wages      = rpVal('rp_wages');
-    const annuity    = rpVal('rp_annuity');
-    const pension    = rpVal('rp_pension');
-    const interest   = rpVal('rp_interest');
-    const divNq      = rpVal('rp_div_nonqual');
-    const divQ       = rpVal('rp_div_qual');
-    const cgDist     = rpVal('rp_cg_dist');
-    const ssSelf     = rpVal('rp_ss_self');
-    const ssSpouse   = rpVal('rp_ss_spouse');
-    const capLossCo  = rpVal('rp_cap_loss_co');
-    const extraDed   = rpVal('rp_extra_ded');
-    const conversion = rpVal('rp_conversion');
-    const fedWH      = rpVal('rp_fed_withheld');
-    const stateWH    = rpVal('rp_state_withheld');
-
-    const ssTotal    = ssSelf + ssSpouse;
-    const ssTaxable  = ssTotal * SS_TAXABLE_PCT;
-    const capLossDed = Math.min(3000, capLossCo);
-
-    const ordinary     = wages + annuity + pension + interest + divNq + ssTaxable + conversion - capLossDed;
-    const preferential = divQ + cgDist;
-    const agi          = ordinary + preferential;
-
-    const stdDed       = STANDARD_DEDUCTION[status];
-    const fedTaxOrd_i  = Math.max(0, ordinary - stdDed - extraDed);
-    const fedTaxOrd    = computeTax(fedTaxOrd_i, status);
-    const fedTaxPref   = computeLtcgTax(fedTaxOrd_i, preferential, status);
-    const fedTax       = fedTaxOrd + fedTaxPref;
-
-    // Base (without conversion)
-    const baseOrd       = ordinary - conversion;
-    const baseTaxOrd_i  = Math.max(0, baseOrd - stdDed - extraDed);
-    const baseFedTaxOrd = computeTax(baseTaxOrd_i, status);
-    const baseFedPref   = computeLtcgTax(baseTaxOrd_i, preferential, status);
-    const baseFedTax    = baseFedTaxOrd + baseFedPref;
-
-    // NY — pension/annuity exclusion: $20K per person
-    const hilaryExcl   = Math.min(NY_PENSION_EXCL, annuity);
-    const kenExcl      = Math.min(NY_PENSION_EXCL, pension);
-    const nyPensionExcl = hilaryExcl + kenExcl;
-
-    const nyTaxable    = Math.max(0, agi - nyPensionExcl - NY_STD_DEDUCTION);
-    const nyTax        = calcBracketTax(nyTaxable, NY_BRACKETS);
-    const nycTax       = calcBracketTax(nyTaxable, NYC_BRACKETS);
-
-    const baseNyTaxable = Math.max(0, (agi - conversion) - nyPensionExcl - NY_STD_DEDUCTION);
-    const baseNyTax     = calcBracketTax(baseNyTaxable, NY_BRACKETS);
-    const baseNycTax    = calcBracketTax(baseNyTaxable, NYC_BRACKETS);
-
-    const totalTax      = fedTax + nyTax + nycTax;
-    const baseTotalTax  = baseFedTax + baseNyTax + baseNycTax;
-    const convCost      = totalTax - baseTotalTax;
-
-    const margFed   = marginalRate(fedTaxOrd_i, status);
-    const margNy    = findMarginalRate(nyTaxable, NY_BRACKETS);
-    const margNyc   = findMarginalRate(nyTaxable, NYC_BRACKETS);
-    const margAll   = margFed + margNy + margNyc;
-
-    const effConvRate = conversion > 0 ? convCost / conversion : 0;
-    const effRate     = agi > 0 ? totalTax / agi : 0;
-
-    const bracket22top = (BRACKETS[status].find(b => b.rate === 0.22) || {}).limit || 206700;
-    const roomIn22     = Math.max(0, bracket22top - baseTaxOrd_i);
-
-    return {
-        status, wages, annuity, pension, interest, divNq, divQ, cgDist,
-        ssSelf, ssSpouse, ssTotal, ssTaxable, capLossCo, capLossDed,
-        extraDed, conversion, ordinary, preferential, agi,
-        stdDed, fedTaxOrd_i, fedTaxOrd, fedTaxPref, fedTax,
-        baseTaxOrd_i, baseFedTax,
-        nyPensionExcl, nyTaxable, nyTax, nycTax,
-        baseNyTaxable, baseNyTax, baseNycTax,
-        totalTax, baseTotalTax, convCost,
-        margFed, margNy, margNyc, margAll, effRate, effConvRate,
-        roomIn22, fedWH, stateWH,
-    };
-}
-
-// ── Planner render ──────────────────────────────────────────
-
-function rpRender() {
-    const r = rpCompute();
-
-    // Summary cards
-    document.getElementById('rpCardBase').textContent    = fmt(r.baseTotalTax);
-    document.getElementById('rpCardCost').textContent    = r.conversion > 0 ? fmt(r.convCost) : '—';
-    document.getElementById('rpCardEffective').textContent = (r.effRate * 100).toFixed(1) + '%';
-    document.getElementById('rpCardEffDetail').textContent =
-        `${fmt(r.totalTax)} on ${fmt(r.agi)} AGI`;
-    document.getElementById('rpCardMarginal').textContent = (r.margAll * 100).toFixed(1) + '%';
-    document.getElementById('rpCardMargDetail').textContent =
-        `Fed ${(r.margFed*100).toFixed(0)}% \u00b7 NY ${(r.margNy*100).toFixed(1)}% \u00b7 NYC ${(r.margNyc*100).toFixed(1)}%`;
-    document.getElementById('rpCardRoom').textContent    = fmt(r.roomIn22);
-
-    // Bracket visualization
-    rpRenderBrackets(r);
-
-    // Detail table
-    rpRenderDetail(r);
-
-    // Multi-year projection
-    rpRenderMultiYear();
-}
-
-// ── Bracket visualization ───────────────────────────────────
-
-function rpRenderBrackets(r) {
-    const el       = document.getElementById('rpBracketViz');
-    const brackets = BRACKETS[r.status];
-    const maxDisp  = 320000; // show up to ~$320K
-
-    const colors = {
-        0.10: '#4a9eff', 0.12: '#34c759', 0.22: '#ff9f0a',
-        0.24: '#ff6b6b', 0.32: '#af52de', 0.35: '#ff2d55', 0.37: '#8b0000',
-    };
-
-    let barHtml    = '<div class="rp-bar">';
-    let labelsHtml = '<div class="rp-bar-labels">';
-    let prev = 0;
-
-    for (const b of brackets) {
-        if (prev >= maxDisp) break;
-        const bEnd  = Math.min(b.limit, maxDisp);
-        const range = bEnd - prev;
-        const w     = (range / maxDisp * 100).toFixed(2);
-        const color = colors[b.rate] || '#999';
-
-        const baseFill = Math.max(0, Math.min(r.baseTaxOrd_i - prev, range));
-        const basePct  = range > 0 ? (baseFill / range * 100) : 0;
-
-        const cStart   = Math.max(prev, r.baseTaxOrd_i);
-        const cEnd     = Math.min(bEnd, r.fedTaxOrd_i);
-        const cFill    = Math.max(0, cEnd - cStart);
-        const cLeft    = range > 0 ? ((cStart - prev) / range * 100) : 0;
-        const cPct     = range > 0 ? (cFill / range * 100) : 0;
-
-        barHtml += `<div class="rp-seg" style="width:${w}%;--seg-color:${color}">
-            <div class="rp-seg-bg"></div>
-            <div class="rp-seg-base" style="width:${basePct.toFixed(1)}%"></div>
-            ${cPct > 0 ? `<div class="rp-seg-conv" style="left:${cLeft.toFixed(1)}%;width:${cPct.toFixed(1)}%"></div>` : ''}
-            <span class="rp-seg-rate">${(b.rate*100).toFixed(0)}%</span>
-        </div>`;
-
-        labelsHtml += `<span style="width:${w}%">$${fmtK(prev)}</span>`;
-        prev = bEnd;
-    }
-
-    barHtml    += '</div>';
-    labelsHtml += '</div>';
-
-    const infoHtml = `<div class="rp-bar-info">
-        <span>Base: ${fmt(r.baseTaxOrd_i)}</span>
-        ${r.conversion > 0
-            ? `<span class="rp-bar-conv">+ ${fmt(r.conversion)} conversion = ${fmt(r.fedTaxOrd_i)}</span>`
-            : ''}
-        <span>Room in 22%: ${fmt(r.roomIn22)}</span>
-    </div>`;
-
-    el.innerHTML = barHtml + labelsHtml + infoHtml;
-}
-
-// ── Detail table ────────────────────────────────────────────
-
-function rpRenderDetail(r) {
-    const el = document.getElementById('rpCalcBody');
-
-    const hdr  = (t)        => `<tr class="rp-section-head"><td colspan="2">${t}</td></tr>`;
-    const row  = (l, v, c)  => `<tr class="${c||''}"><td>${l}</td><td class="calc-val">${v}</td></tr>`;
-    const drow = (l, v, c)  => `<tr class="calc-divider ${c||''}"><td>${l}</td><td class="calc-val">${v}</td></tr>`;
-
-    let h = '';
-
-    // ── Income
-    h += hdr('Income');
-    h += row('Wages (W-2)', fmt(r.wages));
-    h += row('Annuity — NY Life (gross)', fmt(r.annuity));
-    h += row('Pension — ADP', fmt(r.pension));
-    h += row('Taxable Interest', fmt(r.interest));
-    h += row('Non-Qualified Dividends', fmt(r.divNq));
-    if (r.ssTaxable > 0) h += row(`Social Security (${(SS_TAXABLE_PCT*100).toFixed(0)}% of ${fmt(r.ssTotal)})`, fmt(r.ssTaxable));
-    if (r.conversion > 0) h += row('\u25b6 Roth Conversion', fmt(r.conversion), 'rp-conv-row');
-    if (r.capLossDed > 0) h += row('Capital Loss Deduction', '(' + fmt(r.capLossDed) + ')', 'negative-val');
-    h += drow('Ordinary Income', fmt(r.ordinary));
-    if (r.preferential > 0)
-        h += row('Qualified Dividends + CG Distributions', fmt(r.preferential), 'rp-pref-row');
-    h += drow('Adjusted Gross Income', '<strong>' + fmt(r.agi) + '</strong>');
-
-    // ── Federal
-    h += hdr('Federal Tax');
-    h += row('Standard Deduction (MFJ)', '(' + fmt(r.stdDed) + ')', 'negative-val');
-    if (r.extraDed > 0) h += row('Additional Deductions', '(' + fmt(r.extraDed) + ')', 'negative-val');
-    h += drow('Ordinary Taxable Income', fmt(r.fedTaxOrd_i));
-
-    // Per-bracket detail
-    const brackets = BRACKETS[r.status];
-    let prev = 0;
-    for (const b of brackets) {
-        const filled = Math.max(0, Math.min(r.fedTaxOrd_i, b.limit) - prev);
-        if (filled <= 0) { prev = b.limit; continue; }
-        const tax = filled * b.rate;
-        const inConv = r.conversion > 0 && r.baseTaxOrd_i < b.limit && r.fedTaxOrd_i > prev;
-        h += row(
-            `<span style="color:var(--text-secondary)">${(b.rate*100).toFixed(0)}% on ${fmt(filled)}</span>`,
-            fmt(tax), inConv ? 'rp-conv-row' : ''
-        );
-        prev = b.limit;
-    }
-
-    h += drow('Federal Tax — Ordinary', fmt(r.fedTaxOrd));
-    if (r.preferential > 0)
-        h += row('Federal Tax — Preferential (qual div / LTCG)', fmt(r.fedTaxPref));
-    h += drow('<strong>Total Federal Tax</strong>', '<strong>' + fmt(r.fedTax) + '</strong>');
-
-    // ── NY State + NYC
-    h += hdr('NY State + NYC');
-    h += row('NY Pension/Annuity Exclusion (2 \u00d7 $20K)', '(' + fmt(r.nyPensionExcl) + ')', 'negative-val');
-    h += row('NY Standard Deduction', '(' + fmt(NY_STD_DEDUCTION) + ')', 'negative-val');
-    h += row('NY Taxable Income', fmt(r.nyTaxable));
-    h += row('NYS Tax', fmt(r.nyTax));
-    h += row('NYC Tax', fmt(r.nycTax));
-    h += drow('<strong>Total State + City</strong>', '<strong>' + fmt(r.nyTax + r.nycTax) + '</strong>');
-
-    // ── Summary
-    h += hdr('Summary');
-    h += drow('<strong>Total Estimated Tax</strong>', '<strong class="warning-val">' + fmt(r.totalTax) + '</strong>');
-    if (r.conversion > 0) {
-        h += row('Base Tax (without conversion)', fmt(r.baseTotalTax));
-        h += row('Tax Cost of ' + fmt(r.conversion) + ' Conversion', fmt(r.convCost), 'rp-conv-row');
-        h += row('Effective Rate on Conversion', (r.effConvRate * 100).toFixed(1) + '%');
-    }
-    h += row('Federal Withheld', '(' + fmt(r.fedWH) + ')', 'negative-val');
-    h += row('State/Local Withheld', '(' + fmt(r.stateWH) + ')', 'negative-val');
-
-    const net = r.totalTax - r.fedWH - r.stateWH;
-    h += drow(
-        '<strong>' + (net >= 0 ? 'Net Amount Owed' : 'Projected Refund') + '</strong>',
-        '<strong style="color:' + (net >= 0 ? 'var(--warning)' : 'var(--income-accent)') + '">'
-            + (net >= 0 ? fmt(net) : fmt(-net)) + '</strong>'
-    );
-
-    el.innerHTML = h;
-}
-
-// ── Multi-year projection ────────────────────────────────────
-
-function rpYearIncome(yr) {
-    const y        = yr - 2026;
-    const inflRate = (rpVal('rp_inflation') || 2.5) / 100;
-    const inf      = Math.pow(1 + inflRate, y);
-
-    // Wages: Ken works through 2026, partial 2027, done after
-    let wages = 0;
-    if (yr === 2026) wages = rpVal('rp_wages');
-    else if (yr === 2027) wages = 20000;
-
-    // Annuity: fixed payment (not inflation-adjusted)
-    const annuity = rpVal('rp_annuity');
-
-    // Pension: 2026 uses profile input; Park Slope $24K starts 2027
-    let pension = 0;
-    if (yr === 2026) pension = rpVal('rp_pension');
-    else if (yr >= 2027) pension = 24000 * Math.pow(1 + inflRate, yr - 2027);
-
-    // Social Security starts 2029 at FRA, COLA-adjusted
-    let ssSelf = 0, ssSpouse = 0;
-    if (yr >= 2029) {
-        const ssInf = Math.pow(1 + inflRate, yr - 2029);
-        ssSelf   = 22800 * ssInf;
-        ssSpouse = 10500 * ssInf;
-    }
-
-    // Investment income grows with inflation
-    const interest = rpVal('rp_interest') * inf;
-    const divNq    = rpVal('rp_div_nonqual') * inf;
-    const divQ     = rpVal('rp_div_qual') * inf;
-    const cgDist   = rpVal('rp_cg_dist') * inf;
-
-    // Capital loss carryover depletes by $3K/year
-    const capLossCo = Math.max(0, rpVal('rp_cap_loss_co') - y * 3000);
-
-    return { wages, annuity, pension, interest, divNq, divQ, cgDist, ssSelf, ssSpouse, capLossCo };
-}
-
-function rpCalcLtcgInflated(ordTaxable, prefIncome, inf) {
-    const brackets = LTCG_BRACKETS.mfj.map(b => ({
+function inflateBrackets(brackets, inf) {
+    return brackets.map(b => ({
         limit: b.limit === Infinity ? Infinity : Math.round(b.limit * inf),
         rate: b.rate,
     }));
-    let tax = 0, pos = ordTaxable, rem = prefIncome;
+}
+
+function stackedLtcgTax(ordTaxable, pref, brackets) {
+    let tax = 0, pos = ordTaxable, rem = pref;
     for (const b of brackets) {
         if (rem <= 0) break;
         if (pos >= b.limit) continue;
@@ -971,459 +585,347 @@ function rpCalcLtcgInflated(ordTaxable, prefIncome, inf) {
     return tax;
 }
 
-// Compute total federal + state + city tax for a given (ordinary, preferential)
-// income pair, using brackets inflated to the year captured in `inf`.
-// Used for both the projection loop and the post-horizon IRA withdrawal model.
-function rpTaxEngine(baseOrd, pref, inc, inf, stateMode) {
-    const stdDed     = Math.round(STANDARD_DEDUCTION.mfj * inf);
-    const fedBrackets = BRACKETS.mfj.map(b => ({
-        limit: b.limit === Infinity ? Infinity : Math.round(b.limit * inf),
-        rate: b.rate,
-    }));
-    const fedTaxOrd = Math.max(0, baseOrd - stdDed);
-    const fedTax    = calcBracketTax(fedTaxOrd, fedBrackets)
-                    + rpCalcLtcgInflated(fedTaxOrd, pref, inf);
-    const totalAgi  = baseOrd + pref;
+function fmtK(n) {
+    if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(2) + 'M';
+    if (Math.abs(n) >= 1000) return Math.round(n / 1000) + 'K';
+    return Math.round(n).toString();
+}
+
+// ── View toggle ─────────────────────────────────────────────
+
+function setView(view) {
+    document.querySelectorAll('.view-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.view === view));
+    document.getElementById('trackerView').style.display = view === 'tracker' ? '' : 'none';
+    document.getElementById('planView').style.display    = view === 'plan'    ? '' : 'none';
+    if (view === 'plan') cpRender();
+}
+
+// ── Inputs / persistence ────────────────────────────────────
+
+const CP_STORAGE = 'sage-conversion-plan';
+
+const CP_DEFAULTS = {
+    // The plan
+    ken_amt: 50000, ken_start: 2027,
+    hil_2026: 80000, hil_amt: 50000,
+    plan_through: 2036,
+    contrib_limit: 8600,
+    // IRMAA line
+    irmaa_limit: 218000, irmaa_margin: 8000, inflation: 2.5,
+    // Income
+    birth_year: 1962,
+    wages_2026: 58500, wages_2027: 19500, pt_wages: 18000, pt_through: 2029,
+    ken_pension: 0,
+    ken_ss_monthly: 2160, ken_ss_start: 2027, ken_ss_months: 8,
+    hil_annuity: 50649,
+    hil_ss_monthly: 1210, hil_ss_start: 2029,
+    inv_ord_2026: 8075, inv_pref_2026: 9781,
+    inv_ord: 20000, inv_pref: 20000, tax_exempt: 0,
+    cap_loss_co: 36355,
+    // Balances
+    ken_lump: 300000, ken_lump_year: 2027, ira_growth: 5,
+    hil_ira: 785000,
+    ken_roth: 80000, ken_roth_growth: 12,
+    hil_roth: 0, hil_roth_growth: 7.4,
+};
+const CP_SELECTS = { hil_mode: 'fixed', state: 'nyc' };
+const CP_CHECKS  = { contrib_on: true };
+
+let _cpOverrides = { ken: {}, hil: {} };   // per-year hand edits to the conversion cells
+
+function cpInit() {
+    localStorage.removeItem('sage-roth-planner');   // old planner's key
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(CP_STORAGE) || '{}'); } catch (e) { saved = {}; }
+    for (const [k, def] of Object.entries(CP_DEFAULTS)) {
+        const el = document.getElementById('cp_' + k);
+        if (el) el.value = (k in saved) ? saved[k] : def;
+    }
+    for (const [k, def] of Object.entries(CP_SELECTS)) {
+        const el = document.getElementById('cp_' + k);
+        if (el) el.value = saved[k] || def;
+    }
+    for (const [k, def] of Object.entries(CP_CHECKS)) {
+        const el = document.getElementById('cp_' + k);
+        if (el) el.checked = (k in saved) ? !!saved[k] : def;
+    }
+    _cpOverrides = saved.overrides || { ken: {}, hil: {} };
+}
+
+function cpSave() {
+    const data = {};
+    for (const k of Object.keys(CP_DEFAULTS)) {
+        const el = document.getElementById('cp_' + k);
+        if (el) data[k] = parseFloat(el.value) || 0;
+    }
+    for (const k of Object.keys(CP_SELECTS)) {
+        const el = document.getElementById('cp_' + k);
+        if (el) data[k] = el.value;
+    }
+    for (const k of Object.keys(CP_CHECKS)) {
+        const el = document.getElementById('cp_' + k);
+        if (el) data[k] = el.checked;
+    }
+    data.overrides = _cpOverrides;
+    localStorage.setItem(CP_STORAGE, JSON.stringify(data));
+}
+
+function cpVal(key) {
+    const el = document.getElementById('cp_' + key);
+    const v  = parseFloat(el?.value);
+    return Number.isFinite(v) ? v : (CP_DEFAULTS[key] || 0);
+}
+
+function cpOnInput() { cpSave(); cpRender(); }
+
+function cpSetOverride(person, year, raw) {
+    const v = parseFloat(raw);
+    if (raw === '' || !Number.isFinite(v)) delete _cpOverrides[person][year];
+    else _cpOverrides[person][year] = Math.max(0, v);
+    cpOnInput();
+}
+
+function cpResetOverrides() {
+    _cpOverrides = { ken: {}, hil: {} };
+    cpOnInput();
+}
+
+// ── Income by year ──────────────────────────────────────────
+
+function cpYearIncome(yr) {
+    const k   = yr - 2026;
+    const inf = Math.pow(1 + cpVal('inflation') / 100, k);
+
+    let wages = 0;
+    if (yr === 2026)      wages = cpVal('wages_2026');
+    else if (yr === 2027) wages = cpVal('wages_2027');
+    else if (yr <= cpVal('pt_through')) wages = cpVal('pt_wages');
+
+    const kenPension = yr >= 2027 ? cpVal('ken_pension') : 0;
+
+    let ssKen = 0;
+    const ksStart = cpVal('ken_ss_start');
+    if (yr >= ksStart) {
+        const months = yr === ksStart ? Math.min(12, Math.max(0, cpVal('ken_ss_months'))) : 12;
+        ssKen = cpVal('ken_ss_monthly') * months * inf;
+    }
+    let ssHil = 0;
+    if (yr >= cpVal('hil_ss_start')) ssHil = cpVal('hil_ss_monthly') * 12 * inf;
+
+    const annuity = cpVal('hil_annuity');   // NY Life, fixed payment
+
+    let invOrd, invPref, taxExempt = 0;
+    if (yr === 2026) {
+        invOrd  = cpVal('inv_ord_2026');
+        invPref = cpVal('inv_pref_2026');
+    } else {
+        const g = Math.pow(1 + cpVal('inflation') / 100, yr - 2027);
+        invOrd    = cpVal('inv_ord')    * g;
+        invPref   = cpVal('inv_pref')   * g;
+        taxExempt = cpVal('tax_exempt') * g;
+    }
+
+    const capLossDed = Math.min(3000, Math.max(0, cpVal('cap_loss_co') - k * 3000));
+
+    const age = yr - cpVal('birth_year');
+
+    return { yr, k, inf, age, wages, kenPension, ssKen, ssHil, annuity, invOrd, invPref, taxExempt, capLossDed };
+}
+
+// ── Tax engine for one year ─────────────────────────────────
+// Returns federal + NY (+ NYC) tax for the income in `inc` plus the
+// two conversions. MAGI here is AGI + tax-exempt interest, which is
+// what Medicare looks at for IRMAA.
+
+function cpTax(inc, convKen, convHil, stateMode) {
+    const ssTaxable = (inc.ssKen + inc.ssHil) * SS_TAXABLE_PCT;
+    const ordinary  = inc.wages + inc.annuity + inc.kenPension + inc.invOrd + ssTaxable
+                    + convKen + convHil - inc.capLossDed;
+    const pref      = inc.invPref;
+    const agi       = ordinary + pref;
+    const magi      = agi + inc.taxExempt;
+
+    // Deductions
+    let ded = Math.round(CP_STD_DED * inc.inf);
+    if (inc.age >= 65) {
+        ded += 2 * Math.round(CP_AGE65_EXTRA * inc.inf);
+        if (inc.yr <= 2028) {
+            const bonus = Math.max(0, CP_SENIOR_BONUS - 0.06 * Math.max(0, magi - CP_SENIOR_PHASE));
+            ded += 2 * bonus;
+        }
+    }
+    const fedTaxOrd = Math.max(0, ordinary - ded);
+    const fedTax    = calcBracketTax(fedTaxOrd, inflateBrackets(CP_FED_BRACKETS, inc.inf))
+                    + stackedLtcgTax(fedTaxOrd, pref, inflateBrackets(CP_LTCG_BRACKETS, inc.inf));
 
     let nyTax = 0, nycTax = 0;
     if (stateMode === 'nyc' || stateMode === 'ny') {
-        const nyExcl   = Math.min(NY_PENSION_EXCL, inc.annuity || 0)
-                       + Math.min(NY_PENSION_EXCL, inc.pension || 0);
-        const nyStdDed = Math.round(NY_STD_DEDUCTION * inf);
-        const nyTaxable = Math.max(0, totalAgi - nyExcl - nyStdDed);
-        const nyBr     = NY_BRACKETS.map(b => ({
-            limit: b.limit === Infinity ? Infinity : Math.round(b.limit * inf),
-            rate: b.rate,
-        }));
-        nyTax = calcBracketTax(nyTaxable, nyBr);
-        if (stateMode === 'nyc') {
-            nycTax = calcBracketTax(nyTaxable, NYC_BRACKETS);
-        }
-    } else if (stateMode === 'flat_3' || stateMode === 'flat_5') {
-        const flatRate  = stateMode === 'flat_3' ? 0.03 : 0.05;
-        const stTaxable = Math.max(0, totalAgi - stdDed);
-        nyTax = stTaxable * flatRate;
+        const exclHil  = Math.min(NY_PENSION_EXCL, inc.annuity + convHil);
+        const exclKen  = Math.min(NY_PENSION_EXCL, inc.kenPension + convKen);
+        const nyTaxable = Math.max(0, agi - exclHil - exclKen - Math.round(NY_STD_DEDUCTION * inc.inf));
+        nyTax = calcBracketTax(nyTaxable, inflateBrackets(NY_BRACKETS, inc.inf));
+        if (stateMode === 'nyc') nycTax = calcBracketTax(nyTaxable, NYC_BRACKETS);
     }
-    return fedTax + nyTax + nycTax;
+    return { agi, magi, fedTax, nyTax, nycTax, total: fedTax + nyTax + nycTax };
 }
 
-// Incremental tax cost of withdrawing `ira` over `years` years on top of the
-// frozen final-year baseline. Walks brackets correctly: a larger IRA → more
-// brackets crossed each year → higher effective rate.
-function rpTaxOnWithdrawal(ira, years, ctx) {
-    if (!ctx || ira <= 0 || years <= 0) return 0;
-    const slice   = ira / years;
-    const baseTax = rpTaxEngine(ctx.baseOrd, ctx.pref, ctx.inc, ctx.inf, ctx.stateMode);
-    const withTax = rpTaxEngine(ctx.baseOrd + slice, ctx.pref, ctx.inc, ctx.inf, ctx.stateMode);
-    return (withTax - baseTax) * years;
-}
+// ── The plan, year by year ──────────────────────────────────
 
-function rpComputeMultiYear() {
-    const targetRate = parseFloat(document.getElementById('rp_target_bracket')?.value || '0.22');
-    const growth     = (rpVal('rp_growth_rate') || 5) / 100;
-    const inflRate   = (rpVal('rp_inflation') || 2.5) / 100;
-    const stateMode  = document.getElementById('rp_state')?.value || 'nyc';
+function cpCompute() {
+    const stateMode  = document.getElementById('cp_state')?.value || 'nyc';
+    const hilMode    = document.getElementById('cp_hil_mode')?.value || 'fixed';
+    const contribOn  = document.getElementById('cp_contrib_on')?.checked ?? true;
+    const iraG       = cpVal('ira_growth') / 100;
+    const kenRothG   = cpVal('ken_roth_growth') / 100;
+    const hilRothG   = cpVal('hil_roth_growth') / 100;
+    const through    = Math.max(2026, Math.min(2060, Math.round(cpVal('plan_through'))));
 
-    // Gifting parameters
-    const giftOn       = document.getElementById('rp_gift_on')?.checked || false;
-    const giftPriority = document.getElementById('rp_gift_priority')?.value || 'on_top';
-    const heirRate     = (rpVal('rp_heir_rate') || 25) / 100;
-    // 2025 annual exclusion: $19K per donor per recipient, 2 donors × 2 kids = $76K base
-    const giftBaseAmt  = 19000 * 2 * 2;
+    let kenIra  = 0;
+    let hilIra  = cpVal('hil_ira');
+    let kenRoth = cpVal('ken_roth');
+    let hilRoth = cpVal('hil_roth');
 
-    // Convert path balances
-    let iraBalance   = rpVal('rp_ira_balance');
-    let rothBalance  = 0;
-    let taxableA     = rpVal('rp_taxable_balance'); // taxable account, pays conv taxes each year
+    const rows = [];
+    const tot  = { convKen: 0, convHil: 0, convTax: 0, contrib: 0, tax: 0, over: 0 };
 
-    // Don't-convert path balances (parallel universe — same starting state, no conversions)
-    let noConvIRA    = rpVal('rp_ira_balance');
-    let taxableB     = rpVal('rp_taxable_balance'); // taxable account, grows untouched
+    for (let yr = 2026; yr <= through; yr++) {
+        const inc = cpYearIncome(yr);
+        if (yr === cpVal('ken_lump_year')) kenIra += cpVal('ken_lump');
 
-    // Other tax-deferred account — grows in both paths, never converted
-    let otherDeferred = rpVal('rp_other_deferred');
+        const line = Math.round(cpVal('irmaa_limit') * inc.inf) - cpVal('irmaa_margin');
+        const base = cpTax(inc, 0, 0, stateMode);
 
-    // Gift tracking — children's accumulated wealth (both paths track independently)
-    let giftPoolA = 0;  // Convert + Gift path: children's pile
-    let giftPoolB = 0;  // Don't-Convert + Gift path: children's pile
-    let totalGiftedA = 0, totalGiftedB = 0;
-    let totalGiftTaxA = 0, totalGiftTaxB = 0;
+        // Ken: fixed amount from his start year, never more than the IRA holds
+        let convKen = 0;
+        if (yr >= cpVal('ken_start')) convKen = cpVal('ken_amt');
+        if (yr in _cpOverrides.ken) convKen = _cpOverrides.ken[yr];
+        convKen = Math.round(Math.min(convKen, Math.max(0, kenIra)));
 
-    const rows       = [];
-    let totalConv = 0, totalConvCost = 0;
-    let lastCtx = null;
+        // Hilary: 2026 is its own number; afterwards fixed or fill-to-line
+        let convHil, hilAuto = false;
+        if (yr === 2026) convHil = cpVal('hil_2026');
+        else if (hilMode === 'fill') {
+            convHil = Math.floor(Math.max(0, line - base.magi - convKen) / 1000) * 1000;
+            hilAuto = true;
+        } else convHil = cpVal('hil_amt');
+        if (!hilAuto && yr in _cpOverrides.hil) convHil = _cpOverrides.hil[yr];
+        convHil = Math.round(Math.min(convHil, Math.max(0, hilIra)));
 
-    for (let yr = 2026; yr <= 2035; yr++) {
-        const y   = yr - 2026;
-        const inf = Math.pow(1 + inflRate, y);
-        const inc = rpYearIncome(yr);
+        const withC = cpTax(inc, convKen, convHil, stateMode);
+        const convTax = withC.total - base.total;
+        const room    = line - withC.magi;
 
-        // Inflate brackets for this year
-        const brackets = BRACKETS.mfj.map(b => ({
-            limit: b.limit === Infinity ? Infinity : Math.round(b.limit * inf),
-            rate: b.rate,
-        }));
-        const stdDed = Math.round(STANDARD_DEDUCTION.mfj * inf);
-
-        // Base ordinary income (no conversion)
-        const ssTaxable  = (inc.ssSelf + inc.ssSpouse) * SS_TAXABLE_PCT;
-        const capLossDed = Math.min(3000, inc.capLossCo);
-        const baseOrd    = inc.wages + inc.annuity + inc.pension
-                         + inc.interest + inc.divNq + ssTaxable - capLossDed;
-        const pref       = inc.divQ + inc.cgDist;
-        const baseTaxOrd = Math.max(0, baseOrd - stdDed);
-
-        // Find target bracket top
-        let targetTop = 0;
-        for (const b of brackets) {
-            if (b.rate === targetRate) { targetTop = b.limit; break; }
-            if (b.rate > targetRate) break;
+        // Roth contributions from Ken's earned income (his own, then a spousal one)
+        let contribKen = 0, contribHil = 0;
+        if (contribOn && inc.wages > 0) {
+            const limit = Math.round(cpVal('contrib_limit') * inc.inf / 100) * 100;
+            contribKen = Math.min(limit, inc.wages);
+            contribHil = Math.min(limit, inc.wages - contribKen);
         }
 
-        // Annual gift amount (inflation-adjusted), limited by available IRA
-        const giftAmt = giftOn ? Math.round(giftBaseAmt * inf) : 0;
+        // Balances at year end
+        const kenIraStart = kenIra, hilIraStart = hilIra;
+        kenIra  = (kenIra - convKen) * (1 + iraG);
+        hilIra  = (hilIra - convHil) * (1 + iraG);
+        kenRoth = (kenRoth + convKen + contribKen) * (1 + kenRothG);
+        hilRoth = (hilRoth + convHil + contribHil) * (1 + hilRothG);
 
-        // Determine conversion + gift withdrawal amounts based on priority
-        let conversion, giftWithdrawal;
-        const totalRoom = Math.max(0, targetTop - baseTaxOrd);
-
-        if (!giftOn) {
-            // No gifting — same as before
-            conversion     = Math.min(totalRoom, Math.max(0, iraBalance));
-            giftWithdrawal = 0;
-        } else if (giftPriority === 'fill_first') {
-            // Gift fills bracket first, conversion gets remaining room
-            giftWithdrawal = Math.min(giftAmt, Math.max(0, iraBalance));
-            const roomAfterGift = Math.max(0, totalRoom - giftWithdrawal);
-            const iraAfterGift  = Math.max(0, iraBalance - giftWithdrawal);
-            conversion = Math.min(roomAfterGift, iraAfterGift);
-        } else {
-            // 'on_top' — conversion fills bracket, gift is additional withdrawal
-            conversion     = Math.min(totalRoom, Math.max(0, iraBalance));
-            const iraAfterConv = Math.max(0, iraBalance - conversion);
-            giftWithdrawal = Math.min(giftAmt, iraAfterConv);
-        }
-
-        // Total IRA withdrawal (conversion + gift)
-        const totalWithdrawal = conversion + giftWithdrawal;
-
-        // Tax WITH conversion + gift withdrawal
-        const fedTaxOrd_i = baseTaxOrd + totalWithdrawal;
-        const totalAgi    = baseOrd + totalWithdrawal + pref;
-        const fedTax      = calcBracketTax(fedTaxOrd_i, brackets)
-                          + rpCalcLtcgInflated(fedTaxOrd_i, pref, inf);
-
-        // State + city tax based on selected mode
-        let nyTax = 0, nycTax = 0, baseNyTax = 0, baseNycTax = 0;
-        let nyTaxable = 0, margNy = 0, margNyc = 0;
-        const baseAgi = baseOrd + pref;
-
-        if (stateMode === 'nyc' || stateMode === 'ny') {
-            const nyExcl   = Math.min(NY_PENSION_EXCL, inc.annuity)
-                           + Math.min(NY_PENSION_EXCL, inc.pension);
-            const nyStdDed = Math.round(NY_STD_DEDUCTION * inf);
-            nyTaxable      = Math.max(0, totalAgi - nyExcl - nyStdDed);
-            const nyBr     = NY_BRACKETS.map(b => ({
-                limit: b.limit === Infinity ? Infinity : Math.round(b.limit * inf),
-                rate: b.rate,
-            }));
-            nyTax          = calcBracketTax(nyTaxable, nyBr);
-            margNy         = findMarginalRate(nyTaxable, nyBr);
-            const baseNyTaxable = Math.max(0, baseAgi - nyExcl - nyStdDed);
-            baseNyTax      = calcBracketTax(baseNyTaxable, nyBr);
-
-            if (stateMode === 'nyc') {
-                nycTax     = calcBracketTax(nyTaxable, NYC_BRACKETS);
-                margNyc    = findMarginalRate(nyTaxable, NYC_BRACKETS);
-                baseNycTax = calcBracketTax(baseNyTaxable, NYC_BRACKETS);
-            }
-        } else if (stateMode === 'flat_3' || stateMode === 'flat_5') {
-            const flatRate = stateMode === 'flat_3' ? 0.03 : 0.05;
-            const stStdDed = Math.round(STANDARD_DEDUCTION.mfj * inf);
-            nyTaxable      = Math.max(0, totalAgi - stStdDed);
-            nyTax          = nyTaxable * flatRate;
-            margNy         = flatRate;
-            const baseTaxable = Math.max(0, baseAgi - stStdDed);
-            baseNyTax      = baseTaxable * flatRate;
-        }
-
-        const totalTax     = fedTax + nyTax + nycTax;
-
-        // Tax WITHOUT conversion or gift (base)
-        const baseFedTax    = calcBracketTax(baseTaxOrd, brackets)
-                            + rpCalcLtcgInflated(baseTaxOrd, pref, inf);
-        const baseTotalTax  = baseFedTax + baseNyTax + baseNycTax;
-
-        const convCost = totalTax - baseTotalTax;
-
-        // Marginal rates at total withdrawal level
-        const margFed = findMarginalRate(fedTaxOrd_i, brackets);
-
-        const iraStart  = iraBalance;
-        iraBalance      = Math.max(0, iraBalance - totalWithdrawal);
-        rothBalance    += conversion;
-
-        totalConv     += conversion;
-        totalConvCost += convCost;
-
-        const effRate = totalAgi > 0 ? totalTax / totalAgi : 0;
+        tot.convKen += convKen; tot.convHil += convHil; tot.convTax += convTax;
+        tot.contrib += contribKen + contribHil; tot.tax += withC.total;
+        if (room < 0) tot.over++;
 
         rows.push({
-            year: yr, ageH: 64 + y, ageK: 64 + y,
-            baseTaxOrd, conversion, giftWithdrawal, iraStart, rothEnd: rothBalance, agi: totalAgi,
-            totalTax, baseTotalTax, convCost,
-            margAll: margFed + margNy + margNyc, effRate,
+            yr, age: inc.age, inc, line,
+            baseMagi: base.magi, magi: withC.magi, room,
+            convKen, convHil, hilAuto, kenOverride: yr in _cpOverrides.ken, hilOverride: !hilAuto && yr in _cpOverrides.hil,
+            contribKen, contribHil,
+            totalTax: withC.total, fedTax: withC.fedTax, stateTax: withC.nyTax + withC.nycTax,
+            convTax, effRate: (convKen + convHil) > 0 ? convTax / (convKen + convHil) : 0,
+            kenIraStart, hilIraStart, kenIra, hilIra, kenRoth, hilRoth,
         });
-
-        if (yr === 2035) {
-            lastCtx = {
-                baseOrd, pref,
-                inc: { annuity: inc.annuity, pension: inc.pension },
-                inf, stateMode,
-            };
-        }
-
-        // Convert path: pay conversion + gift tax from taxable account
-        taxableA -= convCost;
-        // Gift goes to children
-        if (giftWithdrawal > 0) {
-            giftPoolA    += giftWithdrawal;
-            totalGiftedA += giftWithdrawal;
-        }
-
-        // Don't-convert path gifting: also withdraw from IRA for gifts (same amount)
-        let noConvGiftWD = 0;
-        if (giftOn) {
-            noConvGiftWD = Math.min(Math.round(giftAmt), Math.max(0, noConvIRA));
-            noConvIRA    = Math.max(0, noConvIRA - noConvGiftWD);
-            // Tax on the gift withdrawal in the don't-convert path
-            // Use rpTaxEngine to compute incremental tax
-            const noConvBaseOrdTax = Math.max(0, baseOrd - stdDed);
-            const noConvWithGiftTax = Math.max(0, baseOrd + noConvGiftWD - stdDed);
-            const noConvGiftFedTax = calcBracketTax(noConvWithGiftTax, brackets)
-                                   + rpCalcLtcgInflated(noConvWithGiftTax, pref, inf)
-                                   - calcBracketTax(noConvBaseOrdTax, brackets)
-                                   - rpCalcLtcgInflated(noConvBaseOrdTax, pref, inf);
-            // State tax on gift withdrawal in don't-convert path
-            let noConvGiftStateTax = 0;
-            if (stateMode === 'nyc' || stateMode === 'ny') {
-                const nyExcl   = Math.min(NY_PENSION_EXCL, inc.annuity)
-                               + Math.min(NY_PENSION_EXCL, inc.pension);
-                const nyStdDed = Math.round(NY_STD_DEDUCTION * inf);
-                const nyBr     = NY_BRACKETS.map(b => ({
-                    limit: b.limit === Infinity ? Infinity : Math.round(b.limit * inf),
-                    rate: b.rate,
-                }));
-                const ncBaseNy = Math.max(0, baseAgi - nyExcl - nyStdDed);
-                const ncWithNy = Math.max(0, baseAgi + noConvGiftWD - nyExcl - nyStdDed);
-                noConvGiftStateTax = calcBracketTax(ncWithNy, nyBr) - calcBracketTax(ncBaseNy, nyBr);
-                if (stateMode === 'nyc') {
-                    noConvGiftStateTax += calcBracketTax(ncWithNy, NYC_BRACKETS) - calcBracketTax(ncBaseNy, NYC_BRACKETS);
-                }
-            } else if (stateMode === 'flat_3' || stateMode === 'flat_5') {
-                const flatRate = stateMode === 'flat_3' ? 0.03 : 0.05;
-                noConvGiftStateTax = noConvGiftWD * flatRate;
-            }
-            const noConvGiftTax = noConvGiftFedTax + noConvGiftStateTax;
-            taxableB     -= noConvGiftTax;
-            totalGiftTaxB += noConvGiftTax;
-            giftPoolB    += noConvGiftWD;
-            totalGiftedB += noConvGiftWD;
-        }
-
-        // Grow balances (end of year)
-        iraBalance    *= (1 + growth);
-        rothBalance   *= (1 + growth);
-        taxableA      *= (1 + growth);
-        noConvIRA     *= (1 + growth);
-        taxableB      *= (1 + growth);
-        otherDeferred *= (1 + growth);
-        giftPoolA     *= (1 + growth);
-        giftPoolB     *= (1 + growth);
     }
-
-    const withdrawYears = Math.max(1, Math.round(rpVal('rp_withdraw_years') || 10));
-
-    const deferredA = iraBalance + otherDeferred;
-    const deferredB = noConvIRA  + otherDeferred;
-
-    const taxOnA = rpTaxOnWithdrawal(deferredA, withdrawYears, lastCtx);
-    const taxOnB = rpTaxOnWithdrawal(deferredB, withdrawYears, lastCtx);
-
-    const effRateA = deferredA > 0 ? taxOnA / deferredA : 0;
-    const effRateB = deferredB > 0 ? taxOnB / deferredB : 0;
-
-    const convertNet   = rothBalance + (deferredA - taxOnA) + taxableA;
-    const noConvertNet = 0           + (deferredB - taxOnB) + taxableB;
-
-    return {
-        rows, totalConv, totalConvCost,
-        finalIRA: iraBalance, finalRoth: rothBalance,
-        finalOtherDeferred: otherDeferred,
-        finalTaxableA: taxableA, finalTaxableB: taxableB,
-        noConvIRA, deferredA, deferredB,
-        withdrawYears, taxOnA, taxOnB, effRateA, effRateB,
-        convertNet, noConvertNet,
-        // Gift data
-        giftOn, heirRate,
-        giftPoolA, giftPoolB, totalGiftedA, totalGiftedB,
-        totalGiftTaxA: totalConvCost, // gift tax is embedded in convCost for path A
-        totalGiftTaxB,
-    };
+    return { rows, tot, kenIra, hilIra, kenRoth, hilRoth, hilMode };
 }
 
-function rpRenderMultiYear() {
-    const data = rpComputeMultiYear();
-    const body = document.getElementById('rpProjBody');
-    const foot = document.getElementById('rpProjFoot');
-    if (!body) return;
+// ── Render ──────────────────────────────────────────────────
 
-    body.innerHTML = data.rows.map(r => {
-        const has = r.conversion > 0 || r.giftWithdrawal > 0;
-        const gw = r.giftWithdrawal > 0;
-        return `<tr${has ? '' : ' style="color:var(--text-secondary)"'}>
-            <td>${r.year}</td>
-            <td>${r.ageH} / ${r.ageK}</td>
-            <td style="text-align:right">${fmt(r.baseTaxOrd)}</td>
-            <td style="text-align:right;${r.conversion > 0 ? 'color:var(--warning);font-weight:600' : ''}">${r.conversion > 0 ? fmt(r.conversion) : '\u2014'}${gw ? '<br><span style="font-size:0.78rem;color:var(--text-secondary)">+' + fmt(r.giftWithdrawal) + ' gift</span>' : ''}</td>
-            <td style="text-align:right">${fmt(Math.round(r.iraStart))}</td>
-            <td style="text-align:right;color:var(--income-accent)">${fmt(Math.round(r.rothEnd))}</td>
-            <td style="text-align:right">${fmt(r.totalTax)}</td>
-            <td style="text-align:right;${has ? 'font-weight:600' : ''}">${has ? fmt(r.convCost) : '\u2014'}</td>
-            <td>${(r.effRate * 100).toFixed(1)}%</td>
-            <td>${has ? (r.margAll * 100).toFixed(1) + '%' : '\u2014'}</td>
+function cpRender() {
+    const d = cpCompute();
+    const conv = d.tot.convKen + d.tot.convHil;
+
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('cpCardConv',       fmt(conv));
+    set('cpCardConvDetail', `Ken ${fmtK(d.tot.convKen)} · Hilary ${fmtK(d.tot.convHil)}`);
+    set('cpCardTax',        fmt(d.tot.convTax));
+    set('cpCardRate',       conv > 0 ? (d.tot.convTax / conv * 100).toFixed(1) + '%' : '—');
+    set('cpCardRateDetail', 'tax cost ÷ dollars converted');
+    set('cpCardRoth',       fmt(d.kenRoth + d.hilRoth));
+    set('cpCardRothDetail', `IRAs left: Ken ${fmtK(d.kenIra)} · Hilary ${fmtK(d.hilIra)}`);
+    const overEl = document.getElementById('cpCardOver');
+    if (overEl) {
+        overEl.textContent = d.tot.over;
+        overEl.classList.toggle('warning', d.tot.over > 0);
+        overEl.classList.toggle('success', d.tot.over === 0);
+    }
+    set('cpCardOverDetail', d.tot.over ? 'each costs a year of Part B surcharge' : 'every year under the line');
+
+    const resetBtn = document.getElementById('cpResetBtn');
+    const nOver = Object.keys(_cpOverrides.ken).length + Object.keys(_cpOverrides.hil).length;
+    if (resetBtn) resetBtn.style.display = nOver ? '' : 'none';
+
+    cpRenderTable(d);
+}
+
+function cpRenderTable(d) {
+    const body = document.getElementById('cpBody');
+    if (!body) return;
+    const r = v => `<td class="num">${v}</td>`;
+    const cell = (person, row, val, auto, isOver) => auto
+        ? `<td class="num cp-auto" title="sized to the IRMAA line">${fmt(val)}</td>`
+        : `<td class="num"><input type="number" class="cp-cell${isOver ? ' cp-edited' : ''}" step="1000" min="0" value="${Math.round(val)}"
+              title="${isOver ? 'hand-entered — clear to return to the plan' : 'plan amount — edit to override this year'}"
+              onchange="cpSetOverride('${person}', ${row.yr}, this.value)"></td>`;
+
+    body.innerHTML = d.rows.map(row => {
+        const roomCls = row.room < 0 ? 'cp-over' : (row.room < 10000 ? 'cp-tight' : 'cp-ok');
+        const contrib = row.contribKen + row.contribHil;
+        return `<tr>
+            <td>${row.yr}</td>
+            <td class="num">${row.age}</td>
+            ${r(fmt(row.baseMagi))}
+            ${cell('ken', row, row.convKen, false, row.kenOverride)}
+            ${cell('hil', row, row.convHil, row.hilAuto, row.hilOverride)}
+            ${r(fmt(row.magi))}
+            <td class="num ${roomCls}" title="IRMAA line this year: ${fmt(row.line)}">${row.room < 0 ? '−' : ''}${fmt(Math.abs(row.room))}</td>
+            ${r(fmt(row.totalTax))}
+            ${r(row.convTax > 0 ? fmt(row.convTax) : '—')}
+            ${r(row.effRate > 0 ? (row.effRate * 100).toFixed(1) + '%' : '—')}
+            ${r(contrib > 0 ? fmt(contrib) : '—')}
+            ${r(fmtK(row.kenIra))}
+            ${r(fmtK(row.hilIra))}
+            ${r(fmtK(row.kenRoth + row.hilRoth))}
         </tr>`;
     }).join('');
 
-    foot.innerHTML = `<tr class="total-row">
-        <td colspan="3"><strong>Totals</strong></td>
-        <td style="text-align:right;font-weight:700">${fmt(data.totalConv)}</td>
-        <td style="text-align:right;font-size:0.8rem;color:var(--text-secondary)">final: ${fmt(Math.round(data.finalIRA))}</td>
-        <td style="text-align:right;font-weight:700;color:var(--income-accent)">${fmt(Math.round(data.finalRoth))}</td>
-        <td></td>
-        <td style="text-align:right;font-weight:700">${fmt(data.totalConvCost)}</td>
-        <td></td>
-        <td></td>
-    </tr>`;
-
-    rpRenderCompare(data);
-}
-
-function rpRenderCompare(d) {
-    const wrap = document.getElementById('rpCompare');
-    if (!wrap) return;
-
-    const lastYear = d.rows.length ? d.rows[d.rows.length - 1].year : '';
-    const yrs      = d.withdrawYears;
-
-    // Convert path
-    const A_roth      = Math.round(d.finalRoth);
-    const A_ira       = Math.round(d.finalIRA);
-    const A_other     = Math.round(d.finalOtherDeferred);
-    const A_deferred  = Math.round(d.deferredA);
-    const A_defTax    = Math.round(d.taxOnA);
-    const A_defNet    = A_deferred - A_defTax;
-    const A_taxable   = Math.round(d.finalTaxableA);
-    const A_giftPool  = Math.round(d.giftPoolA || 0);
-    const A_total     = A_roth + A_defNet + A_taxable + A_giftPool;
-    const A_ratePct   = (d.effRateA * 100).toFixed(1) + '%';
-    const A_taxableShortfall = A_taxable < 0;
-
-    // Don't-convert path
-    const B_ira       = Math.round(d.noConvIRA);
-    const B_other     = Math.round(d.finalOtherDeferred);
-    const B_deferred  = Math.round(d.deferredB);
-    const B_defTax    = Math.round(d.taxOnB);
-    const B_defNet    = B_deferred - B_defTax;
-    const B_taxable   = Math.round(d.finalTaxableB);
-    const B_giftPool  = Math.round(d.giftPoolB || 0);
-    const B_total     = B_defNet + B_taxable + B_giftPool;
-    const B_ratePct   = (d.effRateB * 100).toFixed(1) + '%';
-
-    // If no gifting, in bequest the heirs inherit the IRA and pay tax at heir rate
-    // For fair comparison when gifting is off, we don't add anything extra
-    // When gifting is on, the gift pool is already tax-free to the children (tax was paid at withdrawal)
-    // In the no-gift bequest, the IRA passes to heirs who pay heir rate on it
-
-    const diff     = A_total - B_total;
-    const winner   = diff >= 0 ? 'Convert' : 'Don\u2019t Convert';
-    const winColor = diff >= 0 ? 'var(--income-accent)' : 'var(--warning)';
-    const absDiff  = fmt(Math.abs(diff));
-    const pctDiff  = B_total > 0 ? ((Math.abs(diff) / B_total) * 100).toFixed(1) + '%' : '';
-
-    const targetPct = (parseFloat(document.getElementById('rp_target_bracket')?.value || '0.22') * 100).toFixed(0);
-
-    const shortfallNote = A_taxableShortfall
-        ? `<p class="tax-hint" style="color:var(--warning)"><strong>Note:</strong> the Convert path's taxable account ran negative
-           (${fmt(A_taxable)}) &mdash; conversion taxes exceeded its growth. You'd need to source the shortfall from elsewhere,
-           or convert less aggressively.</p>`
-        : '';
-
-    const giftNote = d.giftOn
-        ? `Annual gifts of ~$76K (inflation-adjusted) are withdrawn from the IRA each year.
-           Tax on the withdrawal is paid from the taxable account. The gifted amount grows at the same rate
-           in the children\u2019s hands (tax-free to them \u2014 income tax was already paid at withdrawal).`
-        : '';
-
-    // Gift rows for each column
-    const giftRowsA = d.giftOn
-        ? `<tr style="border-top:1px solid var(--border)"><td style="color:var(--text-secondary)">Gifted to children (grown)</td><td style="color:var(--income-accent)">${fmt(A_giftPool)}</td></tr>
-           <tr><td class="rp-compare-meta">${fmt(Math.round(d.totalGiftedA))} gifted over ${d.rows.length}y</td><td></td></tr>`
-        : '';
-    const giftRowsB = d.giftOn
-        ? `<tr style="border-top:1px solid var(--border)"><td style="color:var(--text-secondary)">Gifted to children (grown)</td><td style="color:var(--income-accent)">${fmt(B_giftPool)}</td></tr>
-           <tr><td class="rp-compare-meta">${fmt(Math.round(d.totalGiftedB))} gifted over ${d.rows.length}y</td><td></td></tr>`
-        : '';
-
-    const totalLabel = d.giftOn ? 'Family net wealth' : 'Net after-tax wealth';
-
-    wrap.innerHTML = `
-        <h4 class="rp-compare-title">Convert vs. Don\u2019t Convert &mdash; Net Wealth at End of ${lastYear}</h4>
-        <p class="tax-hint">
-            All deferred-tax accounts (main IRA + other deferred) are withdrawn together over <strong>${yrs}</strong>
-            year${yrs === 1 ? '' : 's'}, stacked on top of year-${lastYear} baseline income (SS, pension, annuity, etc.).
-            Tax uses actual federal &amp; state brackets &mdash; so the bigger combined pile crosses more brackets and pays
-            a higher effective rate, which is exactly what makes early conversions worthwhile.
-            In the Convert path, conversion taxes are paid out of the taxable account each year (so it shrinks);
-            in Don\u2019t Convert it grows untouched. The taxable account is counted at face value (embedded LTCG ignored
-            in both paths equally).
-            ${giftNote}
-        </p>
-        ${shortfallNote}
-        <div class="rp-compare-grid">
-            <div class="rp-compare-col">
-                <div class="rp-compare-head">Convert (fill ${targetPct}% bracket)${d.giftOn ? ' + Gift' : ''}</div>
-                <table class="rp-compare-table">
-                    <tr><td>Roth (tax-free)</td><td>${fmt(A_roth)}</td></tr>
-                    <tr><td>Main IRA</td><td>${fmt(A_ira)}</td></tr>
-                    <tr><td>Other tax-deferred</td><td>${fmt(A_other)}</td></tr>
-                    <tr><td>&nbsp;&nbsp;&minus; tax to withdraw over ${yrs}y</td><td>(${fmt(A_defTax)})</td></tr>
-                    <tr><td>Taxable account</td><td style="${A_taxableShortfall ? 'color:var(--warning)' : ''}">${fmt(A_taxable)}</td></tr>
-                    ${giftRowsA}
-                    <tr class="rp-compare-total"><td>${totalLabel}</td><td>${fmt(A_total)}</td></tr>
-                    <tr><td class="rp-compare-meta" colspan="2">Effective withdrawal rate: ${A_ratePct} &middot; conversion taxes paid: ${fmt(Math.round(d.totalConvCost))}</td></tr>
-                </table>
-            </div>
-            <div class="rp-compare-col">
-                <div class="rp-compare-head">Don\u2019t Convert${d.giftOn ? ' + Gift' : ' (let IRA grow)'}</div>
-                <table class="rp-compare-table">
-                    <tr><td>Roth (tax-free)</td><td>${fmt(0)}</td></tr>
-                    <tr><td>Main IRA</td><td>${fmt(B_ira)}</td></tr>
-                    <tr><td>Other tax-deferred</td><td>${fmt(B_other)}</td></tr>
-                    <tr><td>&nbsp;&nbsp;&minus; tax to withdraw over ${yrs}y</td><td>(${fmt(B_defTax)})</td></tr>
-                    <tr><td>Taxable account</td><td>${fmt(B_taxable)}</td></tr>
-                    ${giftRowsB}
-                    <tr class="rp-compare-total"><td>${totalLabel}</td><td>${fmt(B_total)}</td></tr>
-                    <tr><td class="rp-compare-meta" colspan="2">Effective withdrawal rate: ${B_ratePct} &middot; no conversion taxes paid</td></tr>
-                </table>
-            </div>
-        </div>
-        <div class="rp-compare-verdict" style="border-color:${winColor}">
-            <span class="rp-compare-verdict-label">Better strategy:</span>
-            <span class="rp-compare-verdict-winner" style="color:${winColor}">${winner}</span>
-            <span class="rp-compare-verdict-diff">by ${absDiff}${pctDiff ? ' (' + pctDiff + ')' : ''}</span>
-        </div>
-    `;
+    const foot = document.getElementById('cpFoot');
+    if (foot) {
+        const conv = d.tot.convKen + d.tot.convHil;
+        foot.innerHTML = `<tr class="cp-total">
+            <td colspan="3">Total</td>
+            <td class="num">${fmt(d.tot.convKen)}</td>
+            <td class="num">${fmt(d.tot.convHil)}</td>
+            <td></td>
+            <td class="num ${d.tot.over ? 'cp-over' : 'cp-ok'}">${d.tot.over ? d.tot.over + ' over' : 'all under'}</td>
+            <td class="num">${fmt(d.tot.tax)}</td>
+            <td class="num">${fmt(d.tot.convTax)}</td>
+            <td class="num">${conv > 0 ? (d.tot.convTax / conv * 100).toFixed(1) + '%' : '—'}</td>
+            <td class="num">${d.tot.contrib > 0 ? fmt(d.tot.contrib) : '—'}</td>
+            <td class="num">${fmtK(d.kenIra)}</td>
+            <td class="num">${fmtK(d.hilIra)}</td>
+            <td class="num">${fmtK(d.kenRoth + d.hilRoth)}</td>
+        </tr>`;
+    }
 }
 
 // ── Boot ─────────────────────────────────────────────────────

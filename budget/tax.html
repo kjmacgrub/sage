@@ -31,7 +31,7 @@
         <!-- View Toggle -->
         <div class="view-toggle-row">
             <button class="view-btn active" data-view="tracker" onclick="setView('tracker')">YTD Tracker</button>
-            <button class="view-btn" data-view="planner" onclick="setView('planner')">Roth Planner</button>
+            <button class="view-btn" data-view="plan" onclick="setView('plan')">Conversion Plan</button>
         </div>
 
         <div id="trackerView">
@@ -163,230 +163,170 @@
         </div><!-- /trackerView -->
 
         <!-- ═══════════════════════════════════════════════════════ -->
-        <!-- ROTH CONVERSION PLANNER                                -->
         <!-- ═══════════════════════════════════════════════════════ -->
-        <div id="plannerView" style="display:none">
+        <!-- CONVERSION PLAN — two people, ten years, under IRMAA    -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <div id="planView" style="display:none">
 
             <!-- Summary Cards -->
-            <div class="tax-summary-row rp-summary">
+            <div class="tax-summary-row cp-summary">
                 <div class="tax-card">
-                    <div class="tax-card-label">Base Tax (no conversion)</div>
-                    <div class="tax-card-value" id="rpCardBase">—</div>
+                    <div class="tax-card-label">Converted</div>
+                    <div class="tax-card-value" id="cpCardConv">—</div>
+                    <div class="tax-card-detail" id="cpCardConvDetail"></div>
                 </div>
                 <div class="tax-card">
-                    <div class="tax-card-label">Conversion Tax Cost</div>
-                    <div class="tax-card-value warning" id="rpCardCost">—</div>
+                    <div class="tax-card-label">Tax on Conversions</div>
+                    <div class="tax-card-value warning" id="cpCardTax">—</div>
                 </div>
                 <div class="tax-card">
                     <div class="tax-card-label">Effective Rate</div>
-                    <div class="tax-card-value" id="rpCardEffective">—</div>
-                    <div class="tax-card-detail" id="rpCardEffDetail"></div>
+                    <div class="tax-card-value" id="cpCardRate">—</div>
+                    <div class="tax-card-detail" id="cpCardRateDetail"></div>
                 </div>
                 <div class="tax-card">
-                    <div class="tax-card-label">Combined Marginal Rate</div>
-                    <div class="tax-card-value" id="rpCardMarginal">—</div>
-                    <div class="tax-card-detail" id="rpCardMargDetail"></div>
+                    <div class="tax-card-label">Years Over IRMAA Line</div>
+                    <div class="tax-card-value" id="cpCardOver">—</div>
+                    <div class="tax-card-detail" id="cpCardOverDetail"></div>
                 </div>
                 <div class="tax-card">
-                    <div class="tax-card-label">Room to Fill 22%</div>
-                    <div class="tax-card-value success" id="rpCardRoom">—</div>
+                    <div class="tax-card-label">Roth at End</div>
+                    <div class="tax-card-value success" id="cpCardRoth">—</div>
+                    <div class="tax-card-detail" id="cpCardRothDetail"></div>
                 </div>
             </div>
 
-            <!-- Conversion Input + Bracket Viz -->
+            <!-- The plan -->
             <div class="section-card">
                 <div class="tax-section-header">
-                    <h3 class="section-heading" style="margin:0">Roth Conversion</h3>
-                    <div class="rp-fill-btns">
-                        <button class="rp-fill-btn" onclick="rpFillBracket(0.12)">Fill 12%</button>
-                        <button class="rp-fill-btn" onclick="rpFillBracket(0.22)">Fill 22%</button>
-                        <button class="rp-fill-btn" onclick="rpFillBracket(0.24)">Fill 24%</button>
-                    </div>
+                    <h3 class="section-heading" style="margin:0">The Plan</h3>
+                    <button class="cp-reset-btn" id="cpResetBtn" style="display:none" onclick="cpResetOverrides()">Clear hand-entered years</button>
                 </div>
-                <div class="rp-conv-controls">
-                    <div class="rp-conv-amount">
-                        <span class="reserve-dollar">$</span>
-                        <input type="number" id="rp_conversion" class="reserve-input"
-                               min="0" max="800000" step="1000" value="0"
-                               oninput="rpSyncSlider(false)" style="width:140px">
+                <p class="tax-hint">Steady conversions from two IRAs, sized so household MAGI stays under the first IRMAA tier. Not trying to empty the IRAs. Hilary converts her own number in 2026; from 2027 either a fixed amount or whatever room is left under the line after Ken's. Edit any year's amount in the table to override it.</p>
+                <div class="cp-grid">
+                    <div class="cp-col">
+                        <div class="cp-field"><label>Ken converts per year</label><input type="number" id="cp_ken_amt" step="5000" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Ken starts in</label><input type="number" id="cp_ken_start" step="1" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Hilary converts in 2026</label><input type="number" id="cp_hil_2026" step="5000" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Hilary from 2027</label>
+                            <select id="cp_hil_mode" class="char-select" onchange="cpOnInput()">
+                                <option value="fixed">Fixed amount per year</option>
+                                <option value="fill">Fill the room under the line</option>
+                            </select>
+                        </div>
+                        <div class="cp-field"><label>Hilary per year (fixed)</label><input type="number" id="cp_hil_amt" step="5000" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Plan through</label><input type="number" id="cp_plan_through" step="1" oninput="cpOnInput()"></div>
                     </div>
-                    <input type="range" id="rp_slider" class="rp-slider"
-                           min="0" max="300000" step="1000" value="0"
-                           oninput="rpSyncSlider(true)">
-                    <div class="rp-slider-labels">
-                        <span>$0</span><span>$150K</span><span>$300K</span>
-                    </div>
-                </div>
-                <div id="rpBracketViz" class="rp-bracket-viz"></div>
-            </div>
-
-            <!-- Income Profile -->
-            <div class="section-card">
-                <h3 class="section-heading">Income Profile</h3>
-                <p class="tax-hint">Pre-filled from 2025 return. Adjust for your 2026 estimates.</p>
-                <div class="rp-income-grid">
-                    <div class="rp-field">
-                        <label>Wages (W-2)</label>
-                        <input type="number" id="rp_wages" value="58500" step="500" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field">
-                        <label>Annuity — gross (NY Life)</label>
-                        <input type="number" id="rp_annuity" value="50649" step="500" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field">
-                        <label>Pension (ADP)</label>
-                        <input type="number" id="rp_pension" value="30305" step="500" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field">
-                        <label>Taxable Interest</label>
-                        <input type="number" id="rp_interest" value="600" step="100" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field">
-                        <label>Non-Qualified Dividends</label>
-                        <input type="number" id="rp_div_nonqual" value="7475" step="100" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field">
-                        <label>Qualified Dividends</label>
-                        <input type="number" id="rp_div_qual" value="5353" step="100" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field">
-                        <label>CG Distributions</label>
-                        <input type="number" id="rp_cg_dist" value="4428" step="100" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field">
-                        <label>Social Security — Ken</label>
-                        <input type="number" id="rp_ss_self" value="0" step="500" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field">
-                        <label>Social Security — Hilary</label>
-                        <input type="number" id="rp_ss_spouse" value="0" step="500" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field">
-                        <label>Capital Loss Carryover</label>
-                        <input type="number" id="rp_cap_loss_co" value="36355" step="500" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field">
-                        <label>Additional Deductions</label>
-                        <input type="number" id="rp_extra_ded" value="0" step="500" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field rp-field-sep">
-                        <label>Federal Tax Withheld</label>
-                        <input type="number" id="rp_fed_withheld" value="15000" step="100" oninput="rpOnInput()">
-                    </div>
-                    <div class="rp-field">
-                        <label>State + Local Withheld</label>
-                        <input type="number" id="rp_state_withheld" value="7000" step="100" oninput="rpOnInput()">
+                    <div class="cp-col">
+                        <div class="cp-field"><label>IRMAA tier-1 limit, 2026 income</label><input type="number" id="cp_irmaa_limit" step="1000" oninput="cpOnInput()" title="MFJ MAGI above which the first Part B/D surcharge applies two years later. Indexed by the inflation rate below."></div>
+                        <div class="cp-field"><label>Safety margin</label><input type="number" id="cp_irmaa_margin" step="1000" oninput="cpOnInput()" title="Stay this far under the limit. The line in the table is limit minus margin."></div>
+                        <div class="cp-field"><label>Inflation / indexing</label><input type="number" id="cp_inflation" step="0.5" min="0" max="10" oninput="cpOnInput()" style="width:70px"><span class="cp-pct">%</span></div>
+                        <div class="cp-field"><label>State</label>
+                            <select id="cp_state" class="char-select" onchange="cpOnInput()">
+                                <option value="nyc">NY + NYC</option>
+                                <option value="ny">NY (no NYC)</option>
+                                <option value="none">No state tax</option>
+                            </select>
+                        </div>
+                        <div class="cp-field"><label>Roth contributions</label>
+                            <label class="cp-check"><input type="checkbox" id="cp_contrib_on" onchange="cpOnInput()"> from Ken's W-2, his own + spousal</label>
+                        </div>
+                        <div class="cp-field"><label>Contribution limit, 50+</label><input type="number" id="cp_contrib_limit" step="100" oninput="cpOnInput()" title="Per person. 2026: $7,500 + $1,100 catch-up. Indexed."></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Detailed Tax Computation -->
+            <!-- Year table -->
             <div class="section-card">
-                <h3 class="section-heading">Tax Computation Detail</h3>
-                <table class="data-table tax-calc-table">
-                    <tbody id="rpCalcBody"></tbody>
-                </table>
-            </div>
-
-            <!-- Multi-Year Projection -->
-            <div class="section-card">
-                <div class="tax-section-header">
-                    <h3 class="section-heading" style="margin:0">10-Year Roth Conversion Projection</h3>
-                </div>
-                <p class="tax-hint">Fills to target bracket each year. Income changes: Ken retires mid-2027 ($20K partial), Park Slope pension $24K starts 2027, Social Security starts 2029 (Ken $22,800 / Hilary $10,500 at FRA). Annuity is fixed; other investment income grows with inflation.</p>
-                <div class="rp-proj-controls">
-                    <div class="rp-field">
-                        <label>Target Bracket</label>
-                        <select id="rp_target_bracket" class="char-select" onchange="rpOnInput()" style="width:auto">
-                            <option value="0.12">12%</option>
-                            <option value="0.22" selected>22%</option>
-                            <option value="0.24">24%</option>
-                        </select>
-                    </div>
-                    <div class="rp-field">
-                        <label>State</label>
-                        <select id="rp_state" class="char-select" onchange="rpOnInput()" style="width:auto">
-                            <option value="nyc" selected>NY + NYC</option>
-                            <option value="ny">NY (no NYC)</option>
-                            <option value="none">No State Tax</option>
-                            <option value="flat_3">Low (3%)</option>
-                            <option value="flat_5">Mid (5%)</option>
-                        </select>
-                    </div>
-                    <div class="rp-field">
-                        <label>IRA Balance</label>
-                        <input type="number" id="rp_ira_balance" value="742000" step="5000" oninput="rpOnInput()" title="Main IRA — the conversion target">
-                    </div>
-                    <div class="rp-field">
-                        <label>Other Deferred</label>
-                        <input type="number" id="rp_other_deferred" value="400000" step="5000" oninput="rpOnInput()" title="Other tax-deferred accounts (401k, other IRAs) that grow but are NOT being converted. They still get taxed on withdrawal in both scenarios and add to bracket pressure.">
-                    </div>
-                    <div class="rp-field">
-                        <label>Taxable Account</label>
-                        <input type="number" id="rp_taxable_balance" value="600000" step="5000" oninput="rpOnInput()" title="Brokerage / taxable account. Grows untouched in 'Don't Convert'. In 'Convert', conversion taxes are paid from this account each year.">
-                    </div>
-                    <div class="rp-field">
-                        <label>IRA Growth</label>
-                        <input type="number" id="rp_growth_rate" value="5" step="0.5" min="0" max="15" oninput="rpOnInput()" style="width:70px">
-                        <span class="rp-pct-label">%</span>
-                    </div>
-                    <div class="rp-field">
-                        <label>Inflation</label>
-                        <input type="number" id="rp_inflation" value="2.5" step="0.5" min="0" max="10" oninput="rpOnInput()" style="width:70px">
-                        <span class="rp-pct-label">%</span>
-                    </div>
-                </div>
-                <div class="rp-proj-table-wrap">
-                    <table class="data-table" id="rpProjTable">
+                <h3 class="section-heading">Year by Year</h3>
+                <p class="tax-hint">Base MAGI is household income before any conversion. Room is how far the year sits under the IRMAA line after conversions; red means over. Roth contributions are after-tax and do not move MAGI. Ken's IRA is the PSFC lump sum once it arrives.</p>
+                <div class="cp-table-wrap">
+                    <table class="data-table" id="cpTable">
                         <thead>
                             <tr>
                                 <th>Year</th>
-                                <th>Age</th>
-                                <th style="text-align:right">Base Taxable</th>
-                                <th style="text-align:right">Conversion</th>
-                                <th style="text-align:right">IRA Balance</th>
-                                <th style="text-align:right">Roth Balance</th>
-                                <th style="text-align:right">Total Tax</th>
-                                <th style="text-align:right">Conv. Cost</th>
-                                <th>Effective</th>
-                                <th>Marginal</th>
+                                <th class="num">Age</th>
+                                <th class="num">Base MAGI</th>
+                                <th class="num">Ken Conv.</th>
+                                <th class="num">Hilary Conv.</th>
+                                <th class="num">MAGI</th>
+                                <th class="num">Room</th>
+                                <th class="num">Total Tax</th>
+                                <th class="num">Conv. Tax</th>
+                                <th class="num">Eff. Rate</th>
+                                <th class="num">Roth Contrib.</th>
+                                <th class="num">Ken IRA</th>
+                                <th class="num">Hilary IRA</th>
+                                <th class="num">Roth Total</th>
                             </tr>
                         </thead>
-                        <tbody id="rpProjBody"></tbody>
-                        <tfoot id="rpProjFoot"></tfoot>
+                        <tbody id="cpBody"></tbody>
+                        <tfoot id="cpFoot"></tfoot>
                     </table>
                 </div>
-
-                <!-- Convert vs Don't Convert comparison -->
-                <div class="rp-compare-controls">
-                    <div class="rp-field">
-                        <label>Withdraw IRA over</label>
-                        <input type="number" id="rp_withdraw_years" value="10" step="1" min="1" max="40" oninput="rpOnInput()" style="width:70px" title="Number of years over which the remaining IRA is assumed to be withdrawn (or, for an inherited IRA, the heir's drawdown window — typically 10)">
-                        <span class="rp-pct-label">years</span>
-                    </div>
-                    <div class="rp-field">
-                        <label style="width:auto;white-space:nowrap">
-                            <input type="checkbox" id="rp_gift_on" onchange="rpOnInput()" style="margin-right:0.4rem;vertical-align:middle">
-                            Annual gifting
-                        </label>
-                    </div>
-                    <div class="rp-field rp-gift-field" style="display:none">
-                        <label>Gift priority</label>
-                        <select id="rp_gift_priority" class="char-select" onchange="rpOnInput()" style="width:auto">
-                            <option value="on_top">On top of conversions</option>
-                            <option value="fill_first">Fill bracket first</option>
-                        </select>
-                    </div>
-                    <div class="rp-field rp-gift-field" style="display:none">
-                        <label>Heir tax rate</label>
-                        <input type="number" id="rp_heir_rate" value="25" step="1" min="0" max="50" oninput="rpOnInput()" style="width:70px" title="Assumed marginal tax rate when heirs draw down an inherited IRA">
-                        <span class="rp-pct-label">%</span>
-                    </div>
-                </div>
-                <div id="rpCompare" class="rp-compare"></div>
             </div>
 
-        </div><!-- /plannerView -->
+            <!-- Income assumptions -->
+            <details class="section-card cp-details">
+                <summary class="section-heading">Income Assumptions</summary>
+                <p class="tax-hint">Nominal dollars. Social Security and investment income grow with the inflation rate; the NY Life annuity and wages are flat. Capital loss carryover is used $3,000 a year.</p>
+                <div class="cp-grid">
+                    <div class="cp-col">
+                        <div class="cp-field"><label>Birth year (both)</label><input type="number" id="cp_birth_year" step="1" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Ken wages 2026</label><input type="number" id="cp_wages_2026" step="500" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Ken wages 2027</label><input type="number" id="cp_wages_2027" step="500" oninput="cpOnInput()" title="Final months at PSFC plus any part-time work that year"></div>
+                        <div class="cp-field"><label>Part-time W-2 per year</label><input type="number" id="cp_pt_wages" step="500" oninput="cpOnInput()" title="From 2028"></div>
+                        <div class="cp-field"><label>Part-time through</label><input type="number" id="cp_pt_through" step="1" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>PSFC annuity per year</label><input type="number" id="cp_ken_pension" step="500" oninput="cpOnInput()" title="Zero if the full lump sum is taken"></div>
+                        <div class="cp-field"><label>Ken SS per month</label><input type="number" id="cp_ken_ss_monthly" step="10" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Ken SS from</label><input type="number" id="cp_ken_ss_start" step="1" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Months paid in first year</label><input type="number" id="cp_ken_ss_months" step="1" min="0" max="12" oninput="cpOnInput()"></div>
+                    </div>
+                    <div class="cp-col">
+                        <div class="cp-field"><label>Hilary NY Life annuity</label><input type="number" id="cp_hil_annuity" step="100" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Hilary spousal SS per month</label><input type="number" id="cp_hil_ss_monthly" step="10" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Hilary SS from</label><input type="number" id="cp_hil_ss_start" step="1" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Ordinary inv. income 2026</label><input type="number" id="cp_inv_ord_2026" step="100" oninput="cpOnInput()" title="Interest + non-qualified dividends"></div>
+                        <div class="cp-field"><label>Qualified / LTCG 2026</label><input type="number" id="cp_inv_pref_2026" step="100" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Ordinary inv. income 2027+</label><input type="number" id="cp_inv_ord" step="1000" oninput="cpOnInput()" title="Once the condo proceeds are invested"></div>
+                        <div class="cp-field"><label>Qualified / LTCG 2027+</label><input type="number" id="cp_inv_pref" step="1000" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Tax-exempt interest 2027+</label><input type="number" id="cp_tax_exempt" step="500" oninput="cpOnInput()" title="Muni interest counts toward IRMAA MAGI even though it is not taxed"></div>
+                        <div class="cp-field"><label>Capital loss carryover</label><input type="number" id="cp_cap_loss_co" step="500" oninput="cpOnInput()"></div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Balances -->
+            <details class="section-card cp-details">
+                <summary class="section-heading">Balances &amp; Growth</summary>
+                <div class="cp-grid">
+                    <div class="cp-col">
+                        <div class="cp-field"><label>Ken lump sum to IRA</label><input type="number" id="cp_ken_lump" step="5000" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Arrives in</label><input type="number" id="cp_ken_lump_year" step="1" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Hilary IRA today</label><input type="number" id="cp_hil_ira" step="5000" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>IRA growth</label><input type="number" id="cp_ira_growth" step="0.5" oninput="cpOnInput()" style="width:70px"><span class="cp-pct">%</span></div>
+                    </div>
+                    <div class="cp-col">
+                        <div class="cp-field"><label>Ken Roth today</label><input type="number" id="cp_ken_roth" step="5000" oninput="cpOnInput()" title="Schwab Roth, the options sleeve"></div>
+                        <div class="cp-field"><label>Ken Roth growth</label><input type="number" id="cp_ken_roth_growth" step="0.5" oninput="cpOnInput()" style="width:70px"><span class="cp-pct">%</span></div>
+                        <div class="cp-field"><label>Hilary Roth today</label><input type="number" id="cp_hil_roth" step="5000" oninput="cpOnInput()"></div>
+                        <div class="cp-field"><label>Hilary Roth growth</label><input type="number" id="cp_hil_roth_growth" step="0.5" oninput="cpOnInput()" style="width:70px"><span class="cp-pct">%</span></div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- How to use it -->
+            <div class="section-card cp-notes">
+                <h3 class="section-heading">Each December</h3>
+                <ol>
+                    <li>Look up the year's income so far on the YTD Tracker tab, plus any muni interest.</li>
+                    <li>Take that away from this year's IRMAA line (hover the Room cell to see it). What is left is Hilary's conversion for the year, after Ken's.</li>
+                    <li>Type the real numbers into the Ken and Hilary cells for that year. Hand-entered years are outlined; clear a cell to return to the plan.</li>
+                </ol>
+                <p class="tax-hint">Medicare looks back two years: this year's MAGI sets premiums two years from now. Crossing the line by one dollar costs the whole first-tier surcharge for a year. Federal brackets and deductions are the 2026 figures indexed; the $6,000 senior deduction applies 2027 and 2028 and phases out at these incomes. NY exempts the first $20,000 of each person's pension, annuity or IRA money, so Ken's first $20,000 of conversions is the cheapest dollar in the plan. Social Security is taken as 85% taxable. RMDs start after this horizon, at 75.</p>
+            </div>
+
+        </div><!-- /planView -->
 
     </div>
 

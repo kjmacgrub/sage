@@ -318,9 +318,9 @@
     color: var(--text-primary);
 }
 
-/* ── Planner summary cards ────────────────────────────────── */
+/* ── Conversion Plan ──────────────────────────────────────── */
 
-.rp-summary {
+.cp-summary {
     grid-template-columns: repeat(5, 1fr);
 }
 
@@ -330,83 +330,34 @@
     margin-top: 0.2rem;
 }
 
-/* ── Conversion controls ──────────────────────────────────── */
-
-.rp-conv-controls {
-    padding: 1rem 2rem 1.5rem;
-}
-
-.rp-conv-amount {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-bottom: 1rem;
-}
-
-.rp-slider {
-    width: 100%;
-    margin: 0;
-    accent-color: #5a7a52;
-    height: 6px;
-}
-
-.rp-slider-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.72rem;
-    color: var(--text-secondary);
-    margin-top: 0.3rem;
-}
-
-/* ── Fill bracket buttons ─────────────────────────────────── */
-
-.rp-fill-btns {
-    display: flex;
-    gap: 0.4rem;
-}
-
-.rp-fill-btn {
-    font-family: var(--font);
-    font-size: 0.78rem;
-    font-weight: 500;
-    padding: 0.3rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.rp-fill-btn:hover {
-    border-color: #5a7a52;
-    color: #5a7a52;
-}
-
-/* ── Income profile grid ──────────────────────────────────── */
-
-.rp-income-grid {
+.cp-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem 2rem;
     padding: 0 2rem 1.5rem;
 }
 
-.rp-field {
+.cp-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.cp-field {
     display: flex;
     align-items: center;
     gap: 0.75rem;
 }
 
-.rp-field label {
+.cp-field > label {
     font-size: 0.85rem;
     color: var(--text-secondary);
-    width: 185px;
+    width: 200px;
     flex-shrink: 0;
     text-align: right;
 }
 
-.rp-field input {
+.cp-field input[type="number"] {
     font-family: var(--font);
     font-size: 0.95rem;
     font-weight: 500;
@@ -419,275 +370,130 @@
     font-variant-numeric: tabular-nums;
 }
 
-.rp-field input:focus {
+.cp-field input[type="number"]:focus {
     outline: none;
     border-color: #5a7a52;
 }
 
-.rp-field-sep {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
-}
+.cp-field .char-select { width: auto; }
 
-/* ── Bracket bar visualization ────────────────────────────── */
-
-.rp-bracket-viz {
-    padding: 0 2rem 1.5rem;
-}
-
-.rp-bar {
-    display: flex;
-    height: 38px;
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-.rp-seg {
-    position: relative;
-    min-width: 3%;
-    border-right: 1px solid rgba(255,255,255,0.15);
-}
-
-.rp-seg:last-child { border-right: none; }
-
-.rp-seg-bg {
-    position: absolute;
-    inset: 0;
-    background: var(--seg-color);
-    opacity: 0.15;
-}
-
-.rp-seg-base {
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    background: var(--seg-color);
-    opacity: 0.7;
-    transition: width 0.15s ease;
-}
-
-.rp-seg-conv {
-    position: absolute;
-    top: 0; bottom: 0;
-    background: var(--seg-color);
-    opacity: 0.35;
-    transition: left 0.15s, width 0.15s ease;
-    background-image: repeating-linear-gradient(
-        -45deg, transparent, transparent 2px,
-        rgba(255,255,255,0.15) 2px, rgba(255,255,255,0.15) 4px
-    );
-}
-
-.rp-seg-rate {
-    position: relative;
-    z-index: 1;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: white;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+.cp-check {
     display: flex;
     align-items: center;
-    justify-content: center;
-    height: 100%;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    width: auto;
+    text-align: left;
 }
 
-[data-theme="light"] .rp-seg-rate {
-    color: #333;
-    text-shadow: 0 1px 1px rgba(255,255,255,0.6);
-}
-
-.rp-bar-labels {
-    display: flex;
-    margin-top: 0.25rem;
-    font-size: 0.68rem;
-    color: var(--text-secondary);
-}
-
-.rp-bar-info {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 0.5rem;
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-}
-
-.rp-bar-conv {
-    color: var(--warning);
-    font-weight: 600;
-}
-
-/* ── Detail table section headers ─────────────────────────── */
-
-.rp-section-head td {
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #5a7a52;
-    padding-top: 1.25rem !important;
-    padding-bottom: 0.5rem !important;
-}
-
-.rp-conv-row td {
-    color: var(--warning) !important;
-    font-weight: 600;
-}
-
-.rp-pref-row td {
-    color: var(--text-secondary);
-}
-
-/* ── Projection controls ──────────────────────────────────── */
-
-.rp-proj-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem 2rem;
-    padding: 0 2rem 1.25rem;
-}
-
-.rp-pct-label {
+.cp-pct {
     color: var(--text-secondary);
     font-size: 0.85rem;
 }
 
-.rp-proj-table-wrap {
+.cp-reset-btn {
+    font-family: var(--font);
+    font-size: 0.8rem;
+    padding: 0.35rem 0.8rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.cp-reset-btn:hover {
+    border-color: #5a7a52;
+    color: var(--text-primary);
+}
+
+/* collapsible assumption cards */
+.cp-details > summary {
+    cursor: pointer;
+    list-style: none;
+}
+.cp-details > summary::-webkit-details-marker { display: none; }
+.cp-details > summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1.1em;
+    color: var(--text-secondary);
+    transition: transform 0.15s ease;
+}
+.cp-details[open] > summary::before { transform: rotate(90deg); }
+
+/* year table */
+.cp-table-wrap {
     padding: 0 1rem 1.5rem;
     overflow-x: auto;
 }
 
-#rpProjTable {
-    font-size: 0.88rem;
+#cpTable {
+    font-size: 0.86rem;
     border-collapse: separate;
     border-spacing: 0;
+    width: 100%;
 }
 
-#rpProjTable th,
-#rpProjTable td {
-    padding: 0.5rem 1rem;
+#cpTable th,
+#cpTable td {
+    padding: 0.45rem 0.7rem;
     white-space: nowrap;
 }
 
-#rpProjTable th {
-    font-size: 0.75rem;
+#cpTable th {
+    font-size: 0.72rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }
 
-/* ── Convert vs Don't Convert comparison ──────────────────── */
-
-.rp-compare-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem 2rem;
-    padding: 1rem 2rem 0.25rem;
-    border-top: 1px solid var(--border);
-    margin-top: 0.5rem;
-}
-
-.rp-compare {
-    padding: 0.5rem 2rem 1.5rem;
-}
-
-.rp-compare-title {
-    margin: 1.25rem 0 0.5rem;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.rp-compare-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-top: 0.75rem;
-}
-
-.rp-compare-col {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--card-bg, var(--bg-secondary));
-    overflow: hidden;
-}
-
-.rp-compare-head {
-    padding: 0.6rem 1rem;
-    background: var(--bg-tertiary, rgba(0,0,0,0.04));
-    font-weight: 600;
-    font-size: 0.9rem;
-    border-bottom: 1px solid var(--border);
-}
-
-.rp-compare-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9rem;
-}
-
-.rp-compare-table td {
-    padding: 0.4rem 1rem;
-}
-
-.rp-compare-table td:last-child {
+#cpTable .num {
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
 
-.rp-compare-table tr.rp-compare-total {
-    border-top: 1px solid var(--border);
-    font-weight: 700;
+#cpTable tr.cp-total td {
+    font-weight: 600;
+    border-top: 1.5px solid var(--border);
 }
 
-.rp-compare-table tr.rp-compare-total td {
-    padding-top: 0.55rem;
-    padding-bottom: 0.55rem;
+.cp-cell {
+    font-family: var(--font);
+    font-size: 0.86rem;
+    font-weight: 500;
+    width: 92px;
+    padding: 0.2rem 0.4rem;
+    text-align: right;
+    border: 1.5px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+.cp-cell:hover { border-color: var(--border); }
+.cp-cell:focus { outline: none; border-color: #5a7a52; background: var(--surface); }
+.cp-cell.cp-edited { border-color: #5a7a52; }
+.cp-cell::-webkit-inner-spin-button { opacity: 0; }
+
+.cp-auto { color: #5a7a52; font-weight: 600; }
+.cp-ok    { color: var(--success, #3a9d5d); }
+.cp-tight { color: var(--warning, #c9922a); }
+.cp-over  { color: var(--danger, #d14343); font-weight: 600; }
+
+.cp-notes ol {
+    margin: 0 2rem 0.75rem;
+    padding-left: 1.25rem;
+    font-size: 0.9rem;
     color: var(--text-primary);
 }
-
-.rp-compare-meta {
-    color: var(--text-secondary);
-    font-size: 0.78rem;
-    font-style: italic;
-}
-
-.rp-compare-verdict {
-    margin-top: 1rem;
-    padding: 0.85rem 1.25rem;
-    border-left: 4px solid var(--income-accent);
-    background: var(--bg-tertiary, rgba(0,0,0,0.03));
-    border-radius: 4px;
-    display: flex;
-    align-items: baseline;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-}
-
-.rp-compare-verdict-label {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-}
-
-.rp-compare-verdict-winner {
-    font-weight: 700;
-    font-size: 1.05rem;
-}
-
-.rp-compare-verdict-diff {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-}
+.cp-notes li { margin-bottom: 0.35rem; }
 
 /* ── Responsive ───────────────────────────────────────────── */
 
 @media (max-width: 700px) {
-    .rp-summary { grid-template-columns: 1fr 1fr; }
-    .rp-income-grid { grid-template-columns: 1fr; }
-    .rp-fill-btns { flex-wrap: wrap; }
-    .rp-field label { width: 140px; }
-    .rp-conv-controls { padding: 1rem 1rem 1.5rem; }
-    .rp-bracket-viz { padding: 0 1rem 1.5rem; }
-    .rp-proj-controls { padding: 0 1rem 1.25rem; }
-    .rp-compare-controls { padding: 1rem 1rem 0.25rem; }
-    .rp-compare { padding: 0.5rem 1rem 1.5rem; }
-    .rp-compare-grid { grid-template-columns: 1fr; }
+    .cp-summary { grid-template-columns: 1fr 1fr; }
+    .cp-grid { grid-template-columns: 1fr; padding: 0 1rem 1.25rem; }
+    .cp-field > label { width: 150px; }
+    .cp-notes ol { margin: 0 1rem 0.75rem; }
 }
