@@ -921,7 +921,8 @@ function cpRenderTable(d) {
             ${r(contrib > 0 ? fmt(contrib) : '—')}
             ${r(fmtK(row.kenIra))}
             ${r(fmtK(row.hilIra))}
-            ${r(fmtK(row.kenRoth + row.hilRoth))}
+            ${r(fmtK(row.kenRoth))}
+            ${r(fmtK(row.hilRoth))}
         </tr>`;
     }).join('');
 
@@ -940,7 +941,8 @@ function cpRenderTable(d) {
             <td class="num">${d.tot.contrib > 0 ? fmt(d.tot.contrib) : '—'}</td>
             <td class="num">${fmtK(d.kenIra)}</td>
             <td class="num">${fmtK(d.hilIra)}</td>
-            <td class="num">${fmtK(d.kenRoth + d.hilRoth)}</td>
+            <td class="num">${fmtK(d.kenRoth)}</td>
+            <td class="num">${fmtK(d.hilRoth)}</td>
         </tr>`;
     }
 }
