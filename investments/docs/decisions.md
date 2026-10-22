@@ -69,6 +69,92 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-09 — Percentage sizing calibrated so $80k trades one contract each
+
+Decision: once the options account is funded at **$80k**, switch the three
+strategies from fixed 1-contract sizing to percentage allocation at
+**CIC - 10am 22% · Long Put Hedge 1.6% · QQQ Leap 16%**, caps left at 2. Until
+the money lands, stay on fixed contracts. The percentages are a mechanical
+version of the ratchet: the backtest log suggests the second contract on its
+own, the cap stops it suggesting a third before the annual review, and the
+review becomes "raise the caps".
+
+### Why those numbers
+
+OO sizes a percentage allocation as **floor(percent × equity ÷ margin per
+contract)**, capped. Verified on 1,544 trades of a 2022–26 run at 22 / 1.6 / 16
+with cap 2: 1,540 matched the formula using prior-close equity; the four misses
+straddled the threshold intraday. The hedge was the only strategy whose
+percentage ever bound in that run, and it went 1 → 2 on 2023-02-24 at $117k
+equity against a predicted $118.75k.
+
+The one-contract window at $80k runs from margin ÷ 80k to twice that. The
+chosen figures sit mid-window so a drawdown does not switch a strategy off:
+
+| Strategy | Margin per contract (OO, today) | Window at $80k | Chosen | 0 contracts below | 2 contracts at |
+|---|---|---|---|---|---|
+| CIC - 10am | ~$11.5k typical, ~$14.5k volatile | 14.4–28.8% | **22%** | ~$52k (~$66k volatile) | ~$105k (~$132k volatile) |
+| Long Put Hedge | ~$950, flat since 2022 | 1.2–2.4% | **1.6%** | ~$59k | ~$119k |
+| QQQ Leap | ~$9.3k debit at QQQ ~$717 (12–13% of spot) | 11.6–23.2% | **16%** | ~$58k | ~$116k |
+
+Total ~40% of equity, consistent with "solvent at ~$32k" and the ~$31k peak
+deployment already recorded. All three cross to two contracts in the
+$105–130k band, where the leap cap was already slated to lift.
+
+### What the 2026-only run at $80k showed (caps off, 2026-01-02 → 10-08)
+
+- **Condor: 1 contract on 159 days, 2 on 34.** Every 2-contract day had margin
+  under $8.8k, i.e. a calm, narrow-width day. The wobble is margin-driven, not
+  equity-driven. Holding exactly one across the year's $7.5k–$14.6k margin
+  range would need a percentage between 18.3 and 18.7 — not a real setting.
+  Accepted as is; a cap of 1 on the condor is the alternative if the wobble
+  ever matters.
+- **Hedge: 1 contract every day.**
+- **Leap: fired 2026-02-03 and 02-12, 1 contract each, both closed at the 80%
+  target in May (+$5.9k, +$6.1k), then nothing** — the known OO chain gap after
+  2026-02-12, not sizing. 16% of the year's lowest equity ($78.6k) bought $12.6k
+  against a $7.4k debit.
+- Year at these settings: condor −$14.7k, hedge +$5.0k, leap +$12.0k; equity
+  $78.9k → $83.0k.
+
+### The leap after February, estimated outside OO
+
+Entry rule rebuilt from QQQ daily closes (close ≥1.75% below the open, close
+above the 200-day SMA) and calls priced with Black-Scholes calibrated on the
+two real February entries (59Δ, IV 23%). The proxy reproduces all four real
+entries since Oct 2025, and replays the two February positions to the target
+within a week of OO's dates. With caps off, four signals enter: 06-05 (QQQ
+705), 06-09 (708), 07-02 (713), 07-29 (662). The June/July entries were bought
+into a vol spike (VXN ~30) and are roughly flat today with QQQ at 748 and VXN
+at 22; **07-29 is the one that paid, ~+$4k.** Combined **+$0.9k to +$9.3k**
+depending on how much one-year IV tracks VXN, best guess ~+$4.4k, all
+unrealized. Not a number for a table; a reconstruction.
+
+### Why not now at $40k
+
+At half funding the same percentages switch off almost everything, hedge
+first: 1.6% of $40k is $640 against a $950 margin, so the crash-positive piece
+never trades; the leap never trades ($6.4k vs $9.3k); the condor trades on
+the calmest one day in six. Collateral is not the constraint ($40k covers one
+condor plus hedge at Schwab); the formula is built around $80k. Doubling the
+percentages for $40k would then over-size at $80k. Fixed contracts until funded.
+
+### Reminders
+
+- Percentages size to **margin**, which tracks index level and vol (condor
+  margin +107% over 2024 → 26 against SPX +36%). Equity has to outrun both
+  before the second contract appears; "account doubled" is not the trigger,
+  equity ÷ margin is.
+- Percentages also **cut on losses**, which the manual ratchet does not. The
+  2023 hedge flickered 1 → 2 → 1 nine times in ten weeks around its threshold.
+  Harmless at $950; at the condor's $105k crossover the swing is $11.5k of
+  margin per flip.
+- A backtest started in 2022 at these percentages is the **2-contract book
+  from day one** (condor margin was ~$5.5k at SPX 3,900), so it tests the cap,
+  not the rule. Read it per contract.
+
+---
+
 ## 2026-10-08 — The put seller was a backtest artefact; the book is condor + hedge + QQQ Leap
 
 Work of 2026-10-05 → 10-08. Started as a question about spread width and ended
