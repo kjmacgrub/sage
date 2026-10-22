@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-import httpx
+from cef.services import http
 from ...database import get_db
 from ...services.exposure import EXPOSURES, resolve as resolve_exposure
 
@@ -96,7 +96,7 @@ def fill_names():
         ticker = row["ticker"]
         try:
             url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range=1d&interval=1d"
-            r = httpx.get(url, headers=HEADERS, timeout=8)
+            r = http.get(url, headers=HEADERS, timeout=8)
             if r.status_code == 200:
                 meta = r.json()["chart"]["result"][0]["meta"]
                 name = meta.get("longName") or meta.get("shortName")

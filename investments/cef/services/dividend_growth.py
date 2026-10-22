@@ -31,6 +31,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import httpx
+from cef.services import http
 
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
 
@@ -56,7 +57,7 @@ def discover_universe():
     strip = lambda c: re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", c)).replace("&amp;", "&").strip()
     seen, out = set(), []
     for url, tag in INDEXES:
-        html = httpx.get(url, headers=UA, timeout=40, follow_redirects=True).text
+        html = http.get(url, headers=UA, timeout=40, follow_redirects=True).text
         seg = html[html.find("constituents"):]
         seg = seg[:seg.find("</table>")]
         for row in re.findall(r"<tr[^>]*>(.*?)</tr>", seg, re.S):
@@ -155,7 +156,7 @@ def fetch_history(rec, client, today=None):
 
 
 def _crumbed_client():
-    c = httpx.Client(follow_redirects=True, timeout=40)
+    c = httpx.Client(follow_redirects=True, timeout=40, transport=http.transport())
     c.get("https://fc.yahoo.com", headers=UA)
     crumb = c.get("https://query1.finance.yahoo.com/v1/test/getcrumb",
                   headers=UA).text.strip()

@@ -18,7 +18,7 @@ gap is a tooling problem, not a fund problem — they lower confidence instead.
 import json
 from datetime import date, datetime, timedelta, timezone
 
-import httpx
+from cef.services import http
 
 from ..database import get_db
 from .. import settings as cfg
@@ -118,7 +118,7 @@ def _merged_distributions(ticker, conn):
     """
     divs, source_note = {}, []
     try:
-        r = httpx.get(
+        r = http.get(
             f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}"
             f"?range=max&interval=1d&events=div",
             headers=HEADERS, timeout=20,

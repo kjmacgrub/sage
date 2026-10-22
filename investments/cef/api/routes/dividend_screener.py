@@ -2,6 +2,7 @@ import json
 import threading
 
 import httpx
+from cef.services import http
 from fastapi import APIRouter
 
 from ...dividend.database import get_db, init_db
@@ -59,7 +60,7 @@ def _do_refresh():
         _state.update(phase="history", total=len(universe))
 
         rows = []
-        with httpx.Client(limits=httpx.Limits(max_connections=8)) as client:
+        with httpx.Client(limits=httpx.Limits(max_connections=8), transport=http.transport()) as client:
             from concurrent.futures import ThreadPoolExecutor, as_completed
             with ThreadPoolExecutor(max_workers=6) as ex:
                 futures = [ex.submit(svc.fetch_history, rec, client) for rec in universe]

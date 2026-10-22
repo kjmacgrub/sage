@@ -4,7 +4,7 @@ for BDCs and other tickers not listed on CEFConnect.
 """
 import re
 from datetime import date, datetime, timedelta, timezone
-import httpx
+from cef.services import http
 from bs4 import BeautifulSoup
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
@@ -29,7 +29,7 @@ def _analyze_distributions(ticker: str, price: float) -> dict:
         return out
     try:
         url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range=2y&interval=1mo&events=dividends"
-        r = httpx.get(url, headers=HEADERS, timeout=10)
+        r = http.get(url, headers=HEADERS, timeout=10)
         if r.status_code != 200:
             return out
         divs = r.json()["chart"]["result"][0].get("events", {}).get("dividends", {})
@@ -80,7 +80,7 @@ def _analyze_distributions(ticker: str, price: float) -> dict:
 def _compute_nav_cagr(ticker: str) -> float:
     """Fetch 5Y weekly NAV history and return annualized NAV CAGR, or None."""
     try:
-        r = httpx.get(
+        r = http.get(
             f"https://www.cefconnect.com/api/v3/pricinghistory/{ticker}/5Y",
             headers=HEADERS, timeout=10,
         )
@@ -110,7 +110,7 @@ def _compute_dist_cagr(ticker: str) -> float:
     """
     try:
         url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range=max&interval=3mo&events=dividends"
-        r = httpx.get(url, headers=HEADERS, timeout=15)
+        r = http.get(url, headers=HEADERS, timeout=15)
         if r.status_code != 200:
             return None
         result = r.json()["chart"]["result"][0]
@@ -161,7 +161,7 @@ def _compute_yield_metrics(ticker: str) -> dict:
 
     # 1. Weekly NAV series (≤5Y) from CEFConnect
     try:
-        r = httpx.get(
+        r = http.get(
             f"https://www.cefconnect.com/api/v3/pricinghistory/{ticker}/5Y",
             headers=HEADERS, timeout=10,
         )
@@ -184,7 +184,7 @@ def _compute_yield_metrics(ticker: str) -> dict:
     divs = []
     try:
         url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range=max&interval=1mo&events=dividends"
-        dr = httpx.get(url, headers=HEADERS, timeout=15)
+        dr = http.get(url, headers=HEADERS, timeout=15)
         if dr.status_code == 200:
             ev = dr.json()["chart"]["result"][0].get("events", {}).get("dividends", {})
             for v in ev.values():
@@ -238,7 +238,7 @@ def cefconnect_history(ticker: str, window: str = "5Y") -> list[dict]:
     row position. Always sort by DataDate.
     """
     try:
-        r = httpx.get(
+        r = http.get(
             f"https://www.cefconnect.com/api/v3/pricinghistory/{ticker}/{window}",
             headers=HEADERS, timeout=10,
         )
@@ -311,7 +311,7 @@ def _fetch_cefconnect(ticker: str) -> dict:
     avg_discount_1y = None
     try:
         hist_url = f"https://www.cefconnect.com/api/v3/pricinghistory/{ticker}/1Y"
-        hr = httpx.get(hist_url, headers=HEADERS, timeout=10)
+        hr = http.get(hist_url, headers=HEADERS, timeout=10)
         if hr.status_code == 200:
             hist_rows = hr.json().get("Data", {}).get("PriceHistory", [])
             discounts = [r["DiscountData"] for r in hist_rows if r.get("DiscountData") is not None]
@@ -326,7 +326,7 @@ def _fetch_cefconnect(ticker: str) -> dict:
     # Step 2: get distribution data from the fund page HTML
     yield_pct = distribution = dist_freq = None
     try:
-        page = httpx.get(f"https://www.cefconnect.com/fund/{ticker}",
+        page = http.get(f"https://www.cefconnect.com/fund/{ticker}",
                          headers=HEADERS, timeout=15, follow_redirects=True)
         if page.status_code == 200:
             soup = BeautifulSoup(page.text, "html.parser")
@@ -390,7 +390,7 @@ def _fetch_cefconnect(ticker: str) -> dict:
 def _yahoo_quote(ticker: str) -> float | None:
     """Just the live last price — used to refresh a stale CEFConnect quote."""
     try:
-        r = httpx.get(
+        r = http.get(
             f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range=1d&interval=1d",
             headers=HEADERS, timeout=10,
         )
@@ -405,7 +405,7 @@ def _fetch_yahoo(ticker: str) -> dict:
     """Fallback for BDCs and other tickers not on CEFConnect."""
     url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range=1y&interval=1mo&events=dividends"
     try:
-        resp = httpx.get(url, headers=HEADERS, timeout=10)
+        resp = http.get(url, headers=HEADERS, timeout=10)
         resp.raise_for_status()
         result = resp.json()["chart"]["result"][0]
         meta = result["meta"]
@@ -474,7 +474,7 @@ def fetch_dividends(ticker: str, since: str = None) -> list:
     """
     url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range=2y&interval=1mo&events=dividends"
     try:
-        resp = httpx.get(url, headers=HEADERS, timeout=10)
+        resp = http.get(url, headers=HEADERS, timeout=10)
         resp.raise_for_status()
         result = resp.json()["chart"]["result"][0]
         divs = result.get("events", {}).get("dividends", {})
@@ -496,7 +496,7 @@ def fetch_dividends(ticker: str, since: str = None) -> list:
 def _fetch_5d_rows(ticker: str) -> list:
     """Fetch CEFConnect 5D price history and return list of {ticker, date, price, nav, premium_discount}."""
     try:
-        r = httpx.get(
+        r = http.get(
             f"https://www.cefconnect.com/api/v3/pricinghistory/{ticker}/5D",
             headers=HEADERS, timeout=10,
         )
@@ -528,7 +528,7 @@ def _fetch_5d_rows(ticker: str) -> list:
 def _fetch_yahoo_5d(ticker: str) -> list:
     """Yahoo Finance fallback for tickers not on CEFConnect (BDCs etc)."""
     try:
-        r = httpx.get(
+        r = http.get(
             f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range=5d&interval=1d",
             headers=HEADERS, timeout=10,
         )
@@ -576,7 +576,7 @@ def fetch_quick_prices(tickers: list) -> dict:
 
 def fetch_cef_list() -> list:
     """Return [{Ticker, Name}, ...] for all CEFs on CEFConnect (~368 funds)."""
-    r = httpx.get("https://www.cefconnect.com/api/v3/funds?take=500", headers=HEADERS, timeout=15)
+    r = http.get("https://www.cefconnect.com/api/v3/funds?take=500", headers=HEADERS, timeout=15)
     r.raise_for_status()
     return r.json()
 
@@ -590,7 +590,7 @@ def fetch_screener_data(ticker: str):
     price = nav = premium_discount = avg_discount_1y = nav_change_1y = None
 
     try:
-        r = httpx.get(
+        r = http.get(
             f"https://www.cefconnect.com/api/v3/pricinghistory/{ticker}/1Y",
             headers=HEADERS, timeout=10,
         )
@@ -629,7 +629,7 @@ def fetch_screener_data(ticker: str):
     yield_pct = dist_freq = inception_date = category = None
     leverage = _empty_leverage()
     try:
-        page = httpx.get(
+        page = http.get(
             f"https://www.cefconnect.com/fund/{ticker}",
             headers=HEADERS, timeout=15, follow_redirects=True,
         )
@@ -887,7 +887,7 @@ def parse_leverage(page_html: str) -> dict:
 def fetch_leverage(ticker: str) -> dict:
     """Standalone leverage fetch (the screener reuses its own page request)."""
     try:
-        r = httpx.get(f"https://www.cefconnect.com/fund/{ticker.upper()}",
+        r = http.get(f"https://www.cefconnect.com/fund/{ticker.upper()}",
                       headers=HEADERS, timeout=15, follow_redirects=True)
         if r.status_code == 200:
             return parse_leverage(r.text)
