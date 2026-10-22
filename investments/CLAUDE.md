@@ -42,8 +42,14 @@
   strategy › year › open date, with upload/merge of further logs. Groups the three
   rows OO writes per condor into one trade. Snapshot — the live copy is a published
   Artifact (Trade Log Pivot). Open with `file://`, no server.
+- `docs/review-checklist.md` — options sleeve: the quarterly and annual review as
+  numbered steps, per strategy. QQQ Leap written (the cap formula, the two vetoes);
+  condor and hedge are stubs carrying their tripwires.
 - `mae_check.py` — audits an Option Omega trade-log export for stop-outs the backtest
   skipped. Run on any new strategy before trusting its P/L.
+- `leap_replay.py` — QQQ Leap replayed on QQQ daily closes from 2000 with Black-Scholes
+  pricing (OO's chain starts 2017 and is blank after 2026-02): gate variants and the
+  contract-cap sweep behind the 2026-10-22 decisions entry. Downloads QQQ and ^VXN.
 - `cef.db` — production database (never commit, never modify directly during dev)
 - `cef_demo.db` — simulation/demo copy (safe to use for testing)
 - `simulate.py` — 3-year portfolio simulation
@@ -195,7 +201,10 @@ Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 > **Plan for ~$38k/yr in a 2023–25 regime, ~$3k/yr in a 2017–21 one. Drawdown
 > $15–18k (18–22% of $80k) in any regime. Solvent at ~$32k (40%).** Peak
 > deployment ~$31k at Schwab. **Nothing is raised until the condor has a positive
-> live year.** QQQ Leap stays at cap 2 until the account passes ~$120k.
+> live year.** QQQ Leap's cap is `floor(22% of sleeve equity ÷ price of one
+> contract)` — cap 2 at $80k, 3 past ~$113k at today's ~$8.3k contract;
+> recomputed quarterly, raised only at the annual review (2026-10-22,
+> `docs/review-checklist.md`).
 > Per-trade benchmarks for the live record: condor $70, hedge $97, QQQ ~$2,900.
 
 **Sell puts is RETIRED (2026-10-08) — its backtest was quote noise.** The 25%
@@ -535,6 +544,15 @@ were removed entirely in favour of Greek/VIX exits.
   delta/percentage-based while SPX went 2,400 → 7,700. Caps still beat
   percentages because index drift is slow and visible, but **the annual review
   must read margin deployed, not contract count.**
+- **QQQ Leap's cap is a division (2026-10-22): 22% of sleeve equity ÷ the price of
+  one contract, rounded down.** Every slot has the same per-trade edge, so the cap
+  is purely a loss budget: ~1 contract price of drawdown per slot in a 2022-type
+  year, ~2.6 in a 2000-type bear (divide by 2.6× the price to budget for that).
+  Lower any quarter the division says so; raise only at the annual review, never
+  mid-drawdown, never while fills average worse than $13/contract/side vs mid.
+  **The `above SMA200` gate stays**: under a cap it changes two trades in 2017–26,
+  costs nothing in bull years, and no moving average sees a top. Shorter averages
+  are strictly worse. Procedure: `docs/review-checklist.md`.
 - **Raise contract counts once a year, on live evidence, never mid-drawdown.**
   A percentage responds only to account equity — a lagging record of past P/L —
   and cannot see whether the edge still works, whether fills have degraded, or

@@ -69,6 +69,102 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-22 — The SMA200 gate stays; the QQQ Leap cap is a division, not a judgment
+
+Ken's observation: the `above SMA200` gate "doesn't seem to do much" — it blocks
+very few entries, a shorter average didn't help, so delete it, change it, or leave
+it? Then: if the cap is the lever, is there anything measurable about the cap?
+
+**Method.** OO's QQQ chain starts 2017 and is blank after 2026-02-12, so no OO run
+contains a multi-year bear. The live rule was replayed on QQQ daily closes from
+2000 (`leap_replay.py`): entry on a close ≥1.75% below the open, gate as chosen,
+call at 0.975 × spot / 360 DTE priced with Black-Scholes, one-year IV = ½ VXN +
+½ a 22% mean, 80% target, exit 7 DTE. Calibration: it reproduces the two real
+February-2026 entries (model IV 23–24%, both at target in the first week of May,
+as OO had them). Returns are in units of the premium paid so 2000 ($100 QQQ) and
+2026 ($700) compare; "$ today" uses the current ~$8,300 contract.
+
+### The gate: KEPT. It is uneventful by design, and no average sees a top.
+
+- **It is not supposed to fire often.** 331 of 539 signals since 2000 were
+  blocked, but 171 of those are 2000–02, 47 are 2008, 36 are 2022. Since 2023 it
+  blocked 5 of 36, all of which would have won. A level gate only has something
+  to do once the trend has broken; QQQ has been above its 200-day on 93–100% of
+  days since 2023.
+- **Per signal it looks decisive; under a cap it is nearly redundant.** Uncapped:
+  passed signals average +25% of premium, blocked −8%. But a cap does the same
+  job — the first 2–3 dips at a top fill the book and those positions die for a
+  year. At 1 contract per slot, $ at the prices of the time:
+
+  | | No gate | Above SMA200 | SMA50 > SMA200 | Above SMA100 |
+  |---|---|---|---|---|
+  | 2000–2026, cap 2 | +$59.6k, 10 busts | +$60.8k, 8 busts | +$58.5k, 6 busts | worse |
+  | 2000–2026, cap 3 | +$94.0k, 15 busts | +$92.8k, 12 busts | +$91.6k, 9 busts | −$6k vs gate |
+  | 2017–2026, cap 2 | +$56,989 | +$56,935 | +$53,082 | |
+
+  In the measured window the two books differ by two trades: no-gate buys
+  December 2022 (+86%, +82%), the gate buys 2023-02-09 and 03-09 instead (+81%
+  each). Same money, different dates.
+- **It does not protect against the top.** Every bust in the replay entered
+  *above* the 200-day: March 2000 (×3), the December-2001 bear rally (×3), late
+  2021. Price breaks the average after the first leg down. This is the
+  bubble-detector limit already recorded on 2026-10-05; the better gate remains
+  the portfolio's equity-beta budget.
+- **Shorter averages are strictly worse** (confirms Ken's test): bull-market
+  pullbacks, the trades that pay, dip under a 100-day far more often than under a
+  200-day, and the top of a bear is above every average.
+- **Golden cross / rising SMA200 / <120 days since the 52-week high**: 9 busts
+  instead of 12 at cap 3, slightly less P/L, because they lag recoveries and
+  skip the first rebound entries (2009, 2023). One to three trades per
+  quarter-century, nearly all in one bear. Not a basis for change.
+- **Deleting it** costs nothing measurable either, but gives up the one thing it
+  does: in a multi-year bear it removes about a third of the re-entries into a
+  falling market. Free insurance on the scenario that matters most for a position
+  that is ~16% of equity.
+
+### The cap: a formula with one explicit judgment left in it
+
+- **Every slot has the same edge.** Trades taken only because the cap rose from
+  k−1 to k average +38 / +42 / +43 / +44 / +44% of premium for slots 1–5. Stacked
+  entries are not worse entries (consistent with "don't pause when positions
+  stack", 2026-09). Edge gives no reason to stop at any cap; the cap is purely a
+  risk budget.
+- **Risk per slot: ~1 premium in a 2022-type bear, ~2.6 in a 2000-type bear.** In
+  2022 the gate shut after the first leg and each slot busted once. In 2000–02
+  the winter rallies reclaimed the 200-day, the slot refilled and busted again
+  (4 busts at cap 2, 6 at cap 3). Entries 2017→, live gate, 1 contract/slot:
+
+  | Cap | Trades/yr | Edge/slot | Max DD 2017→ | $ today | Dot-com DD |
+  |---|---|---|---|---|---|
+  | 1 | 1.4 | +38% of premium | 1.6 premiums | $13k | 2.7 premiums |
+  | 2 | 3.0 | +42% | 2.5 | $20k | 5.2 |
+  | 3 | 4.4 | +43% | 3.6 | $30k | 7.9 |
+  | 4 | 5.5 | +44% | 4.6 | $38k | 9.2 |
+
+- **The premium is the unit and it grows with QQQ** (median 13.6% of spot, p90
+  19.7% in high vol). Cap 2 cost $14k in the 2022 drawdown at QQQ ~$300; the
+  same cap costs ~$20k today and ~$26k at QQQ $900. **Note: the sleeve's "$15–18k
+  in any regime" drawdown figure is a 2022 at 2022 prices.** At today's prices a
+  2022 repeat at cap 2 is already past the $18k tripwire from the leap alone.
+- **Rule adopted:** `cap = floor(loss budget ÷ (contract price × bust cycles))`,
+  loss budget = 22% of sleeve equity, contract price = the actual 60Δ/360-DTE
+  ask, cycles = 1 (accept a 2022) or 2.6 (survive a 2000). With 1 cycle it
+  reproduces the standing settings exactly: cap 2 at $80k, cap 3 past ~$113k.
+  With 2.6 cycles: cap 0 below $98k, cap 1 to $196k, cap 2 to $294k. **Cap 2 at
+  $80k is therefore an explicit choice of the 1-cycle budget** — the same
+  question as the AI-valuation caution, now with a price on each answer.
+- **Vetoes on raising:** never mid-drawdown; never while average fill-vs-mid
+  exceeds the ~$13/contract/side breakeven. Per-trade edge is not a usable veto
+  at three trades a year; fill quality is, on every entry. Lowering never waits.
+- **Caveats.** Black-Scholes with a VXN-tied IV, no bid-ask, strike rounding
+  only; 2000–02 is one bear; the replay takes Jan-2022 entries as Dec-2021 ones
+  (book already full), where OO took them in January — the busts sit above the
+  200-day either way.
+
+**Procedure** for the quarterly and annual review is in
+[review-checklist.md](review-checklist.md) — QQQ Leap written; condor and hedge
+to follow in the same form.
+
 ## 2026-10-09 — Percentage sizing calibrated so $80k trades one contract each
 
 Decision: once the options account is funded at **$80k**, switch the three
