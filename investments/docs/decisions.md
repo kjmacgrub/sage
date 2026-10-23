@@ -69,6 +69,105 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-23 — Sizing is capital per contract (29k / 40k / 42k), and the first live week read against the backtest
+
+### Sizing: supersedes the 2026-10-09 percentage calibration
+
+The book is sized by OO's **capital per contract**, not by allocation
+percentage. The saved portfolio (`2027`, 2022-05-16 → 2026-10-14, $80k) runs:
+
+| Strategy | Capital per contract | Cap | Contracts at $80k | Next contract at |
+|---|---|---|---|---|
+| CIC - 10am | **$29,000** | 6 | 2 | $87k (3), $116k (4), $145k (5), $174k (6) |
+| Long Put Hedge | **$40,000** | none | 2 | $120k (3) |
+| QQQ Leap | **$42,000** | 1 | 1 | never while the cap is 1 |
+
+OO sizes it as `floor(current funds ÷ capital per contract)`, capped, with no
+regard to margin. Switch-off points: condor below $29k, hedge below $40k, leap
+below $42k — all under the ~$32k solvency floor already recorded, so no
+strategy switches itself off inside a tolerable drawdown. This replaces the
+22% / 1.6% / 16% figures of 2026-10-09, which were calibrated to trade one
+contract each; the plan now trades **two condors and two hedges at $80k**.
+
+What it changes, written down so the next review doesn't rediscover it:
+
+- **Per-contract figures double.** Each condor stop-out is now ~$1,000–1,300,
+  each hedge expiry ~$1,000. The "$15–18k drawdown in any regime" and the
+  $18k tripwire were measured at one contract of each; at two, a 2026-type
+  condor year (−$8.7k at 1 ctr) is −$17k on its own. Read the tripwire against
+  that.
+- **The third condor arrives at $87k on its own.** The 2026-10-09 design relied
+  on the cap to stop the backtest suggesting a third contract before the annual
+  review; with cap 6 and $29k per contract nothing does. A good month from here
+  crosses it. Either lower the condor cap to 2 until the annual review, or
+  accept that the ratchet now raises mid-year. Not yet decided.
+- **The hedge sits exactly on its threshold.** At $79,325 on 2026-10-22 the
+  backtest traded one hedge; live traded two. Expect it to flicker 1 ↔ 2 for as
+  long as equity straddles $80k — harmless at ~$985 of margin, noted so the
+  flicker isn't mistaken for a config change.
+- **Leap cap 1 vs the 2026-10-22 division.** The division gives cap 2 at $80k
+  ($17,600 ÷ $8,300). The saved portfolio caps at 1, and $42k per contract
+  would give 1 until $84k anyway. One contract is the conservative reading of
+  the same budget (it is the 2.6-cycle answer for $98k–196k, reached early).
+  Record which is intended at the quarterly check; the checklist's worked
+  example still says 2.
+
+### Live week one (2026-10-19 → 10-22) against the same days backtested
+
+Live autotrader log (`strategy-trade-log (13).csv`) against an OO run of the
+same four days at $80k (`trade-log - 2026-10-23T061510.194.csv`, portfolio CSV
+`portfolio (45).csv`). Both at two condors; hedge 1 in the backtest, 2 live.
+
+| | Backtest | Live |
+|---|---|---|
+| Condor, 2 ctr, 4 days | −$1,187 | −$2,357 |
+| Condor per contract-trade | −$148 | −$295 |
+| Hedge (10/22 only) | +$511 (1 ctr) | +$1,043 (2 ctr) |
+| Week | −$675 | −$114 |
+
+Benchmark is +$70 per condor contract. A bad week in both books; the backtest
+agrees it was bad. Live stopped one side on all four days, the backtest on
+three. The near-identical weekly totals are two errors cancelling:
+
+- **10/21 is the whole gap.** Same 7765 short call; live sold it at 2.70, the
+  backtest at 2.80, so the live stop sat at 8.10 against 8.40. The backtest
+  mark peaked ~8.04 and expired for +$552; live's resting stop filled at
+  exactly 8.10 at 12:40 for −$1,085. A **−$1,636 swing on a ten-cent credit
+  difference**. Knife-edge, not a defect, and the kind of thing 250 trades a
+  year averages out.
+- **10/20 went the other way.** Both stopped the 7740 call within four minutes;
+  the backtest filled at 10.00 against an 8.10 trigger, live at 7.05 against
+  7.05. Live +$526 better.
+- **10/19 strikes differed** (backtest 7730 C, live 7725 C): the 15-second
+  entry delay picked a different 15Δ strike. Both stopped out.
+- **10/22 matched**: put stopped at 10:27 in both, 9.55 vs 9.50; hedge $511 vs
+  $521 per contract.
+
+**Fills.** Live stop fills overshot the 3× trigger by 0.14 / 0.00 / 0.00 /
+0.02 — the resting stop-market order again executing better than the model.
+The backtest's own stop fills overshot by 0.50 / 1.90 / 0.40, so this week OO
+was ~$90/contract more pessimistic than reality, against the ~$50 recorded
+2026-09-30. Entry credits per condor were within 5–16¢ of the backtest (live
+puts a touch richer, calls a touch cheaper, wings cheaper). Nowhere near the
+15¢/leg tripwire.
+
+**Two caveats on reading the live record from here:**
+
+- **The hedge has been exited manually at least once**, in Ken's favour. The
+  live hedge figure is therefore not purely mechanical yet. Expect that to stop
+  (or mostly stop); until it does, compare the hedge to its backtest on expired
+  trades only, and don't credit the strategy with a discretionary exit.
+- **An open QQQ Leap does not appear in either trade log** — logs record closed
+  trades only. Its mark is inside the live account's equity (and so inside the
+  capital-per-contract sizing of the other two strategies) but not in any
+  per-strategy P/L until it closes. When reconciling equity to the logs,
+  subtract the leap's unrealized P/L first.
+
+The portfolio CSV's `P/L` column is the **day's** P/L; `Net Liquidity` is the
+running figure.
+
+---
+
 ## 2026-10-22 — The SMA200 gate stays; the QQQ Leap cap is a division, not a judgment
 
 Ken's observation: the `above SMA200` gate "doesn't seem to do much" — it blocks
