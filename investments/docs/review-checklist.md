@@ -45,9 +45,10 @@ cap = loss budget ÷ contract price, rounded down
 - If the answer is **higher**, do nothing. Raising waits for the annual review.
 
 Worked example, 2026-10-22: equity $80,000 → budget $17,600; contract $8,300;
-$17,600 ÷ $8,300 = 2.1 → **cap 2**. (The saved portfolio runs cap 1 with $42k
-of capital per contract — the conservative reading. Record at each quarterly
-check which one is intended; see decisions 2026-10-23.)
+$17,600 ÷ $8,300 = 2.1 → **cap 2**. In OO the cap is `maxOpenTrades` × contracts
+per trade; the live setting is 3 × 1 = **3 outstanding**, one slot above the
+formula. Record at each quarterly check whether that stands; see decisions
+2026-10-23.
 
 Also note for the file, no action: number of entries this quarter, and for each
 one the mid price when the order went in and the price actually paid.

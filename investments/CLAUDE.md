@@ -190,8 +190,9 @@ Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 
 > **THE BOOK (2026-10-08; sizing 2026-10-23).** CIC-10am · Long Put Hedge ·
 > QQQ Leap, funded at **$80k**, sized by OO **capital per contract**:
-> condor **$29k** (cap 6) · hedge **$40k** · leap **$42k** (cap 1) — i.e.
-> **2 / 2 / 1 contracts at $80k**, third condor at $87k, third hedge at $120k.
+> condor **$29k** (cap 6) · hedge **$40k** · leap **$42k** (1 per trade,
+> **3 open trades**) — i.e. **2 / 2 / 1-per-entry contracts at $80k**, up to
+> three leaps outstanding; third condor at $87k, third hedge at $120k.
 > Live since 2026-10-19 at those sizes. The figures below were measured at
 > **one contract each** (2017 → 2026-10-07) — double the condor and hedge
 > columns to read them at today's size. Three windows because they are three
@@ -207,9 +208,10 @@ Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 > $15–18k (18–22% of $80k) in any regime. Solvent at ~$32k (40%).** Peak
 > deployment ~$31k at Schwab. **Nothing is raised until the condor has a positive
 > live year.** QQQ Leap's cap is `floor(22% of sleeve equity ÷ price of one
-> contract)` — 2 at $80k by the formula, but the saved portfolio runs **cap 1**
-> (the conservative reading; see 2026-10-23); recomputed quarterly, raised only
-> at the annual review (2026-10-22, `docs/review-checklist.md`).
+> contract)` — 2 at $80k by the formula, but OO runs **3 open trades × 1
+> contract = 3 outstanding**, one slot above it (see 2026-10-23); recomputed
+> quarterly, raised only at the annual review (2026-10-22,
+> `docs/review-checklist.md`).
 > Per-trade benchmarks for the live record: condor $70, hedge $97, QQQ ~$2,900.
 > **Reading the live log:** the hedge has been exited manually at least once;
 > an open leap appears in no trade log until it closes (2026-10-23).
