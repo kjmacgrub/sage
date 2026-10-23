@@ -136,7 +136,9 @@ same four days at $80k (`trade-log - 2026-10-23T061510.194.csv`, portfolio CSV
 
 Benchmark is +$70 per condor contract. A bad week in both books; the backtest
 agrees it was bad. Live stopped one side on all four days, the backtest on
-three. The near-identical weekly totals are two errors cancelling:
+three. The near-identical weekly totals are not evidence of tracking: two
+large differences, both within the model's known tolerance, happened to
+offset:
 
 - **10/21 is the whole gap.** Same 7765 short call; live sold it at 2.70, the
   backtest at 2.80, so the live stop sat at 8.10 against 8.40. The backtest
