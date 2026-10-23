@@ -101,6 +101,13 @@ What it changes, written down so the next review doesn't rediscover it:
   review; with cap 6 and $29k per contract nothing does. A good month from here
   crosses it. Either lower the condor cap to 2 until the annual review, or
   accept that the ratchet now raises mid-year. Not yet decided.
+- **Open for the weekend of 2026-10-24: one condor contract or two.** Contract
+  count does not change the evidence (same trade count either way); it doubles
+  the stakes while the condor proves itself in its first negative backtest
+  year. Options: drop to 1 for the first live quarter and let a positive
+  quarter raise it; or keep 2 with a pre-committed drop rule (e.g. condor
+  drawdown reaching $9k, half the tripwire). Ken: run the week out at 2, decide
+  after.
 - **The hedge sits exactly on its threshold.** At $79,325 on 2026-10-22 the
   backtest traded one hedge; live traded two. Expect it to flicker 1 ↔ 2 for as
   long as equity straddles $80k — harmless at ~$985 of margin, noted so the
