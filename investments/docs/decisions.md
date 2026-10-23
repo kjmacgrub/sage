@@ -80,7 +80,7 @@ percentage. The saved portfolio (`2027`, 2022-05-16 → 2026-10-14, $80k) runs:
 |---|---|---|---|---|
 | CIC - 10am | **$29,000** | 6 | 2 | $87k (3), $116k (4), $145k (5), $174k (6) |
 | Long Put Hedge | **$40,000** | none | 2 | $120k (3) |
-| QQQ Leap | **$42,000** | 1 per trade, **3 open trades** | 1 per entry, up to 3 outstanding | 2 per entry at $84k (then up to 6 outstanding) |
+| QQQ Leap | **$42,000** | 1 per trade, **2 open trades** | 1 per entry, up to 2 outstanding | 2 per entry at $84k (then up to 4 outstanding) |
 
 OO sizes it as `floor(current funds ÷ capital per contract)`, capped, with no
 regard to margin. Switch-off points: condor below $29k, hedge below $40k, leap
@@ -105,16 +105,17 @@ What it changes, written down so the next review doesn't rediscover it:
   backtest traded one hedge; live traded two. Expect it to flicker 1 ↔ 2 for as
   long as equity straddles $80k — harmless at ~$985 of margin, noted so the
   flicker isn't mistaken for a config change.
-- **Leap: the effective cap is 3, not the division's 2.** The cap in the
+- **Leap: the effective cap was 3, now 2.** The cap in the
   2026-10-22 entry means contracts *outstanding*. OO expresses it as two
   settings: `maxContractsPerTrade` 1 and `maxOpenTrades` 3 (confirmed in the
   saved backtest 2026-10-23, same live), so up to three contracts can be held
   at once — the saved backtest ended 2026-10-14 with all three slots full. The
   division gives 2 at $80k ($17,600 ÷ $8,300); 3 is the 2026-10-22 table's
   cap-3 row: max drawdown 3.6 premiums (~$30k today) in 2017→, 7.9 in a
-  2000-type bear, against a $17.6k budget. **The live setting is one slot above
-  the formula.** Either lower `maxOpenTrades` to 2 or re-state the budget;
-  decide at the quarterly check, not mid-drawdown. Also: the standalone saved
+  2000-type bear, against a $17.6k budget. The live setting was one slot above
+  the formula. **Decided 2026-10-23: `maxOpenTrades` lowered to 2**, live and
+  test, so the OO setting matches the division (cap 2 at $80k, 3 past ~$113k,
+  raised only at the annual review). Also: the standalone saved
   backtest now reads **$45k** capital per contract where the portfolio snapshot
   ran $42k — the backtest was edited after the portfolio ran. Both give one
   contract per entry at $80k; the second per-entry contract arrives at $84k
