@@ -69,6 +69,37 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-24 — Candidate strategy checked: the ATM put spread again, and it fails the same test
+
+Ken brought a new test (`trade-log - 2026-10-24T074951.449.csv`, not saved in
+OO): **SPX ATM 5-wide put spread, 60–81 DTE (median 67), 2 contracts, no stop,
+profit target at ~80% of credit, re-entry on close, up to 17 open at once.**
+2022-06-03 → 2026-10-21: 519 trades, **+$153,564, 98.8% wins, 6 losers**, $50k
+→ $203k. Every year positive.
+
+It is the retired put seller (2026-10-08) with a tighter target, and the
+measurement rule gives the same answer:
+
+| Check | Result |
+|---|---|
+| Profit-target closes with SPX **at or below** entry | **212 of 512**, $67,136 — 44% of P/L |
+| Closes with SPX more than 20 pts **inside** the short strike | **151**, $47,341 |
+| Worst | 2022-09-21: bought back at **0.07** with SPX **450 pts** through a 4275 strike — a spread worth its full 5.00 |
+| Honest answer for a price-triggered exit | zero |
+
+Mechanism as before: a 5-wide is the difference of two ~$160 options whose
+mids wander ±0.50, so the spread's mark prints near zero on noise regardless
+of where SPX is, and a target with no stop collects every such print. The
+tighter target makes it worse, not better — it needs the mark to fall further,
+which only noise delivers when the index has fallen.
+
+**Not added.** To test it honestly: save it in OO, then re-run with an
+underlying-move exit (SPX +1.5% from entry) or hold to expiry, as on
+2026-10-08 — that run earned $45,866 instead of $351,570 and was negative in
+2018, 2022 and 2026. Expect the same shape here.
+
+---
+
 ## 2026-10-24 — Live vs Backtest moves into Sage (Options sleeve)
 
 The weekly comparison that was being done by hand in these entries is now a
