@@ -121,7 +121,13 @@ Full procedure to be written. Until then, the numbers already decided:
 - **Margin:** read peak margin deployed, not contract count. Group the three
   rows OO writes per condor before summing (`Margin Req.` is per trade).
 - **Drawdown:** sleeve tripwire $18k on $80k (22%).
-- **Nothing is raised until the condor has a positive live year.**
+- **Sizing (2026-10-24): 1 contract.** Raise to 2 only after a positive live
+  calendar quarter (closed P/L above zero, mechanical exits only), and only at
+  a quarterly review. Measured with and without on 2022–26: the condor is half
+  the book's profit and adds $0.6–4.3k a year of dollar drawdown; at 2
+  contracts its own 2026-type drawdown is ~$20k, the sleeve tripwire alone.
+- **Nothing is raised to a third contract until the condor has a positive
+  live year.**
 
 ## Long Put Hedge — STUB
 

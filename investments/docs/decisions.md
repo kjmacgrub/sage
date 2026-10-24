@@ -69,6 +69,38 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-24 — DECIDED: the condor runs one contract from Monday 2026-10-26
+
+Ken, after the with-and-without run below: *"let's go with 1 IC contract going
+forward."* The two Option Omega settings on the saved `IC` backtest were also
+corrected the same day (intra-minute stops ON on both short legs, wide-bid-ask
+filter OFF — confirmed by reading the saved strategy back).
+
+**The rule, in full:**
+
+- **Condor: 1 contract**, live and in the saved `2027` portfolio, from the
+  first entry on 2026-10-26. Set `maxContractsPerTrade` 1 — the cap, not just
+  capital-per-contract, so the change is unmissable in the output. Hedge stays
+  at 2 ($40k per contract), leap at 1 per entry with 2 open.
+- **Raise to 2 only after a positive live calendar quarter for the condor**
+  (mechanical exits only; manual closes are excluded from the record), and
+  only at a quarterly review, never mid-quarter. A positive quarter is the
+  condor's closed P/L for the quarter above zero — not above benchmark.
+- **Why one and not two:** not because the condor is weak — it is half the
+  book's profit on 2022–26 — but because at two contracts its own 2026-type
+  drawdown is ~$20k, the sleeve tripwire by itself, and the live record
+  (−$97 a contract-trade over 26 contract-trades) cannot yet tell a $70 edge
+  from a $7 one. One contract halves the stakes while the evidence arrives.
+  Cost if the strategy is fine: ~$4,300 a quarter of foregone profit.
+- **What this closes:** the "open for the weekend" item in the 2026-10-23
+  entry and the 1-vs-2 section in the week-one entry. The $9k pre-committed
+  drop rule is moot at one contract.
+
+Per-contract figures for the live record are unchanged: benchmark $70,
+tripwire $35, hedge $97 / $48.
+
+---
+
 ## 2026-10-24 — The condor, with and without: it is half the book's profit and adds $1–4k a year of drawdown
 
 Ken, on reading week one: *"It's hard to justify the IC. On its own there's
@@ -270,6 +302,8 @@ Compare on mechanical exits only until the hand-closing stops.
 
 ### The open decision: one condor contract or two
 
+**Decided later the same day: one contract — see the DECIDED entry above.**
+
 Ken's call from 2026-10-23 was to run the week out at two and decide after.
 The week is out. The evidence did not change — the question was never going to
 be settled by one week — so this is the arithmetic, in the plain terms the
@@ -348,7 +382,8 @@ What it changes, written down so the next review doesn't rediscover it:
   quarter raise it; or keep 2 with a pre-committed drop rule (e.g. condor
   drawdown reaching $9k, half the tripwire). Ken: run the week out at 2, decide
   after.
-  **→ Week closed; arithmetic and recommendation in the 2026-10-24 entry.**
+  **→ Decided 2026-10-24: one contract from 2026-10-26, raised only after a
+  positive live quarter. See the DECIDED entry.**
 - **The hedge sits exactly on its threshold.** At $79,325 on 2026-10-22 the
   backtest traded one hedge; live traded two. Expect it to flicker 1 ↔ 2 for as
   long as equity straddles $80k — harmless at ~$985 of margin, noted so the

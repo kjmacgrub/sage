@@ -188,14 +188,15 @@ is why the concentration stayed invisible with a category column on screen.
 Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 `docs/decisions.md` (entries 2026-09-08 through 2026-10-23).
 
-> **THE BOOK (2026-10-08; sizing 2026-10-23).** CIC-10am · Long Put Hedge ·
-> QQQ Leap, funded at **$80k**, sized by OO **capital per contract**:
-> condor **$29k** (cap 6) · hedge **$40k** · leap **$42k** (1 per trade,
-> **2 open trades**) — i.e. **2 / 2 / 1-per-entry contracts at $80k**, up to
-> two leaps outstanding; third condor at $87k, third hedge at $120k.
-> Live since 2026-10-19 at those sizes. The figures below were measured at
-> **one contract each** (2017 → 2026-10-07) — double the condor and hedge
-> columns to read them at today's size. Three windows because they are three
+> **THE BOOK (2026-10-08; sizing 2026-10-24).** CIC-10am · Long Put Hedge ·
+> QQQ Leap, funded at **$80k**: **condor 1 contract** (`maxContractsPerTrade`
+> 1, decided 2026-10-24, live from 2026-10-26; was 2 for the week of
+> 2026-10-19) · hedge **$40k** per contract (2 at $80k, 3 at $120k) · leap
+> **$42k** (1 per trade, **2 open trades**) — i.e. **1 / 2 / 1-per-entry
+> contracts at $80k**, up to two leaps outstanding. **The condor goes to 2 only
+> after a positive live calendar quarter, at a quarterly review.** The figures
+> below were measured at **one contract each** (2017 → 2026-10-07) — double the
+> hedge column to read it at today's size. Three windows because they are three
 > different books:
 >
 > | Window | Condor | Hedge | QQQ Leap | Total | Worst $ DD |
@@ -220,7 +221,7 @@ Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 > has run under three autotrader names (`CIC - AM` → `CIC - 10am` → `IC`) and
 > 9/28–9/29 appear under two of them, so a union keyed on name double-counts.
 > Week one (10/19–10/23): live −$393 vs backtest +$724, all of it the 10/21
-> knife-edge; condor 1-vs-2 contracts decision pending (2026-10-24).
+> knife-edge; condor dropped to 1 contract from 2026-10-26 (2026-10-24).
 
 **Sell puts is RETIRED (2026-10-08) — its backtest was quote noise.** The 25%
 profit target on a 5-wide ATM spread fired 792 times with SPX at or below entry
@@ -240,8 +241,8 @@ calendar year is wrong for 2026. 2022–25 per trade: $62 / $39 / $64 / $86.
 the research backtests behind the −$5.8k no longer exist in the account. Read
 2026 as flat and far below the $35 tripwire, not as negative. Also: the saved
 `IC` backtest has intra-minute stops OFF and the wide-bid-ask filter ON, both
-against the four-settings rule below; effect is ~$700 over 2022–26, ±$5k on
-single years. **With-and-without the condor (2026-10-24, fixed 2/2/1, $80k,
+against the four-settings rule below (corrected by Ken 2026-10-24, confirmed);
+effect was ~$700 over 2022–26, ±$5k on single years. **With-and-without the condor (2026-10-24, fixed 2/2/1, $80k,
 2022-05 → 2026-10): $256k with, $128k without; dollar drawdown $0.6–4.3k worse
 with, every year.** It is half the book's profit, not a drag.
 
