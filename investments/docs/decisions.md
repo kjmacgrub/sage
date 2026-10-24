@@ -69,6 +69,125 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-24 — The condor, with and without: it is half the book's profit and adds $1–4k a year of drawdown
+
+Ken, on reading week one: *"It's hard to justify the IC. On its own there's
+not much to recommend it, but with the other two strategies it somehow
+increases P/L over the long term and decreases drawdown."* The second half of
+that had never been measured — the log has no run of hedge + leap without the
+condor; the "re-run without it" rule was applied to the leap and the hedge,
+never to the condor. So it was run.
+
+### The runs
+
+Fixed live sizing, not the compounding saved portfolio (the saved `2027`
+portfolio sizes by capital-per-contract and ends at $844k trading ~29 condors;
+that is the kind of run the measurement rules say to ignore). Three Option
+Omega portfolio runs, **$80k, 2022-05-16 → 2026-10-23, `ignoreMarginRequirements`
+on so every trade is sized to its cap**: 2 condors · 2 hedges · 1 leap per entry
+(2 open). Because contracts are fixed and margin is ignored, the strategies
+cannot interact in P/L — the only "together" effects are on drawdown timing.
+The saved backtests as they stand today: `IC` (5aargokIPaskkxi3VTma), `Long Put
+Hedge` (vGs6wRTreproMdmZ4iM5), `QQQ Leap''` (O65UgXZo4dJKLKcHZ147).
+
+| | With condor | Without (hedge + leap) | The condor |
+|---|---|---|---|
+| Closed P/L, 4.4 years | **$255,631** | **$128,259** | **$127,372** |
+| CAGR | 37.6% | 23.3% | |
+| Max drawdown, % | −7.32% | −9.43% | |
+| MAR · Sharpe | 5.14 · 1.79 | 2.47 · 1.25 | |
+| Trades | 1,114 condors · 433 hedges · 11 leaps | 433 · 11 | |
+
+Per year, dollars (open leaps marked daily, so the difference is the condor):
+
+| Year | With | Without | Condor adds | Worst $ drawdown, with | Worst $ drawdown, without |
+|---|---|---|---|---|---|
+| 2022 (May→) | +$40.9k | +$8.5k | **+$32.4k** | $9.1k | $6.5k |
+| 2023 | +$44.1k | +$23.8k | **+$20.4k** | $6.9k | $6.3k |
+| 2024 | +$64.8k | +$36.4k | **+$28.4k** | $9.2k | $4.9k |
+| 2025 | +$78.2k | +$35.1k | **+$43.1k** | **$17.2k** (Apr 8) | $14.2k (Apr 17) |
+| 2026 (→ Oct 23) | +$22.3k | +$19.3k | **+$3.0k** | $14.8k (Oct 22) | $13.6k (Jul 29) |
+
+Dollar drawdowns read off the equity curves (trough ÷ (1 + drawdown%) gives the
+peak). The worst with-condor drawdown is the April 2025 tariff week at
+$17.2k — one bad day short of the $18k tripwire — against $14.2k without.
+
+### What this settles
+
+- **"On its own there's not much to recommend it" is wrong on this window.**
+  The condor earned $127k of the book's $256k — the same as the hedge and the
+  leap combined. $29k a year at two contracts for 2022–25, on ~$12k of
+  collateral per contract.
+- **"Decreases drawdown" is true in percent and false in dollars.** The
+  percent figure falls (−7.3% against −9.4%) because the account is bigger; the
+  dollar drawdown rises in every year, by $0.6k to $4.3k. The $18k tripwire is
+  in dollars. Read it in dollars.
+- **The offset Ken remembers is real but is a timing effect, not safety.** The
+  honest standalone condor (below) is down about **$19k from its own peak at
+  two contracts** as of Friday — a 2026 drawdown that on its own exceeds the
+  sleeve tripwire. The book's 2026 drawdown with it was $14.8k, roughly the
+  same as without ($13.6k), because the hedge and the leap were up when the
+  condor was down. The hedge pays on the days the condor stops out; that
+  smooths the curve, it does not reduce what the condor can lose.
+- **The condor is the book's capital.** Hedge + leap alone put ~$20k to work.
+  The question is not whether the condor adds to the book but whether $70 a
+  trade is worth $29k–58k of allocation — and on 2022–25 it plainly was.
+
+### Two problems found on the way
+
+**1. The saved `IC` backtest does not carry the recorded settings.** It has
+`Use 0-DTE Intra-Minute Stops` **OFF** on both short legs and `Ignore Trades
+with Wide Bid-Ask Spread` **ON** — both the opposite of the "four settings"
+rule in `CLAUDE.md` and the 2026-09-26 config table (intra-minute ON). Every
+weekly live-vs-backtest comparison and the `2027` portfolio run from this
+backtest. To size the effect, the condor was re-run standalone with the
+recorded settings (intra-minute ON, wide-bid-ask filter OFF), same window,
+2 contracts fixed:
+
+| Honest settings, 2 ctr | 2022 | 2023 | 2024 | 2025 | 2026 | Total | Max DD |
+|---|---|---|---|---|---|---|---|
+| Condor standalone | +$27.1k | +$25.3k | +$25.9k | +$46.9k | +$2.8k | **$128,056** | −8.99% (~$20k at the 2026 trough) |
+| Saved settings (from the portfolio difference) | +$32.4k | +$20.4k | +$28.4k | +$43.1k | +$3.0k | $127,372 | |
+
+The two settings move individual years by up to $5k and the total by $700 —
+a wash over 4.4 years, and ~$200 on 2026. **Not edited here** (it is Ken's
+saved strategy); flip both back so the weekly comparison stays on the
+recorded basis. Per-contract-trade edge with honest settings, 2022–26:
+$128,056 ÷ 2,230 = **$57**; 2022–25 alone ≈ $70, matching the benchmark.
+
+**2. The recorded "CIC-AM is negative in 2026: −$5.8k YTD at one contract"
+(2026-10-08) cannot be reproduced.** Three runs today put the saved condor at
+roughly **+$1.4–1.5k per contract for 2026 through Oct 23** (condor-only
+portfolio run at 1 ctr: +$1,512 on 204 condors, +$7 a trade, max drawdown
+$6.7k from a +$7.2k peak; honest standalone at 2 ctr: +$2,822; with-minus-
+without: +$3,024). The settings difference is ~$100 of that, and the 12
+trading days since Oct 7 cannot be $7k at one contract. Only three saved
+backtests exist in the account now, so whatever run produced −$5.8k is gone.
+**Treat the condor's 2026 as flat, about +$7 a trade, not negative.** The
+substance of the 2026-10-08 finding stands — the edge collapsed from $70 to
+~$7 a trade this year, far below the $35 tripwire — but "negative" and
+"−$1,200/month" are not supported by the strategy as saved.
+
+### What it means for the decisions on the table
+
+- **Keep the condor.** It doubled the book's profit for $1–4k a year of extra
+  dollar drawdown. Dropping it shrinks the sleeve to a ~$20k hedge-plus-leap
+  book earning ~$29k a year on the same window.
+- **The 1-vs-2 contracts question is where the risk actually sits.** At two
+  contracts the condor's own 2026 drawdown is ~$20k — the sleeve tripwire by
+  itself. At one it is ~$10k, half. The recommendation in the entry below
+  (one contract until a positive live quarter) stands, and this is the
+  reason: not that the condor is bad, but that two contracts of it carry a
+  2026-type year the sleeve cannot absorb without the other two strategies
+  happening to be up at the same time.
+- **Re-run this comparison at the annual review**, same three runs, same
+  fixed sizing, and compare the condor's year to the live record. If the
+  condor's honest per-trade edge is below $35 for two consecutive calendar
+  years, the standing rule says stop adding; nothing in this entry changes
+  that.
+
+---
+
 ## 2026-10-24 — Week one closed: live −$393 against backtest +$724, and the gap is still Wednesday
 
 Friday's logs close the first full live week at two condors and two hedges

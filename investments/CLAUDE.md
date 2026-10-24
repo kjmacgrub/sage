@@ -235,6 +235,15 @@ years) are void** — both had the put seller inside. Full working in the
 **CIC-AM is negative in 2026** — −$5.8k YTD, −$30/trade since March at one
 contract, in three independent runs. Any claim that it is positive in every
 calendar year is wrong for 2026. 2022–25 per trade: $62 / $39 / $64 / $86.
+**Not reproducible as of 2026-10-24:** the saved `IC` strategy reads about
+**+$1.4k per contract for 2026 through Oct 23 (+$7 a trade)** in three runs, and
+the research backtests behind the −$5.8k no longer exist in the account. Read
+2026 as flat and far below the $35 tripwire, not as negative. Also: the saved
+`IC` backtest has intra-minute stops OFF and the wide-bid-ask filter ON, both
+against the four-settings rule below; effect is ~$700 over 2022–26, ±$5k on
+single years. **With-and-without the condor (2026-10-24, fixed 2/2/1, $80k,
+2022-05 → 2026-10): $256k with, $128k without; dollar drawdown $0.6–4.3k worse
+with, every year.** It is half the book's profit, not a drag.
 
 **QQQ Leap is blank after 2026-02-12 in OO** — no usable long-dated QQQ chain
 for new entries (isolated test: May–Oct 2026, no filters, zero entries).
