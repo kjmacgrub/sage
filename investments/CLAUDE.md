@@ -53,6 +53,10 @@
   Tables `oo_trades`, `oo_equity`, `schwab_options`, `compare_uploads` in `cef.db`.
   Schwab is cash-basis: a 0DTE day reconciles to the day, a multi-day position
   only over its whole life, and the leap only on its close.
+- `post_oo_week.py` — converts an Option Omega MCP run (get_trade_log +
+  get_equity_curve JSON) into OO's CSV shapes and POSTs both to the tab. This is
+  the "run the week" path: run the `2027` portfolio for the week sized to the
+  contracts live actually traded, save the two responses, run this.
 - `docs/review-checklist.md` — options sleeve: the quarterly and annual review as
   numbered steps, per strategy. QQQ Leap written (the cap formula, the two vetoes);
   condor and hedge are stubs carrying their tripwires.
