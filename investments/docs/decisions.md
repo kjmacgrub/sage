@@ -69,6 +69,48 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-24 — DECIDED: the cash-floor refill comes from Treasuries, not CEFs
+
+Context: the Ken Alone plan converts ~$50k a year into this Roth through 2033,
+and Ken wants most of it to end up behind the option sleeve while the CEF half
+grows only slowly. Working through what "the CEF half" is for exposed a flaw
+in the cash-floor rule written on 2026-10-22: it refilled trading cash by
+selling CEFs. A sleeve drawdown is a vol spike or a QQQ drop, and CEF
+discounts widen in exactly those weeks, so the refill would always be sold
+at its cheapest. Ken: "I'll be forced to sell some funds at a loss."
+
+**Decided.** The Roth holds three things with separate jobs:
+
+1. **Trading cash** = peak collateral at the current contract count + the $18k
+   drawdown buffer (today $30k + $18k = $48k). Sized by contract count alone;
+   conversions never go here directly.
+2. **Treasury parking lot** (SGOV or a bill ladder). Every conversion lands
+   here and waits for a review to raise contracts. It is the only refill
+   source. Cost ~4–6 points a year of forgone return on money the sleeve
+   cannot yet trade — on a $50k conversion waiting a year, roughly $2,500.
+3. **CEF income sleeve**, never sold for cash. Its size is an annual-review
+   question about wanting an income sleeve, not a collateral question.
+
+Parking lot empty and cash still short = a tripwire event: cut contracts to
+what the cash supports, do not sell CEFs to hold counts up.
+
+**Why not keep it simple with 50/50 CEFs and cash?** The 50% today is an
+accident of an $80k account. The need is a dollar figure that steps up only
+when a review raises contracts; between steps the surplus should earn
+something *and* be sellable at par in a crash. CEFs meet the first test and
+fail the second; cash meets the second and fails the first; bills meet both.
+
+**Why it does not touch the Ken Alone model.** The model treats the Roth as
+one 12% bucket. Conversions parked in bills for a year or two trail that, but
+the contract raises are what the 12% assumes anyway. With contracts scaling
+roughly a condor per $80k, trading cash settles near 55–60% of the account at
+every size, the same neighbourhood as today.
+
+Procedure and the quarterly collateral table: `review-checklist.md`, "Cash
+floor and the Treasury parking lot".
+
+---
+
 ## 2026-10-24 — Candidate strategy checked: the ATM put spread again, and it fails the same test
 
 Ken brought a new test (`trade-log - 2026-10-24T074951.449.csv`, not saved in

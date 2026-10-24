@@ -157,39 +157,73 @@ Full procedure to be written. Until then:
 5. One line in `decisions.md` only if something is outside the known
    tolerances (the 2026-10-24 week-one entry lists them).
 6. Read the **cash balance** off the Schwab export or the Balances screen.
-   Below $32,000 → the cash-floor rule, next section.
+   Below the trading-cash line (today $40,000) → the cash-floor rule, next
+   section.
 
-## Cash floor (the CEF half of the account)
+## Cash floor and the Treasury parking lot
 
-**Why it exists.** The Roth is about $80,000 with roughly half in CEFs. The
-sleeve's sizing rules read the whole $80,000 as equity, but only the cash
-half can secure trades. Peak cash the sleeve ties up at today's sizing
-(2026-10-24, from the week's OO margin figures): condor 1 contract
-$9.5–11.5k, hedge 2 contracts ~$2k, leap 2 open ~$16.6k → **about $30,000**.
-With a second condor contract → about $41,500. So $40,000 of cash fits the
-sleeve now with ~$10,000 to spare, and does not fit contract two.
+**Why it exists.** Only cash can secure a trade. Peak cash the sleeve ties up
+at today's sizing (2026-10-24, from the week's OO margin figures): condor
+1 contract $9.5–11.5k, hedge 2 contracts ~$2k, leap 2 open ~$16.6k → **about
+$30,000**. With a second condor contract → about $41,500. A drawdown comes out
+of that same cash. Once it is gone Schwab rejects the next order and the
+autotrader logs a skipped entry, which is a quiet way to diverge from the
+backtest (OO assumes the whole sleeve is available).
 
-A drawdown comes out of the cash half. Once the spare is gone Schwab rejects
-the next order and the autotrader logs a skipped entry, which is a quiet way
-to diverge from the backtest (OO assumes all $80,000 is available).
+**The 2026-10-24 restructure.** Until this date the refill came from selling
+CEFs. That is the wrong source: a bad stretch for the sleeve is a vol spike or
+a QQQ drop, which is exactly when CEF discounts widen. The refill would be sold
+cheapest at the moment it is needed. From now on the Roth holds three things
+with three jobs, and only the first two talk to each other:
 
-**The rule, measured on cash, never on the account total.**
+1. **Trading cash** — Schwab's sweep / money-market fund. Holds peak
+   collateral at the current contract count **plus the drawdown buffer**
+   (the $18k tripwire figure). Today: $30,000 + $18,000 = **$48,000**.
+2. **The parking lot** — short Treasuries (SGOV, or a ladder of 3–6 month
+   bills). Every conversion or contribution lands here the day it arrives
+   and waits for a review to raise contracts. Does not move in a crash, sells
+   at par, settles T+1. **This is where refills come from.** Cost: Treasury
+   yield instead of whatever the money would earn deployed, on money the sleeve
+   is not yet allowed to trade.
+3. **The CEF income sleeve** — judged on distributions (see `decisions.md`,
+   three-sleeve plan). **Never the source of emergency cash.** Whether to keep
+   it, shrink it or add to it is a separate decision about wanting an income
+   sleeve at all, taken at the annual review, never on a down week.
 
-- Cash balance **below $32,000** → sell enough CEF to bring cash back to
-  **$40,000** (about $10,000). Sell: _______________ (name the fund here,
-  while calm; the sale happens on a down week when discounts are wide).
-- CEFs fall but cash is still $40,000 → nothing to do. The account total
-  can read $70,000 for two different reasons; only the cash case acts.
-- When the condor earns its second contract (see CIC-10am › Sizing), move
-  $5,000–10,000 of CEF to cash *before* changing the live setting.
+**The rule, measured on trading cash, never on the account total.**
+
+- Trading cash **below collateral + $10,000** (today: below **$40,000**) →
+  sell Treasuries to bring it back to **collateral + buffer** (today
+  $48,000). Same day; nothing is at a loss, so there is nothing to wait for.
+- Parking lot empty and trading cash still below the line → the sleeve is in
+  a drawdown the parking lot could not cover. That is a tripwire event, not a
+  refill event: drop contract counts to what the cash supports (hedge rule
+  $40k/contract, leap cap formula) and read the sleeve-level section. Do not
+  sell CEFs to keep contract counts up.
+- CEFs fall but trading cash is above the line → nothing to do. The account
+  total can read lower for two different reasons; only the cash case acts.
+- At a review that raises contracts (condor to 2, hedge to 3, leap cap up):
+  recompute collateral at the new counts, move the difference plus the buffer
+  from Treasuries to trading cash **before** changing the live setting.
+- A conversion lands (December): it goes to Treasuries, not to trading cash
+  and not to CEFs. Trading cash is sized by contract count alone.
+
+**Recompute the numbers each quarter.** Collateral scales with the index level
+and with vol (see `../CLAUDE.md`, margin notes: a volatile year costs ~1.5× a
+calm one at the same SPX). Write the quarter's figure here:
+
+| Quarter | Condor ctr | Hedge ctr | Leap (ctr per entry × open trades) | Peak collateral | Buffer | Trading cash target |
+|---|---|---|---|---|---|---|
+| 2026 Q4 (from 10/26) | 1 | 2 | 1 × 2 | ~$30,000 | $18,000 | $48,000 |
+
+**Transition from the old structure (one-off).** The Roth is about $80,000
+with roughly half in CEFs and no Treasuries yet. Trading cash is near the
+target already, so the parking lot starts empty and fills with the first
+conversion. Do not sell CEFs to seed it.
 
 **What it is not.** This is a buying-power rule, separate from the $18k
 drawdown tripwire below. The tripwire asks whether the strategies still
 work; the cash floor only keeps the autotrader able to place the next order.
-At $70,000 equity the hedge rule ($40k/contract) drops it to one contract
-on its own and the leap arithmetic lands on cap 1 at the next quarterly, so
-peak need falls to ~$21–29k; the sale is still made, to restore the buffer
-rather than run at the edge, but it need not happen the same day.
 
 ## Sleeve-level, every review
 
