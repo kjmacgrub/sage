@@ -1285,7 +1285,7 @@ async function openDivModal(ticker) {
       <table style="width:100%">
         <thead>
           <tr>
-            <th class="left" style="position:static">Ex-Date</th>
+            <th class="left" style="position:static">Pay Date</th>
             <th style="position:static">Per Share</th>
             <th style="position:static">Shares</th>
             <th style="position:static">Total</th>
