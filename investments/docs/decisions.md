@@ -114,7 +114,14 @@ reference for the condor going forward; 2018 is its only losing calendar
 year, and 2026 at +$1.5k on ~200 trades is the ~$7-a-trade year already
 noted. The saved `2027` portfolio still carries its own override (cap 6, $29k
 per contract) and would trade 2 at $80k if re-run as is — change the override
-to cap 1 before using it for a live-vs-backtest week.
+to cap 1 before using it for a live-vs-backtest week. **Done and confirmed
+the same evening: the `2027` override now reads cap 1** ($29k per contract
+left in place, inert under the cap). Note the saved portfolio's stored
+result is now a **2020-02-20 → 2020-04-07 COVID-window run**, not the 2022→
+book: $80k → $77,263, drawdown −12.6% ($7.6k), condor −$4,370 over 33
+sessions at one contract, hedge +$1,634 (its pre-2022 instrument, so the
+sign is not informative). Reset the range to 2022-05-16 → the last
+completed session before using it for a weekly comparison.
 
 ---
 
