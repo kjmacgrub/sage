@@ -156,6 +156,40 @@ Full procedure to be written. Until then:
    tick *Exclude manual exits* to see the comparison without it.
 5. One line in `decisions.md` only if something is outside the known
    tolerances (the 2026-10-24 week-one entry lists them).
+6. Read the **cash balance** off the Schwab export or the Balances screen.
+   Below $32,000 → the cash-floor rule, next section.
+
+## Cash floor (the CEF half of the account)
+
+**Why it exists.** The Roth is about $80,000 with roughly half in CEFs. The
+sleeve's sizing rules read the whole $80,000 as equity, but only the cash
+half can secure trades. Peak cash the sleeve ties up at today's sizing
+(2026-10-24, from the week's OO margin figures): condor 1 contract
+$9.5–11.5k, hedge 2 contracts ~$2k, leap 2 open ~$16.6k → **about $30,000**.
+With a second condor contract → about $41,500. So $40,000 of cash fits the
+sleeve now with ~$10,000 to spare, and does not fit contract two.
+
+A drawdown comes out of the cash half. Once the spare is gone Schwab rejects
+the next order and the autotrader logs a skipped entry, which is a quiet way
+to diverge from the backtest (OO assumes all $80,000 is available).
+
+**The rule, measured on cash, never on the account total.**
+
+- Cash balance **below $32,000** → sell enough CEF to bring cash back to
+  **$40,000** (about $10,000). Sell: _______________ (name the fund here,
+  while calm; the sale happens on a down week when discounts are wide).
+- CEFs fall but cash is still $40,000 → nothing to do. The account total
+  can read $70,000 for two different reasons; only the cash case acts.
+- When the condor earns its second contract (see CIC-10am › Sizing), move
+  $5,000–10,000 of CEF to cash *before* changing the live setting.
+
+**What it is not.** This is a buying-power rule, separate from the $18k
+drawdown tripwire below. The tripwire asks whether the strategies still
+work; the cash floor only keeps the autotrader able to place the next order.
+At $70,000 equity the hedge rule ($40k/contract) drops it to one contract
+on its own and the leap arithmetic lands on cap 1 at the next quarterly, so
+peak need falls to ~$21–29k; the sale is still made, to restore the buffer
+rather than run at the edge, but it need not happen the same day.
 
 ## Sleeve-level, every review
 
