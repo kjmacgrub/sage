@@ -46,6 +46,8 @@ let _showIncomeProjection = false;
 let _audits = {};           // {ticker: latest audit} — drives the grade badges
 let _settings = {};         // server-side settings (see cef/settings.py)
 let _auditRunning = {};     // {ticker: true} while an audit is in flight
+let _cmp = { data: null, start: null, end: null, excludeManual: false,   // Options sleeve: Live vs Backtest (see bottom of file)
+             loading: false, status: '', showUploads: false, uploads: null, chartW: 0, resizeBound: false };
 
 // === API ===
 async function GET(url) {
@@ -83,6 +85,7 @@ async function init() {
   renderApp();
   if (_tab === 'div-holdings') loadDivHoldings().then(renderApp);
   if (_tab === 'div-screen') loadDividendScreen().then(renderApp);
+  if (_tab === 'opt-compare') loadCompare().then(renderApp);
   await loadAll();
   renderApp();
   // Auto-refresh prices from Yahoo Finance, then re-render with live data
@@ -157,6 +160,11 @@ const SLEEVES = {
     tabs: [['div-holdings', 'Holdings'], ['div-screen', 'Screen'],
            ['calc', 'Calculators'], ['div-import', 'Import']],
   },
+  options: {
+    label: 'Options',
+    context: 'SPX condor · hedge · QQQ leap · Roth IRA',
+    tabs: [['opt-compare', 'Live vs Backtest']],
+  },
 };
 
 function sleeveSwitch() {
@@ -208,6 +216,7 @@ function renderApp() {
       ${_tab === 'div-holdings' ? renderDivHoldings() : ''}
       ${_tab === 'div-screen' ? renderDividendScreen() : ''}
       ${_tab === 'div-import' ? renderDivImport() : ''}
+      ${_tab === 'opt-compare' ? renderCompare() : ''}
     </div>
 
     <div id="toast"></div>
@@ -2039,6 +2048,7 @@ function setTab(tab) {
   }
   if (tab === 'div-screen' && !_divScreen.length) loadDividendScreen().then(renderApp);
   if (tab === 'div-holdings' && _divHoldings === null) loadDivHoldings().then(renderApp);
+  if (tab === 'opt-compare' && !_cmp.data) loadCompare().then(renderApp);
   renderApp();
 }
 
@@ -3685,4 +3695,339 @@ async function confirmDivImport() {
     if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
     if (btn) { btn.disabled = false; btn.textContent = 'Confirm Import'; }
   }
+}
+
+// === OPTIONS SLEEVE: LIVE vs BACKTEST ===
+// Three sources per trading day -- the autotrader's log (live), Option Omega's
+// trade log + portfolio CSV (backtest), and Schwab's transaction export (what
+// actually hit the account). Files are auto-detected on upload and replace by
+// date range, so dropping this week's four exports on top of last week's is
+// safe. Server side: cef/services/compare.py.
+
+async function loadCompare() {
+  _cmp.loading = true;
+  const q = new URLSearchParams();
+  if (_cmp.start && _cmp.end) { q.set('start', _cmp.start); q.set('end', _cmp.end); }
+  if (_cmp.excludeManual) q.set('exclude_manual', 'true');
+  try {
+    _cmp.data = await GET('/api/compare/summary?' + q.toString());
+    if (!_cmp.data.empty) { _cmp.start = _cmp.data.start; _cmp.end = _cmp.data.end; }
+    _cmp.uploads = (await GET('/api/compare/uploads')).uploads;
+  } catch (e) { _cmp.status = e.message; }
+  _cmp.loading = false;
+}
+
+function cmpSetRange(start, end) { _cmp.start = start; _cmp.end = end; loadCompare().then(renderApp); }
+function cmpToggleManual(on) { _cmp.excludeManual = on; loadCompare().then(renderApp); }
+function cmpDates() {
+  const c = _cmp.data?.coverage || {};
+  return [...new Set([...(c.live || []), ...(c.backtest || []), ...(c.portfolio || [])])].sort();
+}
+/** Monday..Friday ISO bounds of the week containing `iso`. */
+function cmpWeekOf(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  const dow = (d.getDay() + 6) % 7;            // Mon = 0
+  const mon = new Date(d); mon.setDate(d.getDate() - dow);
+  const fri = new Date(mon); fri.setDate(mon.getDate() + 4);
+  const f = x => x.toISOString().slice(0, 10);
+  return [f(mon), f(fri)];
+}
+function cmpPreset(which) {
+  const ds = cmpDates();
+  if (!ds.length) return;
+  const last = ds[ds.length - 1];
+  if (which === 'last5') return cmpSetRange(ds[Math.max(0, ds.length - 5)], last);
+  if (which === 'week') { const [a, b] = cmpWeekOf(last); return cmpSetRange(a, b); }
+  if (which === 'prior') {
+    const [a] = cmpWeekOf(last);
+    const p = new Date(a + 'T12:00:00'); p.setDate(p.getDate() - 7);
+    const [pa, pb] = cmpWeekOf(p.toISOString().slice(0, 10));
+    return cmpSetRange(pa, pb);
+  }
+  if (which === 'all') return cmpSetRange(ds[0], last);
+}
+
+async function onCompareFiles(input) {
+  const files = [...(input.files || [])];
+  if (!files.length) return;
+  const el = document.getElementById('cmp-upload-status');
+  const lines = [];
+  for (const f of files) {
+    if (el) el.textContent = 'Reading ' + f.name + '…';
+    try {
+      const txt = await f.text();
+      const r = await POST('/api/compare/upload', { csv: txt, filename: f.name });
+      lines.push(`<span class="cmp-ok">✓</span> ${f.name} — <strong>${r.kind}</strong>, ${r.rows} rows, ${r.min_date} → ${r.max_date}${r.replaced ? `, replaced ${r.replaced}` : ''}`);
+    } catch (e) {
+      lines.push(`<span class="cmp-bad">✕</span> ${f.name} — ${e.message.replace(/^\{"detail":"|"\}$/g, '')}`);
+    }
+  }
+  _cmp.status = lines.join('<br>');
+  // After an upload the natural view is the newest week.
+  _cmp.start = _cmp.end = null;
+  await loadCompare();
+  renderApp();
+  toast(`${files.length} file${files.length > 1 ? 's' : ''} processed`);
+}
+function cmpDrop(ev) {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('over');
+  const input = document.getElementById('cmp-file-input');
+  if (input && ev.dataTransfer?.files?.length) { input.files = ev.dataTransfer.files; onCompareFiles(input); }
+}
+async function cmpDeleteUpload(id, label) {
+  if (!confirm(`Remove the rows loaded from ${label}?`)) return;
+  await DELETE('/api/compare/uploads/' + id);
+  await loadCompare(); renderApp();
+}
+
+const fmtWhole = n => n == null ? '—' : (n < 0 ? '−' : n > 0 ? '+' : '') + '$' + Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+const cmpSign = n => n == null || Math.abs(n) < 0.5 ? '' : n > 0 ? 'cmp-pos' : 'cmp-neg';
+const cmpCell = (n, cls = '') => `<td class="num ${cls} ${cmpSign(n)}">${fmtWhole(n)}</td>`;
+const cmpStrikes = t => t ? `${t.short_put ?? '—'} / ${t.short_call ?? '—'}` : '—';
+function cmpExits(t) {
+  if (!t) return '—';
+  return t.sides.filter(s => s.kind !== 'wings').map(s => {
+    const r = s.reason === 'Expired' ? 'expired'
+      : s.is_stop ? `stop ${s.time_closed?.slice(0, 5) || ''} @${s.closing_cost.toFixed(2)}${s.overshoot != null ? ` (${s.overshoot >= 0 ? '+' : ''}${s.overshoot.toFixed(2)})` : ''}`
+      : `${s.reason.replace('Manual User Exit', 'manual').replace('VIX Move Down', 'VIX↓')} ${s.time_closed?.slice(0, 5) || ''}${s.closing_cost ? ' @' + s.closing_cost.toFixed(2) : ''}`;
+    return `<span class="cmp-exit ${s.is_manual ? 'manual' : ''}">${s.kind}: ${r}</span>`;
+  }).join(' ');
+}
+
+function renderCompare() {
+  const d = _cmp.data;
+  const upload = `
+    <div class="cmp-drop" ondragover="event.preventDefault();this.classList.add('over')"
+         ondragleave="this.classList.remove('over')" ondrop="cmpDrop(event)">
+      <input type="file" id="cmp-file-input" multiple accept=".csv" onchange="onCompareFiles(this)" style="display:none">
+      <div><strong>Drop the week's exports here</strong> or <a href="#" onclick="document.getElementById('cmp-file-input').click();return false">choose files</a></div>
+      <div class="cmp-drop-hint">Option Omega trade log + portfolio CSV · autotrader strategy trade log · Schwab transactions. Any order, any mix — each file is recognised by its header and replaces the same dates from an earlier upload.</div>
+      ${_cmp.status ? `<div id="cmp-upload-status" class="cmp-upload-status">${_cmp.status}</div>` : `<div id="cmp-upload-status" class="cmp-upload-status"></div>`}
+    </div>`;
+
+  if (_cmp.loading && !d) return `<div class="cmp-root">${upload}<p class="cmp-muted">Loading…</p></div>`;
+  if (!d || d.empty) return `<div class="cmp-root">${upload}<p class="cmp-muted">Nothing loaded yet. Drop the four exports above to start.</p></div>`;
+
+  const t = d.totals, cols = d.columns.filter(c => c !== 'Other' || t.live.Other || t.backtest.Other);
+  const hasSchwab = d.days.some(x => x.has.schwab);
+  const schwabU = Object.keys(t.schwab);
+  const diff = t.live_total - t.backtest_total;
+  const dg = d.diagnostics;
+
+  const toolbar = `
+    <div class="cmp-toolbar">
+      <div class="cmp-presets">
+        <button class="btn btn-ghost btn-sm" onclick="cmpPreset('last5')">Last 5 days</button>
+        <button class="btn btn-ghost btn-sm" onclick="cmpPreset('week')">This week</button>
+        <button class="btn btn-ghost btn-sm" onclick="cmpPreset('prior')">Prior week</button>
+        <button class="btn btn-ghost btn-sm" onclick="cmpPreset('all')">All</button>
+      </div>
+      <div class="cmp-range">
+        <input type="date" value="${d.start}" onchange="cmpSetRange(this.value, '${d.end}')">
+        <span class="cmp-muted">to</span>
+        <input type="date" value="${d.end}" onchange="cmpSetRange('${d.start}', this.value)">
+      </div>
+      <label class="cmp-check"><input type="checkbox" ${_cmp.excludeManual ? 'checked' : ''} onchange="cmpToggleManual(this.checked)">
+        Exclude manual exits <span class="cmp-muted">(${t.manual} this range)</span></label>
+      <div class="toolbar-right">
+        <button class="btn btn-ghost btn-sm" onclick="_cmp.showUploads=!_cmp.showUploads;renderApp()">${_cmp.showUploads ? 'Hide' : 'Show'} uploads</button>
+      </div>
+    </div>`;
+
+  const cov = `
+    <div class="cmp-cov">
+      ${d.days.map(x => `<div class="cmp-cov-day" title="${x.date}">
+        <div class="cmp-cov-date">${x.date.slice(5)}</div>
+        <div class="cmp-cov-dots">
+          <span class="dot live ${x.has.live ? 'on' : ''}" title="live"></span>
+          <span class="dot bt ${x.has.backtest ? 'on' : ''}" title="backtest"></span>
+          <span class="dot schwab ${x.has.schwab ? 'on' : ''}" title="schwab"></span>
+        </div></div>`).join('')}
+      <div class="cmp-cov-key"><span class="dot live on"></span> live <span class="dot bt on"></span> backtest <span class="dot schwab on"></span> schwab</div>
+    </div>`;
+
+  const tile = (label, value, sub, cls = '') => `
+    <div class="cmp-tile"><div class="cmp-tile-label">${label}</div>
+      <div class="cmp-tile-value ${cls}">${value}</div>${sub ? `<div class="cmp-tile-sub">${sub}</div>` : ''}</div>`;
+  const tiles = `
+    <div class="cmp-tiles">
+      ${tile('Live', fmtWhole(t.live_total), cols.map(c => `${c} ${fmtWhole(t.live[c])}`).join(' · '), cmpSign(t.live_total))}
+      ${tile('Backtest', fmtWhole(t.backtest_total), cols.map(c => `${c} ${fmtWhole(t.backtest[c])}`).join(' · '), cmpSign(t.backtest_total))}
+      ${tile('Live − backtest', fmtWhole(diff), `${t.pairs} paired trades${t.excluded ? `, ${t.excluded} excluded` : ''}`, cmpSign(diff))}
+      ${hasSchwab ? tile('Schwab option cash', fmtWhole(t.schwab_total), schwabU.map(u => `${u} ${fmtWhole(t.schwab[u])}`).join(' · ') + ` · fees ${fmtWhole(-Math.abs(t.schwab_fees))}`, cmpSign(t.schwab_total))
+                  : tile('Schwab option cash', '—', 'no Schwab rows in this range')}
+      ${tile('Stop fill vs 3× trigger', `${dg.live_stop_overshoot.avg == null ? '—' : dg.live_stop_overshoot.avg.toFixed(2)} <span class="cmp-vs">live</span> ${dg.backtest_stop_overshoot.avg == null ? '—' : dg.backtest_stop_overshoot.avg.toFixed(2)} <span class="cmp-vs">test</span>`,
+            `${dg.live_stop_overshoot.n} / ${dg.backtest_stop_overshoot.n} stops · per share, lower is better`)}
+      ${tile('Entry credit, live − test', dg.credit_diff_matched.avg == null ? '—' : (dg.credit_diff_matched.avg >= 0 ? '+' : '') + dg.credit_diff_matched.avg.toFixed(2),
+            `${dg.credit_diff_matched.n} matched-strike trades · per share · tripwire 0.15/leg`)}
+    </div>`;
+
+  const chart = renderCmpChart(d.days, hasSchwab, _cmp.chartW || 860);
+  // The SVG is drawn 1:1 in CSS pixels, so it has to know the container width;
+  // that is only measurable once the markup is in the DOM.
+  requestAnimationFrame(cmpFitChart);
+  if (!_cmp.resizeBound) { _cmp.resizeBound = true; window.addEventListener('resize', () => requestAnimationFrame(cmpFitChart)); }
+
+  const daily = `
+    <div class="table-wrap cmp-table-wrap">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th rowspan="2" class="left">Day</th>
+            ${cols.map(c => `<th colspan="3" class="group">${c}</th>`).join('')}
+            <th colspan="3" class="group total">Total</th>
+            ${hasSchwab ? `<th colspan="${schwabU.length + 1}" class="group">Schwab cash</th>` : ''}
+            <th rowspan="2" class="num">Test net liq</th>
+          </tr>
+          <tr>
+            ${cols.map(() => `<th class="num">Live</th><th class="num">Test</th><th class="num">Δ</th>`).join('')}
+            <th class="num">Live</th><th class="num">Test</th><th class="num">Δ</th>
+            ${hasSchwab ? schwabU.map(u => `<th class="num">${u}</th>`).join('') + '<th class="num">Fees</th>' : ''}
+          </tr>
+        </thead>
+        <tbody>
+          ${d.days.map(x => `<tr>
+            <td class="left">${x.date}</td>
+            ${cols.map(c => cmpCell(x.live[c]) + cmpCell(x.backtest[c]) + cmpCell(x.live[c] - x.backtest[c], 'delta')).join('')}
+            ${cmpCell(x.live_total, 'total')}${cmpCell(x.backtest_total, 'total')}${cmpCell(x.live_total - x.backtest_total, 'total delta')}
+            ${hasSchwab ? schwabU.map(u => cmpCell(x.schwab[u] ?? null)).join('') + `<td class="num cmp-muted">${x.schwab_fees ? fmtWhole(-Math.abs(x.schwab_fees)) : '—'}</td>` : ''}
+            <td class="num cmp-muted">${x.net_liq != null ? '$' + x.net_liq.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—'}</td>
+          </tr>`).join('')}
+          <tr class="cmp-total-row">
+            <td class="left">Total</td>
+            ${cols.map(c => cmpCell(t.live[c]) + cmpCell(t.backtest[c]) + cmpCell(t.live[c] - t.backtest[c], 'delta')).join('')}
+            ${cmpCell(t.live_total, 'total')}${cmpCell(t.backtest_total, 'total')}${cmpCell(diff, 'total delta')}
+            ${hasSchwab ? schwabU.map(u => cmpCell(t.schwab[u])).join('') + `<td class="num cmp-muted">${fmtWhole(-Math.abs(t.schwab_fees))}</td>` : ''}
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+
+  const trades = `
+    <div class="table-wrap cmp-table-wrap">
+      <table class="cmp-table cmp-trades">
+        <thead><tr>
+          <th class="left">Date</th><th class="left">Strategy</th>
+          <th class="left">Strikes live</th><th class="left">Strikes test</th>
+          <th class="num">Credit live</th><th class="num">Credit test</th>
+          <th class="left">Exits live</th><th class="left">Exits test</th>
+          <th class="num">P/L live</th><th class="num">P/L test</th><th class="num">Δ</th>
+          <th class="left">Flags</th>
+        </tr></thead>
+        <tbody>
+          ${d.pairs.map(p => `<tr class="${p.excluded ? 'cmp-excluded' : ''}">
+            <td class="left">${p.date}</td>
+            <td class="left">${p.strategy}${p.live && p.live.contracts ? ` <span class="cmp-muted">×${p.live.contracts}</span>` : ''}</td>
+            <td class="left mono">${cmpStrikes(p.live)}</td><td class="left mono">${cmpStrikes(p.backtest)}</td>
+            <td class="num">${p.live ? p.live.credit.toFixed(2) : '—'}</td><td class="num">${p.backtest ? p.backtest.credit.toFixed(2) : '—'}</td>
+            <td class="left">${cmpExits(p.live)}</td><td class="left">${cmpExits(p.backtest)}</td>
+            ${cmpCell(p.live?.pl ?? null)}${cmpCell(p.backtest?.pl ?? null)}${cmpCell(p.diff, 'delta')}
+            <td class="left">${p.flags.map(f => `<span class="cmp-flag ${/manual/.test(f) ? 'warn' : ''}">${f}</span>`).join(' ')}${p.excluded ? '<span class="cmp-flag">excluded</span>' : ''}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  const uploads = _cmp.showUploads && _cmp.uploads ? `
+    <div class="cmp-section">
+      <div class="cmp-h">Uploads</div>
+      <table class="cmp-table cmp-uploads"><thead><tr><th class="left">When</th><th class="left">Kind</th><th class="left">File</th><th class="num">Rows</th><th class="left">Dates</th><th></th></tr></thead>
+      <tbody>${_cmp.uploads.map(u => `<tr>
+        <td class="left cmp-muted">${u.uploaded_at}</td><td class="left">${u.kind}</td><td class="left">${u.filename || ''}</td>
+        <td class="num">${u.rows}</td><td class="left">${u.min_date} → ${u.max_date}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="cmpDeleteUpload(${u.id}, '${(u.filename || u.kind).replace(/'/g, '')}')">remove</button></td></tr>`).join('')}
+      </tbody></table>
+    </div>` : '';
+
+  return `
+    <div class="cmp-root">
+      ${toolbar}
+      ${cov}
+      ${tiles}
+      ${chart}
+      <div class="cmp-h">By day <span class="cmp-muted">closed P/L, net of commissions · Schwab is cash that settled, by underlying</span></div>
+      ${daily}
+      <div class="cmp-h">By trade <span class="cmp-muted">live and test paired on strategy and day · credit and closing cost per share · stop fill shown as (overshoot past 3× credit)</span></div>
+      ${trades}
+      ${upload}
+      ${uploads}
+    </div>`;
+}
+
+function cmpFitChart() {
+  const wrap = document.getElementById('cmp-chart-wrap');
+  if (!wrap || !_cmp.data || _cmp.data.empty) return;
+  const w = Math.max(360, wrap.clientWidth - 24);
+  if (Math.abs(w - (_cmp.chartW || 0)) < 2) return;
+  _cmp.chartW = w;
+  const hasSchwab = _cmp.data.days.some(x => x.has.schwab);
+  wrap.outerHTML = renderCmpChart(_cmp.data.days, hasSchwab, w);
+}
+
+/** Cumulative P/L for the range: live, backtest, and Schwab cash when present.
+ *  Inline SVG drawn at 1:1 for the container width, crosshair + tooltip on hover. */
+function renderCmpChart(days, hasSchwab, W = 860) {
+  if (!days.length) return '';
+  const H = 220, L = 60, R = 16, T = 14, B = 30;
+  const series = [['backtest', 'Backtest', 'bt'], ['live', 'Live', 'live']];
+  if (hasSchwab) series.push(['schwab', 'Schwab cash', 'schwab']);
+  const vals = [0, ...days.flatMap(x => series.map(([k]) => x.cum[k]))];
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (hi - lo < 1) { hi += 1; lo -= 1; }
+  const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  const n = days.length;
+  const xs = i => L + (n === 1 ? (W - L - R) / 2 : (W - L - R) * i / (n - 1));
+  const ys = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  // Clean ticks: 4–5 round steps.
+  const span = hi - lo, raw = span / 4, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag;
+  const ticks = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
+  const fmtTick = v => (v < 0 ? '−' : '') + '$' + (Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(Math.abs(v) % 1000 ? 1 : 0) + 'K' : Math.abs(v).toFixed(0));
+  const path = k => days.map((x, i) => `${i ? 'L' : 'M'}${xs(i).toFixed(1)},${ys(x.cum[k]).toFixed(1)}`).join(' ');
+  const zeroY = ys(0);
+  return `
+    <div class="cmp-chart-wrap" id="cmp-chart-wrap">
+      <div class="cmp-legend">
+        ${series.map(([k, label, cls]) => `<span class="cmp-legend-item"><span class="swatch ${cls}"></span>${label}</span>`).join('')}
+        <span class="cmp-muted">cumulative over the range</span>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="cmp-chart" onmousemove="cmpHover(event)" onmouseleave="cmpHoverOff()" data-n="${n}" data-l="${L}" data-r="${R}" data-w="${W}">
+        ${ticks.map(v => `<line class="grid" x1="${L}" x2="${W - R}" y1="${ys(v).toFixed(1)}" y2="${ys(v).toFixed(1)}"></line>
+          <text class="tick" x="${L - 8}" y="${(ys(v) + 4).toFixed(1)}" text-anchor="end">${fmtTick(v)}</text>`).join('')}
+        ${zeroY >= T && zeroY <= H - B ? `<line class="zero" x1="${L}" x2="${W - R}" y1="${zeroY.toFixed(1)}" y2="${zeroY.toFixed(1)}"></line>` : ''}
+        ${days.map((x, i) => (n <= 12 || i % Math.ceil(n / 12) === 0 || i === n - 1) ? `<text class="tick" x="${xs(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">${x.date.slice(5)}</text>` : '').join('')}
+        ${series.map(([k, , cls]) => `<path class="line ${cls}" d="${path(k)}"></path>`).join('')}
+        ${series.map(([k, , cls]) => `<circle class="end ${cls}" cx="${xs(n - 1).toFixed(1)}" cy="${ys(days[n - 1].cum[k]).toFixed(1)}" r="4"></circle>`).join('')}
+        <g id="cmp-hover" style="display:none">
+          <line class="cross" x1="0" x2="0" y1="${T}" y2="${H - B}"></line>
+          ${series.map(([k, , cls]) => `<circle class="pt ${cls}" data-k="${k}" r="5"></circle>`).join('')}
+        </g>
+      </svg>
+      <div class="cmp-tip" id="cmp-tip" style="display:none"></div>
+      <script type="application/json" id="cmp-chart-data">${JSON.stringify({ xs: days.map((_, i) => xs(i)), ys: days.map(x => Object.fromEntries(series.map(([k]) => [k, ys(x.cum[k])]))), days: days.map(x => ({ date: x.date, cum: x.cum, live: x.live_total, backtest: x.backtest_total, schwab: x.schwab_total })), series })}</script>
+    </div>`;
+}
+function cmpHover(ev) {
+  const svg = ev.currentTarget, data = JSON.parse(document.getElementById('cmp-chart-data').textContent);
+  const rect = svg.getBoundingClientRect();
+  const W = +svg.dataset.w;
+  const vx = (ev.clientX - rect.left) / rect.width * W;
+  let best = 0, bd = Infinity;
+  data.xs.forEach((x, i) => { const dd = Math.abs(x - vx); if (dd < bd) { bd = dd; best = i; } });
+  const g = document.getElementById('cmp-hover'); g.style.display = '';
+  const cross = g.querySelector('.cross'); cross.setAttribute('x1', data.xs[best]); cross.setAttribute('x2', data.xs[best]);
+  g.querySelectorAll('.pt').forEach(c => { c.setAttribute('cx', data.xs[best]); c.setAttribute('cy', data.ys[best][c.dataset.k]); });
+  const d = data.days[best], tip = document.getElementById('cmp-tip');
+  tip.style.display = '';
+  tip.innerHTML = `<div class="cmp-tip-date">${d.date}</div>` + data.series.map(([k, label, cls]) =>
+    `<div class="cmp-tip-row"><span class="swatch ${cls}"></span>${label} <span class="num">${fmtWhole(d.cum[k])}</span> <span class="cmp-muted">day ${fmtWhole(k === 'live' ? d.live : k === 'backtest' ? d.backtest : d.schwab)}</span></div>`).join('');
+  const px = data.xs[best] / W * rect.width;
+  tip.style.left = Math.min(px + 12, rect.width - 220) + 'px';
+}
+function cmpHoverOff() {
+  const g = document.getElementById('cmp-hover'); if (g) g.style.display = 'none';
+  const tip = document.getElementById('cmp-tip'); if (tip) tip.style.display = 'none';
 }

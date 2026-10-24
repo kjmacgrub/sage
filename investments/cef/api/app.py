@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from ..database import init_db
 from .routes import (funds, prices, holdings, distributions, screener,
                      nav_history, imports, settings, audit, bdc_screener,
-                     dividend_screener, dividend)
+                     dividend_screener, dividend, compare)
 
 load_dotenv()
 
@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(bdc_screener.router, prefix="/api/bdc-screener")
     app.include_router(dividend_screener.router, prefix="/api/dividend-screener")
     app.include_router(dividend.router, prefix="/api/dividend")
+    app.include_router(compare.router, prefix="/api/compare")
 
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 

@@ -222,6 +222,73 @@ def init_db():
                 fetched_at     TEXT
             );
 
+            -- Options sleeve: live vs backtest. Three sources, replaced by
+            -- date range on upload so the newest file for a day wins. OO and
+            -- the autotrader write one row per leg group (a condor is three);
+            -- grouping into trades happens at read time (services/compare.py).
+            CREATE TABLE IF NOT EXISTS compare_uploads (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind        TEXT NOT NULL,      -- backtest | live | portfolio | schwab
+                filename    TEXT,
+                rows        INTEGER,
+                min_date    TEXT,
+                max_date    TEXT,
+                uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS oo_trades (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                upload_id      INTEGER,
+                source         TEXT NOT NULL,   -- backtest | live
+                strategy_raw   TEXT,
+                strategy       TEXT,            -- Condor | Hedge | Leap | raw name
+                date_opened    TEXT NOT NULL,
+                time_opened    TEXT,
+                opening_price  REAL,
+                legs           TEXT,
+                row_kind       TEXT,            -- put | call | wings | long | combo
+                premium        REAL,            -- net credit per share, this row's legs
+                short_strike   REAL,
+                short_right    TEXT,
+                contracts      INTEGER,
+                pl             REAL,
+                closing_price  REAL,
+                date_closed    TEXT,
+                time_closed    TEXT,
+                closing_cost   REAL,            -- per share, positive = paid
+                reason         TEXT,
+                is_manual      INTEGER DEFAULT 0,
+                is_stop        INTEGER DEFAULT 0,
+                funds_at_close REAL,
+                margin_req     REAL,
+                account        TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_oo_trades_src_date ON oo_trades(source, date_opened);
+            CREATE TABLE IF NOT EXISTS oo_equity (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                upload_id INTEGER,
+                source    TEXT NOT NULL,
+                date      TEXT NOT NULL,
+                net_liq   REAL,
+                day_pl    REAL,
+                dd_pct    REAL
+            );
+            CREATE TABLE IF NOT EXISTS schwab_options (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                upload_id  INTEGER,
+                date       TEXT NOT NULL,
+                action     TEXT,
+                symbol     TEXT,
+                underlying TEXT,
+                expiry     TEXT,
+                strike     REAL,
+                right      TEXT,
+                qty        REAL,
+                price      REAL,
+                fees       REAL,
+                amount     REAL
+            );
+            CREATE INDEX IF NOT EXISTS idx_schwab_options_date ON schwab_options(date);
+
             CREATE TABLE IF NOT EXISTS bdc_fundamentals (
                 id                 INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker             TEXT NOT NULL,

@@ -139,6 +139,24 @@ Full procedure to be written. Until then:
 - Its value is the 2022-type year (+34% against 17.9% without), on an
   instrument that has existed since 2022-05-11 — n = 1. Size the reliance to that.
 
+## Weekly (10 minutes, Friday after the close)
+
+1. Export four files: Option Omega trade log and portfolio CSV for the week
+   from the `2027` portfolio (funded at the account's actual equity, range
+   Monday → Friday), the autotrader strategy trade log, and the Schwab
+   transaction export.
+2. Drop all four on **Sage › Investments › Options › Live vs Backtest**. Each
+   is recognised by its header and replaces the same dates from last time.
+3. Read, in order: the live − backtest tile (the week's gap), the by-trade
+   rows with flags (which day made the gap and why), stop fill vs 3× trigger
+   (live should stay well under the test's), entry credit live − test
+   (tripwire 0.15 per leg), and Schwab SPX cash against the live SPX total
+   (they should agree to the dollar on an all-0DTE week).
+4. Anything flagged `manual exit` is a day the record is not mechanical;
+   tick *Exclude manual exits* to see the comparison without it.
+5. One line in `decisions.md` only if something is outside the known
+   tolerances (the 2026-10-24 week-one entry lists them).
+
 ## Sleeve-level, every review
 
 - Drawdown > $18k on $80k (22%): one tripwire = investigate, two = stop adding.

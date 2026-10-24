@@ -69,6 +69,44 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-24 — Live vs Backtest moves into Sage (Options sleeve)
+
+The weekly comparison that was being done by hand in these entries is now a
+tab: **Investments › Options › Live vs Backtest**. Ken asked for a button that
+produces both reports; what is buildable is half of that, so the design is
+file-based with the Option Omega half runnable on request.
+
+- **Why files, not a button.** The Option Omega connection is a hosted MCP
+  server (`https://mcp.optionomega.com/mcp`) with 27 tools — all backtest,
+  portfolio and optimizer; **no live-trading or autotrader tool exists**, so the
+  live log can only arrive as the autotrader's export. And the tools live in a
+  Claude session, not in the Flask/FastAPI app, so Sage cannot call them
+  itself. "Press the button" therefore means: drop the exports, or ask Claude
+  to run the `2027` portfolio for the week and post the result.
+- **Three sources, by design.** Backtest (OO trade log + portfolio CSV), live
+  (autotrader log), and **Schwab's transaction export as the third** — Ken:
+  "just to make sure that OO isn't missing anything and to confirm the real
+  numbers in the account." Schwab carries no strategy names, so it is compared
+  by underlying and by cash. Checked on 2026-09-09: live hedge −$267.14,
+  Schwab SPX cash −$267.14. On a day with multi-day positions open (9/08) the
+  cash and the P/L legitimately differ; they reconcile over the position's
+  life. For the current all-0DTE book they should agree daily except the leap.
+- **Decisions baked in:** daily rows stored, weekly view by default; uploads
+  replace by date range per source (newest file wins, no duplicates); live and
+  test paired on (strategy, day) with the three condor rows grouped; manual
+  exits flagged and excludable as a *pair*, so totals stay like-for-like;
+  diagnostics are the two live measurements the tripwires read — stop fill
+  against the 3× trigger and net entry credit on matched strikes. Strategy
+  names are canonicalised (`IC`, `CIC - 10am`, `CIC - AM` → Condor), so the
+  autotrader's renames stop splitting the record.
+- **Checked against this entry's own numbers**: the tab reproduces week one
+  exactly (live −$393, backtest +$724, seven pairs, 10/21 exit mismatch and
+  10/23 manual exit flagged, stop overshoot 0.04 live / 0.93 test).
+
+Procedure in `review-checklist.md` under *Weekly*.
+
+---
+
 ## 2026-10-24 — DECIDED: the condor runs one contract from Monday 2026-10-26
 
 Ken, after the with-and-without run below: *"let's go with 1 IC contract going

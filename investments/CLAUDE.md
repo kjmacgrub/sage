@@ -42,6 +42,17 @@
   strategy › year › open date, with upload/merge of further logs. Groups the three
   rows OO writes per condor into one trade. Snapshot — the live copy is a published
   Artifact (Trade Log Pivot). Open with `file://`, no server.
+- `cef/services/compare.py` + `cef/api/routes/compare.py` — options sleeve **Live vs
+  Backtest** tab (sleeve switch › Options). Three uploads, auto-detected by header:
+  OO trade log + portfolio CSV (backtest), autotrader strategy trade log (live),
+  Schwab transactions (option rows only — the cash that actually settled). Each
+  upload **replaces its date range per source**, so re-dropping a week is safe.
+  OO's three rows per condor are grouped at read time; live and test trades are
+  paired on (strategy, day); manual exits are flagged and can exclude the pair.
+  Strategy names map through `CANON` (`IC`/`CIC - 10am`/`CIC - AM` → Condor).
+  Tables `oo_trades`, `oo_equity`, `schwab_options`, `compare_uploads` in `cef.db`.
+  Schwab is cash-basis: a 0DTE day reconciles to the day, a multi-day position
+  only over its whole life, and the leap only on its close.
 - `docs/review-checklist.md` — options sleeve: the quarterly and annual review as
   numbered steps, per strategy. QQQ Leap written (the cap formula, the two vetoes);
   condor and hedge are stubs carrying their tripwires.
