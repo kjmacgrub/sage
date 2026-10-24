@@ -216,10 +216,16 @@ calm one at the same SPX). Write the quarter's figure here:
 |---|---|---|---|---|---|---|
 | 2026 Q4 (from 10/26) | 1 | 2 | 1 × 2 | ~$30,000 | $18,000 | $48,000 |
 
-**Transition from the old structure (one-off).** The Roth is about $80,000
-with roughly half in CEFs and no Treasuries yet. Trading cash is near the
-target already, so the parking lot starts empty and fills with the first
-conversion. Do not sell CEFs to seed it.
+**Transition from the old structure (one-off, 2026-10-24).** Schwab shows
+cash $35,637 of $81,472, so about $45,800 in CEFs and no Treasuries. One leap
+open today, but the target is sized on the cap (two open), so trading cash is
+$12,400 under the $48,000 target and $4,400 under the $40,000 action line.
+The parking lot is seeded without selling CEFs: make the **2026 Roth
+contribution ($8,600, from the taxable pot, on 2026 wages, due by April 2027)
+now and buy SGOV with it**. That lifts cash + bills to about $44,200, above the
+line. The rest of the gap closes with the first 2027 conversion. Until then
+the leap cap stays at 2 only if cash can carry a second entry; if it cannot,
+run the cap at 1 rather than sell CEFs.
 
 **What it is not.** This is a buying-power rule, separate from the $18k
 drawdown tripwire below. The tripwire asks whether the strategies still
