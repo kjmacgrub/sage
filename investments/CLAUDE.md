@@ -213,8 +213,14 @@ Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 > quarterly, raised only at the annual review (2026-10-22,
 > `docs/review-checklist.md`).
 > Per-trade benchmarks for the live record: condor $70, hedge $97, QQQ ~$2,900.
-> **Reading the live log:** the hedge has been exited manually at least once;
-> an open leap appears in no trade log until it closes (2026-10-23).
+> **Reading the live log:** the hedge and the condor have both been exited
+> manually (condor 14 times by 2026-10-23, ~$25/leg given up each time against
+> the closed 2026-10-03 hold-to-expiry decision) — compare mechanical exits
+> only; an open leap appears in no trade log until it closes; the live condor
+> has run under three autotrader names (`CIC - AM` → `CIC - 10am` → `IC`) and
+> 9/28–9/29 appear under two of them, so a union keyed on name double-counts.
+> Week one (10/19–10/23): live −$393 vs backtest +$724, all of it the 10/21
+> knife-edge; condor 1-vs-2 contracts decision pending (2026-10-24).
 
 **Sell puts is RETIRED (2026-10-08) — its backtest was quote noise.** The 25%
 profit target on a 5-wide ATM spread fired 792 times with SPX at or below entry

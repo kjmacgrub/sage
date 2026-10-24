@@ -69,6 +69,127 @@ Two mechanics worth not forgetting:
 
 ---
 
+## 2026-10-24 — Week one closed: live −$393 against backtest +$724, and the gap is still Wednesday
+
+Friday's logs close the first full live week at two condors and two hedges
+(`strategy-trade-log (14).csv` live; `trade-log - 2026-10-24T053529.700.csv`
+and `portfolio (46).csv` for the same five days in OO). **This OO run was
+funded at $82,000, not $80,000** — the portfolio CSV opens at $81,540 after a
+−$460 day — which is why the backtest hedge traded two contracts on both
+hedge days where last week's $80k run traded one. Both books are now 2 / 2.
+
+| | Backtest ($82k) | Live |
+|---|---|---|
+| Condor, 2 ctr, 5 days | **+$166** | **−$1,121** |
+| Condor per contract-trade | +$17 | −$112 |
+| Hedge, 2 ctr, 2 trades | +$558 | +$728 |
+| Week | +$724 | −$393 |
+
+Day by day, condor only (live − backtest): Mon −$182 · Tue +$588 · **Wed
+−$1,604** · Thu +$28 · Fri −$117. Hedge: Thu +$20 · Fri +$150. Everything
+except Wednesday nets to +$467 in live's favour. **Wednesday is the whole
+week's gap**, and it is the 10/21 knife-edge already written up on
+2026-10-23: a ten-cent credit difference on the 7765 call put the live stop
+at 8.10 against 8.40, the mark peaked ~8.04 in the backtest and 8.10 live.
+Nothing new happened Thursday or Friday to change that reading.
+
+### What Friday added
+
+- **Friday was the clean day.** Both short strikes (7580 P / 7685 C) expired
+  untouched in the backtest for +$1,353. Live closed both sides by hand at
+  14:13 for +$1,236, paying 0.35 and 0.25 to buy them back: **−$129 against
+  expiry** at two contracts, including $9.76 of closing commissions. SPX
+  settled 7,623.68 — 44 points above the put, 61 below the call.
+- **The hedge exited on `VIX Move Down` in both books**, backtest at 10:32 for
+  −$464, live at 10:38 for −$314. Same signal, live paid 7.30 to close against
+  the backtest's 7.85 — a $150 fill difference on two contracts, in live's
+  favour again.
+- **Entry credits matched on the net, not per leg.** Friday's short legs were
+  39¢ richer on the put and 31¢ cheaper on the call live than in OO's
+  one-minute mid, but the whole condor collected 6.85 against 6.87. On
+  matched strikes the net credit per condor was within 7¢ of the backtest
+  every day this week (5.35/5.42 · 5.35/5.32 · 5.55/5.52 · 6.85/6.87). **Read
+  the 15¢/leg tripwire off the net credit when the legs offset like this**;
+  OO's mid is not a live mid and single legs will scatter around it.
+- **No new stop fills** to add to the overshoot record (0.14 / 0.00 / 0.00 /
+  0.02 against the 3× trigger, all before Friday).
+
+### The live condor record so far, under three names
+
+The autotrader has carried the same condor as **`CIC - AM`** (9/28–9/29),
+**`CIC - 10am`** (9/28–10/16) and **`IC`** (10/19 on). The 9/28–9/29 trades
+appear under both of the first two names with slightly different P/L, so a
+union of exports keyed on strategy name double-counts them; take `CIC - 10am`
+plus `IC` as the record.
+
+| | |
+|---|---|
+| Trading days since 2026-09-28 | 20 (one condor a day) |
+| Contract-trades | 26 (1 ctr for 14 days, 2 ctr for 6) |
+| Total P/L | **−$2,515** |
+| Per contract-trade | **−$97** (benchmark +$70, tripwire +$35) |
+| Days with a stop-out | 10 of 20 (backtest 2022–26 rate: 28%) |
+| Peak → trough | +$1,344 (10/07) → −$3,751 (10/22) = **−$5,095** |
+| Drawdown from peak at Friday's close | −$3,859 |
+
+Twenty trades can't distinguish a $70 edge from a $35 one — the per-trade
+spread is about $500, so even a quarter's 62 trades only narrows the error to
+~$65 a trade. What twenty trades *can* say is that the condor is running at
+the pace of its own 2026 backtest (−$30/trade since March) or worse, not at
+the 2022–25 pace. Nothing here contradicts the backtest; it confirms that 2026
+is a bad year for the structure.
+
+**Manual exits are a pattern, not a one-off.** Across all live exports the
+condor has been closed by hand 14 times (12 under `CIC - 10am`, 2 under `IC`),
+mostly between 12:44 and 15:52 for the last 0.25–0.35 of a short. The
+2026-10-03 entry closed this question: late stops hit 1.05% of short legs at
+about −$603, so holding to 16:00 costs ~$6 a leg in expectation while buying
+back costs $25–35 plus commissions. **Each manual close gives up roughly $25 a
+leg**, and it makes the live record incomparable to the backtest on those
+days — the 2026-10-23 caveat about the hedge now applies to the condor too.
+Compare on mechanical exits only until the hand-closing stops.
+
+### The open decision: one condor contract or two
+
+Ken's call from 2026-10-23 was to run the week out at two and decide after.
+The week is out. The evidence did not change — the question was never going to
+be settled by one week — so this is the arithmetic, in the plain terms the
+decision needs.
+
+What a contract is worth per quarter (~62 condor days):
+
+| If the condor runs at… | 2nd contract earns | Source |
+|---|---|---|
+| the 2022–25 benchmark, +$70/trade | **+$4,300** | honest backtest |
+| the 2026 backtest, −$30/trade | **−$1,900** | OO, March → October |
+| the live pace so far, −$97/trade | **−$6,000** | 20 trades, noisy |
+
+The two options on the table, with what each costs:
+
+1. **Drop to one contract until the condor shows a positive live quarter.**
+   Halves the dollars at stake during the period when the record can't tell
+   good from bad. Costs ~$4,300 a quarter of foregone profit if the strategy
+   is fine. In OO: capital per contract **$58,000** (was $29,000), live and
+   test together — at $82k that gives one; the second returns at $116k, which
+   is a decision not a drift.
+2. **Keep two, with a pre-committed drop.** Drop to one if the condor's P/L
+   falls **$9,000 below its 10/07 peak** (half the sleeve tripwire). It is
+   $3,859 below now; at two contracts a stop day costs $600–1,300, so the rule
+   fires after roughly **four to six more bad days than good ones**. Costs
+   nothing if the strategy is fine; costs up to ~$5,100 more than option 1
+   before it acts.
+
+Recommendation: **option 1.** The condor is in its first negative backtest
+year and the live record is at −$97 a trade. The second contract is a bet that
+2026's pattern ends before the record can show it has, and the ratchet rule
+already says nothing is raised until the condor has a positive live year —
+running two from day one was the raise. The $4,300 a quarter it gives up is
+the price of waiting for evidence; the $6,000 it might lose is the price of
+not waiting. Either way, **write the choice and the trigger here before Monday
+10:00**, so the next bad week isn't the thing that decides it.
+
+---
+
 ## 2026-10-23 — Sizing is capital per contract (29k / 40k / 42k), and the first live week read against the backtest
 
 ### Sizing: supersedes the 2026-10-09 percentage calibration
@@ -108,6 +229,7 @@ What it changes, written down so the next review doesn't rediscover it:
   quarter raise it; or keep 2 with a pre-committed drop rule (e.g. condor
   drawdown reaching $9k, half the tripwire). Ken: run the week out at 2, decide
   after.
+  **→ Week closed; arithmetic and recommendation in the 2026-10-24 entry.**
 - **The hedge sits exactly on its threshold.** At $79,325 on 2026-10-22 the
   backtest traded one hedge; live traded two. Expect it to flicker 1 ↔ 2 for as
   long as equity straddles $80k — harmless at ~$985 of margin, noted so the
