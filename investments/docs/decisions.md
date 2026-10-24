@@ -99,6 +99,23 @@ filter OFF — confirmed by reading the saved strategy back).
 Per-contract figures for the live record are unchanged: benchmark $70,
 tripwire $35, hedge $97 / $48.
 
+**Confirmed set, same evening.** Saved `IC` backtest read back with
+`maxContractsPerTrade` 1 (intra-minute ON, wide-bid-ask filter OFF). Live
+autotrader set to a **fixed 1 contract, not capital-based** — so nothing
+raises it on its own; the raise is a review decision, which is the rule. The
+saved backtest re-run at 1 contract, 2017-05 → 2026-10-15, honest settings:
+
+| 2017 | 2018 | 2019 | 2020 | 2021 | 2022 (May→) | 2023 | 2024 | 2025 | 2026 (→Oct 15) |
+|---|---|---|---|---|---|---|---|---|---|
+| +$1.5k | **−$0.5k** | +$2.3k | +$0.3k | +$6.0k | +$7.1k | +$12.7k | +$13.0k | +$23.4k | +$1.5k |
+
+Total $67,270, max drawdown −9.5% (Q4 2022). This is the one-contract
+reference for the condor going forward; 2018 is its only losing calendar
+year, and 2026 at +$1.5k on ~200 trades is the ~$7-a-trade year already
+noted. The saved `2027` portfolio still carries its own override (cap 6, $29k
+per contract) and would trade 2 at $80k if re-run as is — change the override
+to cap 1 before using it for a live-vs-backtest week.
+
 ---
 
 ## 2026-10-24 — The condor, with and without: it is half the book's profit and adds $1–4k a year of drawdown
