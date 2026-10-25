@@ -9,6 +9,40 @@ live in `../CLAUDE.md`. This file is only for judgment calls.
 
 ---
 
+## 2026-10-25 — DECIDED: the option sleeve trades Ken's Roth only; $50K/yr conversions stand (the $20K NY-exclusion schedule rejected)
+
+**The sleeve stays in one account.** Hilary's Roth, her IRA and the taxable pot
+are never traded, whatever the sleeve's record. Its capital grows only from
+Ken's conversions (~$50K/yr to 2033), his Roth contributions from wages, and
+compounding. The earlier scaling order (own Roth → Hilary's Roth → her IRA →
+taxable via 1256 index options) is withdrawn. The sleeve-level section of the
+review checklist now carries this as a rule with a footnote.
+
+**Plan at 12%, not 15%.** A 15% sleeve changes nothing but the Roth bar
+(Roth ~$5.4M in 2047 with the CEF side at 9%, vs $3.7M at 12%); through 2033
+it is only ~$70-110K ahead. Ken: "that would be great but let's not plan for
+it." Also, 15% at a 2037 sleeve of $1.4M means 15-20x today's contract count
+inside one account; the tripwires (drawdown > 22%, two losing years) are the
+brakes if the return sags with size.
+
+**$20K/yr conversions (all inside the NY $20K pension/IRA exclusion) rejected.**
+The exclusion is state tax only; federal 22% applies to every converted dollar
+either way. At $20K/yr the IRA (growing 5%) never empties: $205K left in 2037,
+conversions continue to 2047 and RMDs from 75 are taxed on top, so total
+conversion tax is almost unchanged ($92K vs $95K) while the money waits in the
+IRA at 5% instead of the sleeve at 12%. Kenalone model, after-tax totals
+(IRA at 70%):
+
+| sleeve return | 2037 $50K / $20K | 2047 $50K / $20K |
+|---|---|---|
+| 12% | $1.97M / $1.79M | $4.38M / $3.64M |
+| 9% | $1.70M / $1.62M | $2.88M / $2.63M |
+| ~6% | tie | tie |
+
+The exclusion is also a New York rule; if Ken is not a NY resident after 2027
+there is nothing to protect. $20K/yr remains the fallback if the sleeve has two
+losing years and the January review stops the $50K pace.
+
 ## Standing context
 
 **Three sleeves, each with a different job.** Judge each against its own job —
