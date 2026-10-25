@@ -38,10 +38,15 @@ def list_holdings():
                    p.price, p.nav, p.premium_discount, p.avg_discount_1y, p.nav_cagr, p.yield_pct,
                    p.has_special_dist, p.regular_yield_pct, p.last_special_date, p.last_special_amount,
                    p.earned_yield_1y, p.dist_yield_1y, p.earned_yield_life, p.dist_yield_life, p.yield_life_years,
-                   p2.price AS prev_price
+                   p2.price AS prev_price,
+                   dt.dist_trend, dt.dist_cuts_5y, dt.dist_cuts_10y, dt.dist_raises_5y,
+                   dt.dist_last_cut, dt.dist_last_cut_pct, dt.dist_max_cut_pct,
+                   dt.dist_change_5y, dt.dist_trend_as_of,
+                   dt.dist_rate_now, dt.dist_high_3y, dt.dist_off_high_pct, dt.dist_flag
             FROM holdings h
             JOIN funds f ON f.ticker = h.ticker
             LEFT JOIN screener_cache sc ON sc.ticker = h.ticker
+            LEFT JOIN dist_trend dt ON dt.ticker = h.ticker
             LEFT JOIN prices p ON p.ticker = h.ticker
               AND p.date = (SELECT MAX(px.date) FROM prices px WHERE px.ticker = h.ticker)
             LEFT JOIN prices p2 ON p2.ticker = h.ticker

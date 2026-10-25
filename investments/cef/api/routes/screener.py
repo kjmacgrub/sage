@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from ...database import get_db
 from ...services.exposure import resolve as resolve_exposure
 from ...services.scraper import fetch_screener_data, fetch_cef_list
+from ...services import dist_trend
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -15,7 +16,8 @@ _write_lock = threading.Lock()
 def screener_funds():
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM screener_cache ORDER BY ticker"
+            f"SELECT sc.*, {dist_trend.SELECT_COLS} FROM screener_cache sc "
+            "LEFT JOIN dist_trend dt ON dt.ticker = sc.ticker ORDER BY sc.ticker"
         ).fetchall()
         data = [dict(r) for r in rows]
 
@@ -55,6 +57,44 @@ def screener_refresh():
     return {"message": "Refresh started"}
 
 
+_trend_state = {"running": False, "done": 0, "total": 0, "errors": []}
+
+
+@router.post("/trend/refresh")
+def trend_refresh():
+    """Recompute the distribution trend for held and watchlist funds only."""
+    if _trend_state["running"]:
+        return {"message": "Already running", "state": _trend_state}
+    threading.Thread(target=_do_trend_refresh, daemon=True).start()
+    return {"message": "Trend refresh started"}
+
+
+@router.get("/trend/status")
+def trend_status():
+    return _trend_state
+
+
+def _do_trend_refresh():
+    global _trend_state
+    with get_db() as conn:
+        tickers = [r["ticker"] for r in conn.execute(
+            "SELECT ticker FROM holdings WHERE shares > 0 "
+            "UNION SELECT ticker FROM funds WHERE active = 1 ORDER BY 1")]
+    _trend_state = {"running": True, "done": 0, "total": len(tickers), "errors": []}
+    try:
+        def one(t):
+            try:
+                dist_trend.refresh_one(t)
+            except Exception:
+                _trend_state["errors"].append(t)
+            finally:
+                _trend_state["done"] += 1
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            list(pool.map(one, tickers))
+    finally:
+        _trend_state["running"] = False
+
+
 def _do_refresh():
     global _state
     _state = {"running": True, "done": 0, "total": 0, "errors": []}
@@ -67,8 +107,11 @@ def _do_refresh():
             name = f["Name"]
             try:
                 data = fetch_screener_data(ticker)
+                trend = dist_trend.analyze(dist_trend.fetch_events(ticker)) if data else None
                 if data:
                     with _write_lock:
+                        with get_db() as conn:
+                            dist_trend.upsert(conn, ticker, trend)
                         with get_db() as conn:
                             conn.execute("""
                                 INSERT INTO screener_cache

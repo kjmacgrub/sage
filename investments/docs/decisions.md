@@ -9,6 +9,66 @@ live in `../CLAUDE.md`. This file is only for judgment calls.
 
 ---
 
+## 2026-10-25 — DECIDED: CEF selection and inventory rule — steady or rising payout, never cut
+
+**The rule.** A fund in the CEF sleeve must hold or raise its regular
+distribution. Cutting disqualifies it as a candidate and puts a holding on the
+review list. Ken used the same screen (rising dividends) when he looked at the
+dividend-aristocrat strategy; the CEF screener never had it.
+
+**Why `dist_cagr` was not enough.** The screener's Dist/yr figure is first
+complete year → last, a smooth average. A fund that cut 20% in 2023 and has
+been climbing back since shows a flat CAGR and passes. Only the actual payment
+sequence shows the cut.
+
+**How it is measured** (`cef/services/dist_trend.py`): Yahoo's max and 2-year
+dividend feeds merged with the broker rows in `distributions` (the max feed
+drops payments at random: ECAT came back with 30 events on one call and 59 on
+the next). Specials are removed by comparing each payment with its twelve
+neighbours on both sides, so NPFD's genuine doubling of the payout does not
+read as a run of specials. Each payment is annualised by the schedule in force
+when it was paid, so TYG's quarterly→monthly switch in Dec 2024 is a change of
+frequency, not a 53% cut, and a month missing from the feed is a hole, not a
+frequency change. Broker rows prove a payment happened but their per-share
+amount is total ÷ shares and goes wrong when the position changed mid-month
+(TYG 2026-06 read as a 25% cut that never happened), so they count for
+frequency only. A cut is a drop of more than 2% in the annualised rate; USA and
+SPE-style managed payouts that move a cent either way are not cuts. Funds whose
+payout floats with NAV (USA: 10% of NAV a year) are labelled Variable rather
+than scored: there is no fixed rate to cut, and they fall with the market by
+design.
+
+**First inventory of the sleeve (trailing 5 years):**
+
+| verdict | funds |
+|---|---|
+| Rising, no cut | ECAT, NML, NXG, SRV, TYG (all four MLP funds cut 60-80% in 2020 and have more than rebuilt since) |
+| Steady | AVK |
+| One cut, now 3+ years old | ARCC (-6% 2023), EXG (-20% 2022), NCV/NCZ (-21% 2023), SPE (-21% 2023) |
+| Cut within the last year | AOD (toggles 0.10/0.11, -9% Oct 2026), AWP (-8% Oct 2026), FSCO (-15% Mar 2026), HGLB (-3% Jan 2026; -21% worst), NPFD (-6% Dec 2025; 4 cuts), BSTZ (-25% Oct 2025; 3 cuts), BBDC (-16% Dec 2025), XFLT (-25% Apr 2026; 4 cuts, -38% over 5y) |
+| Variable (NAV-linked) | USA |
+
+Watchlist that passes a 5-year no-cut screen: FFA, EMO, IGA, PDX (the last
+three are 2019-20 cutters rebuilt since).
+
+**Revised the same day: judge the level, not each step.** Applied cut and
+dry, "never cut" leaves very few CEFs to choose from: a CEF's payout is a
+policy number reset against NAV or earnings, so a trim is housekeeping, not the
+broken promise it is for a dividend aristocrat. Ken: "There needs to be some
+leeway for the fund to operate." The rule adopted is **the annualised regular
+payout more than 10% below its own three-year high, for two consecutive
+payments**. That ignores AOD's penny toggles, HGLB's 3% trim and USA's
+NAV-linked swings, forgives a cut that is reversed (BBDC, HGLB), and still
+catches ECAT, which never took a step bigger than 2% and has bled 12% through a
+dozen of them, a slow bleed the per-payment cut count missed entirely. The
+"vs 3y high" column replaces Cuts as the headline in Positions and the
+screener; the screener filter is "Payout within N% of 3y high". The cut count
+stays in the hover text.
+
+Flagged on the first run: XFLT (-47% vs its high), BSTZ (-27%), BBDC (-16%),
+ECAT (-14%), FSCO (-13%). Near the line: AOD (-9%), AWP (-8%), NPFD (-6%).
+Everything else is at or within 3% of its high. Which to act on is Ken's call.
+
 ## 2026-10-25 — DECIDED: the option sleeve trades Ken's Roth only; $50K/yr conversions stand (the $20K NY-exclusion schedule rejected)
 
 **The sleeve stays in one account.** Hilary's Roth, her IRA and the taxable pot

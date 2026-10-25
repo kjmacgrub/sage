@@ -69,6 +69,12 @@ def init_db():
             # midstream with tech. Null means "not yet classified"; a value
             # here overrides the category-derived default.
             "ALTER TABLE funds ADD COLUMN exposure TEXT",
+            # Payout level vs its own 3-year high: the rule that replaced the
+            # cut count as the headline (decisions 2026-10-25).
+            "ALTER TABLE dist_trend ADD COLUMN dist_rate_now REAL",
+            "ALTER TABLE dist_trend ADD COLUMN dist_high_3y REAL",
+            "ALTER TABLE dist_trend ADD COLUMN dist_off_high_pct REAL",
+            "ALTER TABLE dist_trend ADD COLUMN dist_flag INTEGER",
         ]:
             try:
                 conn.execute(sql)
@@ -132,6 +138,29 @@ def init_db():
                 category        TEXT,
                 dist_cagr       REAL,
                 fetched_at      TEXT
+            );
+
+            -- Distribution trend: has the regular payout been cut, and when.
+            -- Own table rather than screener_cache columns because BDCs are
+            -- not on CEFConnect and never get a screener row. Filled by the
+            -- screener refresh, the price refresh and refresh_dist_trend.py.
+            CREATE TABLE IF NOT EXISTS dist_trend (
+                ticker            TEXT PRIMARY KEY,
+                dist_trend        TEXT,      -- Rising | Steady | Cut | Variable | NULL
+                dist_cuts_5y      INTEGER,
+                dist_cuts_10y     INTEGER,
+                dist_raises_5y    INTEGER,
+                dist_last_cut     TEXT,
+                dist_last_cut_pct REAL,
+                dist_max_cut_pct  REAL,      -- worst single cut in 10 years
+                dist_change_5y    REAL,      -- annualised rate now vs 5 years ago, %
+                dist_payments     INTEGER,
+                dist_trend_as_of  TEXT,      -- last regular payment seen
+                dist_rate_now     REAL,      -- annualised regular payout, latest payment
+                dist_high_3y      REAL,      -- its 3-year high
+                dist_off_high_pct REAL,      -- now vs that high, %
+                dist_flag         INTEGER,   -- 1 = more than 10% below the high, two payments running
+                fetched_at        TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
             CREATE TABLE IF NOT EXISTS distributions (

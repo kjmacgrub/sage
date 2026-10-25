@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from ...database import get_db
 from ...services.exposure import resolve as resolve_exposure
 from ...services.scraper import fetch_fund_data, fetch_quick_prices
+from ...services import dist_trend
 
 router = APIRouter()
 
@@ -200,6 +201,10 @@ def refresh_prices():
     for ticker in tickers:
         try:
             data = fetch_fund_data(ticker)
+            try:
+                dist_trend.refresh_one(ticker)   # cut history rides along with the full refresh
+            except Exception:
+                pass
             with get_db() as conn:
                 conn.execute("""
                     INSERT INTO prices (ticker, date, price, nav, premium_discount, avg_discount_1y, nav_cagr, yield_pct, distribution, dist_freq,

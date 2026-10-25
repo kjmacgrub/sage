@@ -9,7 +9,7 @@ let _hideHeld = true;
 let _distributions = [];
 let _screenData = [];
 let _screenState = { running: false, done: 0, total: 0, errors: [] };
-let _screenFilters = { minYield: null, maxPremium: null, monthlyOnly: false, minHistory: null, minNavChange: null, hideWatchlist: false };
+let _screenFilters = { minYield: null, maxPremium: null, monthlyOnly: false, minHistory: null, minNavChange: null, hideWatchlist: false, maxOffHigh: null };
 let _importCsv = null;   // raw Schwab CSV awaiting confirm
 let _importPlan = null;
 let _importResult = null;  // survives the re-render after a confirmed import
@@ -367,6 +367,7 @@ function renderPortfolio() {
             ${th('yield_pct', 'Yield', false, false, 'Current market yield')}
             ${th('yoc', 'YoC', false, false, 'Yield on cost basis (annualized distributions / total cost)')}
             ${th('coverage_ratio', 'Coverage', false, false, 'Is the yield paying for itself? For CEFs: earned yield (NAV total return) ÷ distributed yield, taken over rolling 3-year windows. For BDCs: net investment income ÷ dividend, as filed. At or above 1.0× the payout is earned; below it, the shortfall comes out of principal. Run the audit (badge beside the ticker) to populate.')}
+            ${th('dist_off_high_pct', 'vs 3y high', false, false, 'Annualised regular payout now vs its own 3-year high. The rule for this sleeve: more than 10% below the high for two payments running (red) is the review trigger. Judges the level, not each step, so a penny toggle or a reversed cut passes and a slow bleed does not. Hover for the cut count, last cut and 5-year change; Refresh recomputes.')}
             ${th('disc_vs_avg', 'δ vs Avg', false, false, 'Current disc/premium relative to its 1-year average. Negative = trading cheaper than usual.')}
             ${th('unrealized_gain', 'Unr. Gain')}
             ${th('dividends_received', 'Divs')}
@@ -458,6 +459,7 @@ function portfolioRow(h, totalMkt, idx) {
       ${yieldCell(h)}
       <td class="positive" title="Yield on cost basis">${yoc != null ? yoc.toFixed(2) + '%' : '—'}</td>
       ${coverageCell(h)}
+      ${distTrendCell(h)}
       <td>${fmtDiscCell(h.premium_discount, h.avg_discount_1y)}</td>
       <td class="${gainClass(h.unrealized_gain)}">${fmtGain$(h.unrealized_gain)}</td>
       <td class="positive" onclick="event.stopPropagation(); openDivModal('${h.ticker}')" style="cursor:pointer;text-decoration:underline dotted" title="Click to view distribution history">${fmt$(h.dividends_received)}</td>
@@ -1537,6 +1539,7 @@ function applyScreenFilters(funds) {
       if (yrs == null || yrs < _screenFilters.minHistory) return false;
     }
     if (_screenFilters.minNavChange != null && (f.nav_cagr == null || f.nav_cagr < _screenFilters.minNavChange)) return false;
+    if (_screenFilters.maxOffHigh != null && (f.dist_off_high_pct == null || f.dist_off_high_pct < -_screenFilters.maxOffHigh)) return false;
     return true;
   });
 }
@@ -1558,12 +1561,13 @@ function readScreenFilters() {
     minHistory:    num(v('sf-history')),
     minNavChange:  num(v('sf-navchg')),
     hideWatchlist: cb('sf-hide-wl'),
+    maxOffHigh:    num(v('sf-offhigh')),
   };
   renderApp();
 }
 
 function clearScreenFilters() {
-  _screenFilters = { minYield: null, maxPremium: null, monthlyOnly: false, minHistory: null, minNavChange: null, hideWatchlist: false };
+  _screenFilters = { minYield: null, maxPremium: null, monthlyOnly: false, minHistory: null, minNavChange: null, hideWatchlist: false, maxOffHigh: null };
   renderApp();
 }
 
@@ -1779,6 +1783,11 @@ function renderScreen() {
             <input type="number" id="sf-navchg" class="filter-input" placeholder="-5" value="${_screenFilters.minNavChange ?? ''}" oninput="readScreenFilters()">
             <span class="filter-unit">%</span>
           </div>
+          <label class="filter-label" title="Keep only funds whose annualised regular payout is within this many percent of its own 3-year high. Judges the level, not each step: a penny toggle or a reversed cut passes, a slow bleed does not. Not yet computed = excluded.">Payout within</label>
+          <div class="filter-input-group">
+            <input type="number" id="sf-offhigh" class="filter-input" placeholder="10" value="${_screenFilters.maxOffHigh ?? ''}" oninput="readScreenFilters()">
+            <span class="filter-unit">% of 3y high</span>
+          </div>
           <label class="filter-check"><input type="checkbox" id="sf-monthly" ${_screenFilters.monthlyOnly ? 'checked' : ''} onchange="readScreenFilters()"> Monthly</label>
           <label class="filter-check"><input type="checkbox" id="sf-hide-wl" ${_screenFilters.hideWatchlist ? 'checked' : ''} onchange="readScreenFilters()"> Hide watchlist</label>
           <button class="btn btn-ghost btn-sm" onclick="clearScreenFilters()" style="margin-left:auto">Clear</button>
@@ -1808,7 +1817,8 @@ function renderScreen() {
               ${th('premium_discount', 'Disc/Prem')}
               ${th('coverage_1y', '1Y E/D', false, false, 'Earned yield (total return on NAV) vs Distributed yield (distributions ÷ NAV), trailing 1 year. Green = distribution out-earned, NAV growing; red = NAV eroding. Sorted by the earned−distributed gap.')}
               ${th('coverage_life', 'Life E/D', false, false, 'Earned vs Distributed yield, annualized over up to 5 years (or since inception). Green = sustainable; red = NAV-eroding.')}
-              ${th('dist_cagr', 'Dist/yr', false, false, 'Annualized distribution change rate since inception (first → last complete year)')}
+              ${th('dist_cagr', 'Dist/yr', false, false, 'Annualized distribution change rate since inception (first → last complete year). A smooth average: it cannot see a cut followed by a recovery — the Cuts column can.')}
+              ${th('dist_off_high_pct', 'vs 3y high', false, false, 'Annualised regular payout now vs its own 3-year high. Red = more than 10% below for two payments running. Judges the level, not each step. Hover for the cut count, last cut and 5-year change.')}
               ${th('leverage_pct', 'Lev', false, false, 'Effective leverage as a % of total assets. The 1940 Act tests debt at 300% asset coverage but preferred at only 200%, so identical ratios differ sharply in how far the market can fall before a forced deleveraging. Blank = not reported, which is unknown rather than zero.')}
               ${th('inception_date', 'Since', true)}
               <th></th>
@@ -1820,6 +1830,32 @@ function renderScreen() {
         </table>
       </div>` : (state !== 'empty' ? `<div class="empty-state"><p>No funds match the current filters.</p></div>` : '')}
     </div>`;
+}
+
+/** Has the regular payout been cut? Steady-or-rising is the rule for the CEF
+ *  sleeve; a fund that cut once and climbed back shows a flat Dist/yr CAGR and
+ *  would otherwise pass unnoticed. */
+function yearsSince(dateStr) {
+  return dateStr ? (Date.now() - Date.parse(dateStr + 'T00:00:00')) / (365.25 * 86400000) : null;
+}
+
+function distTrendCell(f) {
+  const t = f.dist_trend;
+  if (!t) return `<td style="color:var(--text-muted)" title="Not computed yet — Refresh fills it in">—</td>`;
+  const chg = f.dist_change_5y != null ? `${f.dist_change_5y >= 0 ? '+' : ''}${f.dist_change_5y.toFixed(0)}% over 5 years` : '';
+  const last = f.dist_last_cut
+    ? `Last cut ${f.dist_last_cut} (${f.dist_last_cut_pct}%)${f.dist_max_cut_pct != null && f.dist_max_cut_pct !== f.dist_last_cut_pct ? `, worst in 10y ${f.dist_max_cut_pct}%` : ''}`
+    : 'No cut in 10 years';
+  const level = f.dist_high_3y != null ? `payout $${f.dist_rate_now.toFixed(2)}/yr vs 3y high $${f.dist_high_3y.toFixed(2)}` : '';
+  const title = [level, `${t}: ${f.dist_cuts_5y} cut${f.dist_cuts_5y === 1 ? '' : 's'}, ${f.dist_raises_5y} raise${f.dist_raises_5y === 1 ? '' : 's'} in 5y`, last, chg, f.dist_trend_as_of ? `through ${f.dist_trend_as_of}` : ''].filter(Boolean).join(' · ');
+  if (f.dist_off_high_pct == null) {
+    return `<td style="color:var(--text-muted)" title="${title}">${t}</td>`;
+  }
+  const off = f.dist_off_high_pct;
+  const color = f.dist_flag ? 'var(--red)' : off >= -2 ? 'var(--green)' : off > -10 ? 'var(--text-2)' : 'var(--yellow)';
+  const text = off >= -0.05 ? 'at high' : `${off.toFixed(0)}%`;
+  const suffix = t === 'Variable' ? ' <span style="color:var(--text-muted);font-size:11px">NAV</span>' : '';
+  return `<td style="color:${color};white-space:nowrap" title="${title}">${text}${suffix}</td>`;
 }
 
 function leverageCell(f) {
@@ -1977,6 +2013,7 @@ function screenRow(f, wlTickers, heldTickers) {
       ${yieldPairCell(f.earned_yield_1y, f.dist_yield_1y, '1-Year')}
       ${yieldPairCell(f.earned_yield_life, f.dist_yield_life, 'Lifetime', f.yield_life_years)}
       <td>${distChg}</td>
+      ${distTrendCell(f)}
       ${leverageCell(f)}
       <td style="color:var(--text-muted)">${yrs != null ? yrs + 'y' : '—'}</td>
       <td>${inWl ? '' : `<button class="btn btn-ghost btn-sm" onclick="addFromScreener('${f.ticker}','${(f.name||'').replace(/'/g,"\\'")}')">+ Watch</button>`}</td>

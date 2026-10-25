@@ -29,6 +29,15 @@
   history so an explicit `period1` is required. Standalone copies of the same
   pipeline live in `dividend/` for rebuilding the published artifact.
 - `backfill_leverage.py` — populate leverage for already-cached screener rows without a full refresh
+- `cef/services/dist_trend.py` — has a fund cut its regular payout, and when. Walks the
+  actual payment sequence (Yahoo max + 2y feeds merged with broker rows; specials and
+  frequency changes recognised) and labels Rising / Steady / Cut / Variable with cut
+  counts, last cut, worst cut and the 5-year change, and the headline rule: annualised
+  payout vs its own 3-year high, flagged when more than 10% below for two payments
+  running. Shown as the **vs 3y high** column in Positions and the screener (cut count
+  in the hover), and behind the screener's "Payout within N% of 3y high" filter.
+  Filled by the screener refresh, the Positions Refresh, or `refresh_dist_trend.py`
+  (held + watchlist; `--all` for every cached ticker; or named tickers).
 - `import_schwab_transactions.py` — command-line front end for the same importer
 - `cef/settings.py` — user-tunable settings; code defaults, DB rows override
 - `cef/database.py` — SQLite schema + migrations
@@ -78,6 +87,8 @@
 - `nav_history` table — exists but empty (NAV sparklines is a planned feature)
 - `screener_cache` table — pre-computed screener data, including leverage
   (ratio, preferred/debt split, band, indicative cushion, as-of date)
+- `dist_trend` table — distribution cut history per ticker (own table so BDCs, which
+  have no screener row, get one too)
 - `settings` table — key/JSON overrides; a missing row means "use the code default"
 - `audits` table — one row per audit run, history kept; `settings_json` snapshots the
   rubric each grade was computed under, so old grades stay interpretable after retuning
