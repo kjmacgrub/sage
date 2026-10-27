@@ -14,7 +14,9 @@ stubs carrying only their tripwires.[^status]
 2. Drop all four on **Sage › Investments › Options › Live vs Backtest**.
 3. Read in order: live − backtest tile → flagged by-trade rows → stop fill vs
    3× trigger → entry credit live − test (tripwire **0.15/leg**) → Schwab SPX
-   cash = live SPX total.[^weekly-read]
+   cash = live SPX total.[^weekly-read] Then **Open positions** at the foot:
+   any leap still held, cost and days held (built from the Schwab rows, so
+   current only if the Schwab export covers the range).
 4. Any `manual exit` flag → tick *Exclude manual exits*.
 5. One line in `decisions.md` only if outside tolerances.[^tolerances]
 6. Cash balance below the action line (**$40,000**) → Cash floor, below.
