@@ -973,6 +973,7 @@ tr.group-header:hover td { background: var(--surface2); }
 .cmp-drop { border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 16px 18px; background: var(--surface); font-size: 13px; }
 .cmp-drop.over { border-color: var(--accent); background: var(--surface2); }
 .cmp-drop a { color: var(--accent); }
+.cmp-drop-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .cmp-drop-hint { color: var(--text-2); font-size: 12px; margin-top: 4px; line-height: 1.5; }
 .cmp-upload-status { margin-top: 8px; font-size: 12px; line-height: 1.6; }
 .cmp-section { display: flex; flex-direction: column; gap: 8px; }

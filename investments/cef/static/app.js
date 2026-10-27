@@ -3834,17 +3834,30 @@ function cmpExits(t) {
 
 function renderCompare() {
   const d = _cmp.data;
+  const uploads = _cmp.showUploads && _cmp.uploads ? `
+    <div class="cmp-section">
+      <div class="cmp-h">Uploads</div>
+      <table class="cmp-table cmp-uploads"><thead><tr><th class="left">When</th><th class="left">Kind</th><th class="left">File</th><th class="num">Rows</th><th class="left">Dates</th><th></th></tr></thead>
+      <tbody>${_cmp.uploads.map(u => `<tr>
+        <td class="left cmp-muted">${u.uploaded_at}</td><td class="left">${u.kind}</td><td class="left">${u.filename || ''}</td>
+        <td class="num">${u.rows}</td><td class="left">${u.min_date} → ${u.max_date}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="cmpDeleteUpload(${u.id}, '${(u.filename || u.kind).replace(/'/g, '')}')">remove</button></td></tr>`).join('')}
+      </tbody></table>
+    </div>` : '';
   const upload = `
     <div class="cmp-drop" ondragover="event.preventDefault();this.classList.add('over')"
          ondragleave="this.classList.remove('over')" ondrop="cmpDrop(event)">
       <input type="file" id="cmp-file-input" multiple accept=".csv" onchange="onCompareFiles(this)" style="display:none">
-      <div><strong>Drop the week's exports here</strong> or <a href="#" onclick="document.getElementById('cmp-file-input').click();return false">choose files</a></div>
+      <div class="cmp-drop-head">
+        <div><strong>Drop the week's exports here</strong> or <a href="#" onclick="document.getElementById('cmp-file-input').click();return false">choose files</a></div>
+        <button class="btn btn-ghost btn-sm" onclick="_cmp.showUploads=!_cmp.showUploads;renderApp()">${_cmp.showUploads ? 'Hide' : 'Show'} uploads</button>
+      </div>
       <div class="cmp-drop-hint">Option Omega trade log + portfolio CSV · autotrader strategy trade log · Schwab transactions. Any order, any mix — each file is recognised by its header and replaces the same dates from an earlier upload.</div>
       ${_cmp.status ? `<div id="cmp-upload-status" class="cmp-upload-status">${_cmp.status}</div>` : `<div id="cmp-upload-status" class="cmp-upload-status"></div>`}
     </div>`;
 
-  if (_cmp.loading && !d) return `<div class="cmp-root">${upload}<p class="cmp-muted">Loading…</p></div>`;
-  if (!d || d.empty) return `<div class="cmp-root">${upload}<p class="cmp-muted">Nothing loaded yet. Drop the four exports above to start.</p></div>`;
+  if (_cmp.loading && !d) return `<div class="cmp-root">${upload}${uploads}<p class="cmp-muted">Loading…</p></div>`;
+  if (!d || d.empty) return `<div class="cmp-root">${upload}${uploads}<p class="cmp-muted">Nothing loaded yet. Drop the four exports above to start.</p></div>`;
 
   const t = d.totals, cols = d.columns.filter(c => c !== 'Other' || t.live.Other || t.backtest.Other);
   const hasSchwab = d.days.some(x => x.has.schwab);
@@ -3867,9 +3880,6 @@ function renderCompare() {
       </div>
       <label class="cmp-check"><input type="checkbox" ${_cmp.excludeManual ? 'checked' : ''} onchange="cmpToggleManual(this.checked)">
         Exclude manual exits <span class="cmp-muted">(${t.manual} this range)</span></label>
-      <div class="toolbar-right">
-        <button class="btn btn-ghost btn-sm" onclick="_cmp.showUploads=!_cmp.showUploads;renderApp()">${_cmp.showUploads ? 'Hide' : 'Show'} uploads</button>
-      </div>
     </div>`;
 
   const cov = `
@@ -3966,17 +3976,6 @@ function renderCompare() {
         </tbody>
       </table>
     </div>`;
-
-  const uploads = _cmp.showUploads && _cmp.uploads ? `
-    <div class="cmp-section">
-      <div class="cmp-h">Uploads</div>
-      <table class="cmp-table cmp-uploads"><thead><tr><th class="left">When</th><th class="left">Kind</th><th class="left">File</th><th class="num">Rows</th><th class="left">Dates</th><th></th></tr></thead>
-      <tbody>${_cmp.uploads.map(u => `<tr>
-        <td class="left cmp-muted">${u.uploaded_at}</td><td class="left">${u.kind}</td><td class="left">${u.filename || ''}</td>
-        <td class="num">${u.rows}</td><td class="left">${u.min_date} → ${u.max_date}</td>
-        <td><button class="btn btn-ghost btn-sm" onclick="cmpDeleteUpload(${u.id}, '${(u.filename || u.kind).replace(/'/g, '')}')">remove</button></td></tr>`).join('')}
-      </tbody></table>
-    </div>` : '';
 
   return `
     <div class="cmp-root">
