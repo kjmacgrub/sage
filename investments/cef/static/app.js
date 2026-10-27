@@ -3983,7 +3983,7 @@ function renderCompare() {
     </div>`;
 
   const openPos = d.open_positions && d.open_positions.length ? `
-    <div class="cmp-h">Open positions <span class="cmp-muted">from the Schwab rows, as of ${d.end} · a buy-to-open with no close yet · neither trade log lists a position until the day it closes</span></div>
+    <div class="cmp-h">Open trades <span class="cmp-muted">from the Schwab rows, as of ${d.end} · a buy-to-open with no close yet · neither trade log lists a position until the day it closes</span></div>
     <div class="table-wrap cmp-table-wrap">
       <table class="cmp-table cmp-open">
         <thead><tr>
@@ -4010,12 +4010,12 @@ function renderCompare() {
       ${toolbar}
       ${cov}
       ${tiles}
+      ${openPos}
       ${chart}
       <div class="cmp-h">By day <span class="cmp-muted">closed P/L, net of commissions · Schwab is cash that settled, by underlying</span></div>
       ${daily}
       <div class="cmp-h">By trade <span class="cmp-muted">live and test paired on strategy and day · credit and closing cost per share · stop fill shown as (overshoot past 3× credit)</span></div>
       ${trades}
-      ${openPos}
       ${upload}
       ${uploads}
     </div>`;
