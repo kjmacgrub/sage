@@ -58,6 +58,11 @@
   upload **replaces its date range per source**, so re-dropping a week is safe.
   OO's three rows per condor are grouped at read time; live and test trades are
   paired on (strategy, day); manual exits are flagged and can exclude the pair.
+  **Trades are filed under the day they closed** (same as opened for 0DTE; a
+  leap lands in the week it is sold) — ranges, replacement and pairing all use
+  it. Neither trade log lists an open position; the tab's *Open positions*
+  table rebuilds them from the Schwab rows (buy-to-open with no close by the
+  range's end date), which is the only place an open leap is visible.
   Strategy names map through `CANON` (`IC`/`CIC - 10am`/`CIC - AM` → Condor).
   Tables `oo_trades`, `oo_equity`, `schwab_options`, `compare_uploads` in `cef.db`.
   Schwab is cash-basis: a 0DTE day reconciles to the day, a multi-day position

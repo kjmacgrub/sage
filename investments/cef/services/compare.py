@@ -19,7 +19,7 @@ import csv
 import io
 import re
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime
 
 # The live condor has run under three autotrader names; OO's saved strategy was
 # renamed too. One canonical name per book strategy, everything else kept raw.
@@ -247,17 +247,24 @@ def parse_schwab_options(text):
 
 # ---------------------------------------------------------------- storage
 
+# The day a trade is filed under: when it closed. For 0DTE that is the day it
+# opened; for a leap it is months later, and the P/L belongs to the week it
+# was realised, not to a week nobody will look at again.
+CLOSE_DATE = "COALESCE(date_closed, date_opened)"
+
 def store_upload(conn, text, filename):
     kind = detect_kind(text)
     if kind in ("backtest", "live"):
         rows = parse_trades(text, kind)
         if not rows:
             raise ValueError("No trades found in that file.")
-        dates = [r["date_opened"] for r in rows]
+        # A week's export is the trades that CLOSED that week (a leap bought
+        # months earlier lands in the week it is sold), so replace by close date.
+        dates = [r["date_closed"] or r["date_opened"] for r in rows]
         lo, hi = min(dates), max(dates)
         up = _log_upload(conn, kind, filename, len(rows), lo, hi)
         cur = conn.execute(
-            "DELETE FROM oo_trades WHERE source=? AND date_opened BETWEEN ? AND ?",
+            f"DELETE FROM oo_trades WHERE source=? AND {CLOSE_DATE} BETWEEN ? AND ?",
             (kind, lo, hi))
         replaced = cur.rowcount
         conn.executemany("""
@@ -332,7 +339,7 @@ def coverage(conn):
     out = {}
     for src in ("live", "backtest"):
         out[src] = [r[0] for r in conn.execute(
-            "SELECT DISTINCT date_opened FROM oo_trades WHERE source=? ORDER BY 1", (src,))]
+            f"SELECT DISTINCT {CLOSE_DATE} FROM oo_trades WHERE source=? ORDER BY 1", (src,))]
     out["portfolio"] = [r[0] for r in conn.execute(
         "SELECT DISTINCT date FROM oo_equity ORDER BY 1")]
     out["schwab"] = [r[0] for r in conn.execute(
@@ -343,12 +350,16 @@ def coverage(conn):
 # ---------------------------------------------------------------- comparison
 
 def _group_trades(rows):
-    """OO rows -> trades keyed on (source, strategy_raw, date, time)."""
+    """OO rows -> trades keyed on (source, strategy_raw, date opened, time).
+
+    The trade's `date` is the day it closed (= opened for 0DTE); `opened` is
+    kept for display when the two differ."""
     groups = defaultdict(list)
     for r in rows:
         groups[(r["source"], r["strategy_raw"], r["date_opened"], r["time_opened"])].append(r)
     trades = []
-    for (source, raw, d, t), rs in groups.items():
+    for (source, raw, opened, t), rs in groups.items():
+        d = max((r["date_closed"] or r["date_opened"]) for r in rs)
         sides = []
         for r in sorted(rs, key=lambda x: (x["row_kind"], x["time_closed"] or "")):
             over = None
@@ -366,7 +377,7 @@ def _group_trades(rows):
         short_call = next((s["strike"] for s in sides if s["kind"] == "call"), None)
         trades.append({
             "source": source, "strategy_raw": raw, "strategy": canon(raw),
-            "date": d, "time": t,
+            "date": d, "opened": opened, "time": t,
             "contracts": max(r["contracts"] for r in rs),
             "opening_price": rs[0]["opening_price"],
             "legs": " | ".join(r["legs"] for r in rs if r["legs"]),
@@ -381,9 +392,56 @@ def _group_trades(rows):
     return trades
 
 
+def _signed_qty(action, qty):
+    """Position change per Schwab row. Trades carry unsigned quantities;
+    Expired/Assigned carry the position's sign (−2 = two short) and close it."""
+    if qty is None:
+        return 0.0
+    a = action.lower()
+    if a.startswith("buy"):
+        return qty
+    if a.startswith("sell"):
+        return -qty
+    if a in ("expired", "assigned", "exercised"):
+        return -qty
+    return 0.0
+
+
+def open_positions_at(conn, as_of):
+    """Option positions still open at the close of `as_of`, from every Schwab
+    row on or before it: a buy-to-open with no matching close is a leap that
+    the trade logs will not mention until the day it is sold."""
+    pos = {}
+    for r in conn.execute(
+            "SELECT * FROM schwab_options WHERE date <= ? ORDER BY date, id", (as_of,)):
+        dq = _signed_qty(r["action"], r["qty"])
+        if not dq:
+            continue
+        p = pos.setdefault(r["symbol"], {
+            "symbol": r["symbol"], "underlying": r["underlying"], "expiry": r["expiry"],
+            "strike": r["strike"], "right": r["right"], "qty": 0.0, "cost": 0.0,
+            "opened": None, "fees": 0.0})
+        if p["qty"] == 0:            # (re)opening: start the lot fresh
+            p["opened"], p["cost"], p["fees"] = r["date"], 0.0, 0.0
+        p["qty"] = round(p["qty"] + dq, 4)
+        p["cost"] = round(p["cost"] + (r["amount"] or 0.0), 2)
+        p["fees"] = round(p["fees"] + (r["fees"] or 0.0), 2)
+    out = []
+    for p in pos.values():
+        if p["qty"] == 0 or (p["expiry"] and p["expiry"] <= as_of):
+            continue   # closed, or expired by the close of as_of (Schwab's
+                       # Expired rows arrive a day later than the expiry)
+        d0 = date.fromisoformat(p["opened"]) if p["opened"] else None
+        p["days_held"] = (date.fromisoformat(as_of) - d0).days if d0 else None
+        p["strategy"] = "Leap" if p["underlying"] == "QQQ" and p["right"] == "C" and p["qty"] > 0 else None
+        out.append(p)
+    out.sort(key=lambda x: (x["opened"] or "", x["symbol"]))
+    return out
+
+
 def default_range(conn, days=5):
     dates = sorted({r[0] for r in conn.execute(
-        "SELECT DISTINCT date_opened FROM oo_trades")} | {r[0] for r in conn.execute(
+        f"SELECT DISTINCT {CLOSE_DATE} FROM oo_trades")} | {r[0] for r in conn.execute(
         "SELECT DISTINCT date FROM schwab_options")})
     if not dates:
         return None, None
@@ -392,9 +450,10 @@ def default_range(conn, days=5):
 
 def summary(conn, start, end, exclude_manual=False):
     rows = [dict(r) for r in conn.execute(
-        "SELECT * FROM oo_trades WHERE date_opened BETWEEN ? AND ? "
+        f"SELECT * FROM oo_trades WHERE {CLOSE_DATE} BETWEEN ? AND ? "
         "ORDER BY date_opened, time_opened", (start, end))]
     trades = _group_trades(rows)
+    open_positions = open_positions_at(conn, end)
     equity = {r["date"]: dict(r) for r in conn.execute(
         "SELECT * FROM oo_equity WHERE source='backtest' AND date BETWEEN ? AND ?",
         (start, end))}
@@ -517,4 +576,4 @@ def summary(conn, start, end, exclude_manual=False):
     return {"start": start, "end": end, "exclude_manual": bool(exclude_manual),
             "columns": cols, "days": day_list, "totals": totals,
             "pairs": pairs, "diagnostics": diag_out,
-            "schwab_rows": schwab}
+            "schwab_rows": schwab, "open_positions": open_positions}

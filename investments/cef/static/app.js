@@ -3821,6 +3821,11 @@ async function cmpDeleteUpload(id, label) {
 const fmtWhole = n => n == null ? '—' : (n < 0 ? '−' : n > 0 ? '+' : '') + '$' + Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
 const cmpSign = n => n == null || Math.abs(n) < 0.5 ? '' : n > 0 ? 'cmp-pos' : 'cmp-neg';
 const cmpCell = (n, cls = '') => `<td class="num ${cls} ${cmpSign(n)}">${fmtWhole(n)}</td>`;
+const cmpOpened = p => {
+  const t = p.live || p.backtest;
+  if (!t || !t.opened || t.opened === p.date) return '';
+  return `<div class="cmp-muted" style="font-size:11px">opened ${t.opened}</div>`;
+};
 const cmpStrikes = t => t ? `${t.short_put ?? '—'} / ${t.short_call ?? '—'}` : '—';
 function cmpExits(t) {
   if (!t) return '—';
@@ -3956,7 +3961,7 @@ function renderCompare() {
     <div class="table-wrap cmp-table-wrap">
       <table class="cmp-table cmp-trades">
         <thead><tr>
-          <th class="left">Date</th><th class="left">Strategy</th>
+          <th class="left">Closed</th><th class="left">Strategy</th>
           <th class="left">Strikes live</th><th class="left">Strikes test</th>
           <th class="num">Credit live</th><th class="num">Credit test</th>
           <th class="left">Exits live</th><th class="left">Exits test</th>
@@ -3965,7 +3970,7 @@ function renderCompare() {
         </tr></thead>
         <tbody>
           ${d.pairs.map(p => `<tr class="${p.excluded ? 'cmp-excluded' : ''}">
-            <td class="left">${p.date}</td>
+            <td class="left">${p.date}${cmpOpened(p)}</td>
             <td class="left">${p.strategy}${p.live && p.live.contracts ? ` <span class="cmp-muted">×${p.live.contracts}</span>` : ''}</td>
             <td class="left mono">${cmpStrikes(p.live)}</td><td class="left mono">${cmpStrikes(p.backtest)}</td>
             <td class="num">${p.live ? p.live.credit.toFixed(2) : '—'}</td><td class="num">${p.backtest ? p.backtest.credit.toFixed(2) : '—'}</td>
@@ -3977,6 +3982,29 @@ function renderCompare() {
       </table>
     </div>`;
 
+  const openPos = d.open_positions && d.open_positions.length ? `
+    <div class="cmp-h">Open positions <span class="cmp-muted">from the Schwab rows, as of ${d.end} · a buy-to-open with no close yet · neither trade log lists a position until the day it closes</span></div>
+    <div class="table-wrap cmp-table-wrap">
+      <table class="cmp-table cmp-open">
+        <thead><tr>
+          <th class="left">Opened</th><th class="left">Strategy</th><th class="left">Contract</th>
+          <th class="num">Qty</th><th class="num">Cost</th><th class="num">Fees</th>
+          <th class="num">Days held</th><th class="left">Expires</th>
+        </tr></thead>
+        <tbody>${d.open_positions.map(o => `<tr>
+          <td class="left">${o.opened || ''}</td>
+          <td class="left">${o.strategy || '<span class="cmp-muted">—</span>'}</td>
+          <td class="left mono">${o.symbol}</td>
+          <td class="num">${o.qty > 0 ? '+' : ''}${o.qty}</td>
+          ${cmpCell(o.cost)}
+          <td class="num cmp-muted">${o.fees ? o.fees.toFixed(2) : ''}</td>
+          <td class="num">${o.days_held ?? ''}</td>
+          <td class="left">${o.expiry || ''}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : '';
+
   return `
     <div class="cmp-root">
       ${toolbar}
@@ -3987,6 +4015,7 @@ function renderCompare() {
       ${daily}
       <div class="cmp-h">By trade <span class="cmp-muted">live and test paired on strategy and day · credit and closing cost per share · stop fill shown as (overshoot past 3× credit)</span></div>
       ${trades}
+      ${openPos}
       ${upload}
       ${uploads}
     </div>`;
