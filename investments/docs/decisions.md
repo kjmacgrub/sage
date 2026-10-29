@@ -9,6 +9,59 @@ live in `../CLAUDE.md`. This file is only for judgment calls.
 
 ---
 
+## 2026-10-28 — Candidate strategies checked: put backspreads (two versions) and a mirror of the hedge; none qualify
+
+Ken brought a claude.ai brainstorm proposing DBMF (trend-following ETF) plus
+XSP put backspreads sized to cover "a bad 0DTE day of $3–4k" at "2–3% annual
+drag" on "a sleeve of $450–650k". Three premises were wrong before any test:
+the Roth is **$80k, half in CEFs, ~$40k cash**; the condor is entered at 10:00
+and expires the same day, so it **carries no overnight gap risk** (the one
+risk a 45-DTE backspread is built for); and the fast intraday crash is already
+covered by the **Long Put Hedge** (0DTE long 5Δ put + ATM call spread on a VIX
+jump ≥1.7% and a 0.2% drop after the opening range breaks low — $5,566 live on
+2026-10-16). The condor's worst single trade in the 2017–2026 record is
+**−$2,760 per contract**, average loser −$213; the "$3–4k bad day" is a
+two-contract number from before the 2026-10-24 sizing.
+
+**Tested honestly in OO** (SPY as the XSP proxy, 2 lots, 45 DTE, exit at 21
+DTE, re-enter next day, 2022-05-16 → 2026-10-27, 54 cycles each):
+
+| Backspread | Total | Years negative | Win % | Max gain / lot |
+|---|---|---|---|---|
+| Narrow (sell 3.3% OTM, buy 2× 4.6% OTM) | **−$23,266** | 5 of 5 (−$3.2k…−$7.6k) | 9% | $1,222 |
+| Classic (sell 25Δ, buy 2× 10Δ) | −$2,830 | 3 of 5 | 67% | $210 |
+
+The decisive rows: the narrow version was open through **April 2025** (SPY
+564 → ~480 → 550) and through **August 5 2024**. Unrealised it reached
+**+938%** and +690%; held to the 21-DTE exit it booked **+$96** and **−$482**.
+The payoff exists only with a discretionary sale at the top, which the book
+forbids. The classic version's best cycle (+$420) came from the credit in the
+April-2025 rebound, not from any crash. The modelled "every down scenario
+makes money" was a Black-Scholes shape, not a fill.
+
+**The real hole in the book is the sharp intraday up-move** (call-side stops;
+the hedge pays on down-moves only). Tested the obvious filler — a mirror of
+the hedge (long 5Δ call + ATM put spread, VIX down ≥1.7%, 0.2% up, breakout
+high, same exits) at $40k/contract over the same range: +$7,772 total,
+$26/lot (friction breakeven ~$45 for three legs), **2022 −$5.6k, 2024 −$1.4k,
+2026 −$7.0k**, −16% drawdown. Fails gate 1 (positive every year) and gate 2
+(edge ≥ 2× friction). The hedge itself over the same range, for reference:
++$46,737, $97/lot, 10.9% CAGR, −11.3% DD, 2022 −$288 then positive every year.
+
+**DBMF/KMLM** are not options strategies and cannot be qualified by this
+log's gates (no per-trade edge, no exit to audit). They are an allocation
+question for the **CEF half** at the annual review — leveraged credit vs
+trend — not a complement to the condor, which has no multi-week exposure for
+a trend fund to offset.
+
+**Not added.** Nothing here changes the 2026-10-24 decision: the book needs a
+positive live condor quarter, not a fourth strategy. If a candidate for the
+up-move hole is tested next, it starts from the four gates (standalone
+2022-05→now, settlement/stop exits only, zero wrong-way exits; edge ≥ 2×
+friction; positive Mar–Oct 2026 and Apr 2025; with-and-without in dollars).
+Runs: narrow `99Tx4vpvGEzzLEnzhYMw`, classic `aHgW8v8HcokNwQmcfwpi`,
+hedge `8bkXiYGAjZSlPzA9hpZT`, mirror `yPvIIIfbOuUbocZmXdKy` (unsaved OO runs).
+
 ## 2026-10-25 — DECIDED: CEF selection and inventory rule — steady or rising payout, never cut
 
 **The rule.** A fund in the CEF sleeve must hold or raise its regular
