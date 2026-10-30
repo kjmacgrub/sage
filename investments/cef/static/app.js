@@ -4053,6 +4053,9 @@ function renderCmpChart(days, hasSchwab, W = 860) {
   const fmtTick = v => (v < 0 ? '−' : '') + '$' + (Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(Math.abs(v) % 1000 ? 1 : 0) + 'K' : Math.abs(v).toFixed(0));
   const path = k => days.map((x, i) => `${i ? 'L' : 'M'}${xs(i).toFixed(1)},${ys(x.cum[k]).toFixed(1)}`).join(' ');
   const zeroY = ys(0);
+  // Schwab is drawn last and dashed: on an all-0DTE week it equals live to
+  // the cent, and a solid line on top would hide the live line entirely.
+  const draw = series;
   return `
     <div class="cmp-chart-wrap" id="cmp-chart-wrap">
       <div class="cmp-legend">
@@ -4064,8 +4067,8 @@ function renderCmpChart(days, hasSchwab, W = 860) {
           <text class="tick" x="${L - 8}" y="${(ys(v) + 4).toFixed(1)}" text-anchor="end">${fmtTick(v)}</text>`).join('')}
         ${zeroY >= T && zeroY <= H - B ? `<line class="zero" x1="${L}" x2="${W - R}" y1="${zeroY.toFixed(1)}" y2="${zeroY.toFixed(1)}"></line>` : ''}
         ${days.map((x, i) => (n <= 12 || i % Math.ceil(n / 12) === 0 || i === n - 1) ? `<text class="tick" x="${xs(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">${x.date.slice(5)}</text>` : '').join('')}
-        ${series.map(([k, , cls]) => `<path class="line ${cls}" d="${path(k)}"></path>`).join('')}
-        ${series.map(([k, , cls]) => `<circle class="end ${cls}" cx="${xs(n - 1).toFixed(1)}" cy="${ys(days[n - 1].cum[k]).toFixed(1)}" r="4"></circle>`).join('')}
+        ${draw.map(([k, , cls]) => `<path class="line ${cls}" d="${path(k)}"></path>`).join('')}
+        ${draw.map(([k, , cls]) => `<circle class="end ${cls}" cx="${xs(n - 1).toFixed(1)}" cy="${ys(days[n - 1].cum[k]).toFixed(1)}" r="4"></circle>`).join('')}
         <g id="cmp-hover" style="display:none">
           <line class="cross" x1="0" x2="0" y1="${T}" y2="${H - B}"></line>
           ${series.map(([k, , cls]) => `<circle class="pt ${cls}" data-k="${k}" r="5"></circle>`).join('')}
