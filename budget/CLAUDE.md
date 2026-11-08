@@ -14,7 +14,7 @@
 - `index.html` + `app.js` + `styles.css` — Budget Planner (pure client-side, localStorage)
 - `dashboard.html` + `dashboard.js` + `dashboard.css` — Cash Flow dashboard (reads Quicken CSV)
 - `tax.html` + `tax.js` + `tax.css` — Tax estimator
-- `reserve.html` + `reserve.js` + `reserve.css` — Reserve: the two-year cash bucket checked once a month (gap = all-in expenses − guaranteed income, where the monthly expense figure comes from the Planner and the large irregular items are budgeted on this page; months of cover; sell/hold rule; smooth transfer to checking; annual items with a sinking-fund float; monthly log). One JSON blob in the `reserve` table via `/api/reserve` GET/PUT.
+- `reserve.html` + `reserve.js` + `reserve.css` — Reserve: one-screen monthly check-in for the two-year cash bucket. Steps on the left (three balances, expenses from the newest Planner plan, guaranteed income list, fixed monthly distributions with an on/paused switch), the action card on the right with exact instructions. Rule: draw rate (yearly gap ÷ managed accounts) against a guardrail band over a baseline; above the band → pause distributions and live off the reserve; back inside → restart and top up to 24 months; under 12 months → sell/restart regardless. Annual items with sinking-fund float, rule table, settings, log and a family explainer live in popups. One JSON blob in the `reserve` table via `/api/reserve` GET/PUT.
 - `api.py` — Flask API (port 5050), serves dashboard data
 - `query.py` — Quicken CSV parsing logic
 - `db.py` — SQLite helpers

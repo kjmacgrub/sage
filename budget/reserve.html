@@ -7,7 +7,6 @@
     <link rel="icon" type="image/svg+xml" href="/sage-favicon.svg">
     <script>(function(){var p=new URLSearchParams(location.search),t=p.get('theme')||localStorage.getItem('sage-theme')||'dark';if(p.get('theme'))localStorage.setItem('sage-theme',t);document.documentElement.setAttribute('data-theme',t);})();</script>
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="tax.css">
     <link rel="stylesheet" href="reserve.css">
 </head>
 <body>
@@ -22,184 +21,212 @@
         <button class="theme-toggle" id="themeToggle" title="Toggle theme"></button>
     </nav>
 
-    <div class="container">
+    <div class="rv-page">
 
         <div class="error-banner" id="errorBanner">
-            Could not connect to the API. Make sure it's running:<br>
-            <code>python3 budget/api.py</code>
+            Could not connect to the API. Make sure it's running: <code>python3 budget/api.py</code>
         </div>
 
-        <!-- Summary cards -->
-        <div class="tax-summary-row rv-summary">
-            <div class="tax-card">
-                <div class="tax-card-label">Monthly gap</div>
-                <div class="tax-card-value" id="cardGap">—</div>
-                <div class="tax-card-detail" id="cardGapDetail"></div>
-            </div>
-            <div class="tax-card">
-                <div class="tax-card-label">Reserve target</div>
-                <div class="tax-card-value" id="cardTarget">—</div>
-                <div class="tax-card-detail" id="cardTargetDetail"></div>
-            </div>
-            <div class="tax-card">
-                <div class="tax-card-label">Months of cover</div>
-                <div class="tax-card-value" id="cardCover">—</div>
-                <div class="tax-card-detail" id="cardCoverDetail"></div>
-            </div>
-            <div class="tax-card">
-                <div class="tax-card-label">Managed drawdown</div>
-                <div class="tax-card-value" id="cardDD">—</div>
-                <div class="tax-card-detail" id="cardDDDetail"></div>
-            </div>
-            <div class="tax-card">
-                <div class="tax-card-label">Transfer to checking</div>
-                <div class="tax-card-value success" id="cardTransfer">—</div>
-                <div class="tax-card-detail" id="cardTransferDetail"></div>
-            </div>
-        </div>
-
-        <!-- Action -->
-        <div class="section-card rv-action" id="actionCard">
-            <div class="rv-action-title" id="actionTitle">—</div>
-            <div class="rv-action-body" id="actionBody"></div>
-            <div class="rv-action-foot">
-                <label class="rv-month-label">Check-in for
-                    <input type="month" id="rvMonth" class="rv-month" onchange="onInput()">
-                </label>
-                <button class="btn export-btn" onclick="saveToLog()">Save this month to the log</button>
-            </div>
-        </div>
-
-        <!-- Inputs -->
-        <div class="section-card">
-            <div class="tax-section-header">
-                <h3 class="section-heading" style="margin:0">This month</h3>
-                <span class="tax-section-note" id="savedNote"></span>
-            </div>
-            <p class="tax-hint">The expense total and checking balance come from the newest plan on the Planner tab and fill in anything left blank. The guaranteed income list is this page's own; it was seeded once from the Planner's scheduled income, leaving out the draws from managed accounts, which are what the transfer replaces. Type in the money market and managed balances from the statements.</p>
-            <div class="rv-planner" id="plannerStrip" style="display:none">
-                <span id="plannerText"></span>
-                <button class="rv-add" onclick="useplanner(true)">Pull expenses and checking again</button>
-            </div>
-            <div class="cp-grid">
-                <div class="cp-col">
-                    <div class="rv-subhead">Expenses</div>
-                    <div class="cp-field"><label>Recurring monthly expenses</label><input type="number" id="rv_recurring" step="100" oninput="onInput()" title="The month's expense total from the Planner: rent, insurance, groceries, taxes, discretionary. Not the annual items listed below, which this page carries instead."></div>
-                    <div class="cp-field"><label>Annual items, per month</label><span class="rv-computed" id="rv_annual_pm">—</span></div>
-                    <div class="cp-field"><label>All-in monthly expenses</label><span class="rv-computed rv-strong" id="rv_expenses">—</span></div>
-
-                    <div class="rv-subhead" style="margin-top:0.75rem">Guaranteed income, per month</div>
-                    <div id="incomeList"></div>
-                    <div class="cp-field"><label></label><button class="rv-add" onclick="addIncome()">+ income line</button></div>
-                    <div class="cp-field"><label>Total guaranteed income</label><span class="rv-computed rv-strong" id="rv_income">—</span></div>
+        <!-- ───────────── Left: the steps ───────────── -->
+        <aside class="rv-steps">
+            <div class="rv-steps-head">
+                <div>
+                    <div class="rv-title">Monthly check-in</div>
+                    <label class="rv-month-label">for <input type="month" id="rvMonth" class="rv-month" onchange="onInput()"></label>
                 </div>
-                <div class="cp-col">
-                    <div class="rv-subhead">Balances</div>
-                    <div class="cp-field"><label>Money market (reserve)</label><input type="number" id="rv_mm" step="1000" oninput="onInput()"></div>
-                    <div class="cp-field"><label>Shared checking</label><input type="number" id="rv_checking" step="100" oninput="onInput()"></div>
-                    <div class="cp-field"><label>Managed accounts, total</label><input type="number" id="rv_managed" step="1000" oninput="onInput()" title="The accounts the reserve is refilled from: today the two Fidelity managed accounts, later the Schwab 70/30, plus the IRAs once draws come from them. Leave out the Roths, which are touched last and run differently. Keep the same set every month, since the high-water mark depends on it."></div>
-                    <div class="cp-field"><label>High-water mark</label><span class="rv-computed" id="rv_hwm">—</span></div>
-
-                    <div class="rv-subhead" style="margin-top:0.75rem">Checking</div>
-                    <div class="cp-field"><label>One month of expenses</label><span class="rv-computed" id="rv_chk_base">—</span></div>
-                    <div class="cp-field"><label>Saved toward annual items</label><span class="rv-computed" id="rv_chk_sink">—</span></div>
-                    <div class="cp-field"><label>Checking should hold</label><span class="rv-computed rv-strong" id="rv_chk_target">—</span></div>
-                    <div class="cp-field"><label>Checking is</label><span class="rv-computed" id="rv_chk_var">—</span></div>
-                </div>
+                <button class="rv-icon-btn" title="How this works, for the family" onclick="openDialog('dlgExplain', event)">?</button>
             </div>
-        </div>
 
-        <!-- Annual items -->
-        <div class="section-card">
-            <div class="tax-section-header">
-                <h3 class="section-heading" style="margin:0">Annual and irregular expenses</h3>
-                <span class="tax-section-note" id="annualTotal"></span>
-            </div>
-            <p class="tax-hint">The large and irregular expenses the monthly Planner does not carry: long-term care premiums, quarterly tax estimates, the big trip. This is where they are budgeted. Each year's total divided by twelve is added to the monthly expenses so the reserve and the transfer are smooth, and checking builds a float toward each one between due dates.</p>
-            <table class="data-table rv-items" id="itemsTable">
-                <thead>
-                    <tr>
-                        <th style="text-align:left">Item</th>
-                        <th class="num">Per year</th>
-                        <th>Every</th>
-                        <th>Next due</th>
-                        <th class="num">Per month</th>
-                        <th class="num" title="How much should have been set aside toward this item since it was last paid">Saved so far</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody id="itemsBody"></tbody>
-            </table>
-            <div class="rv-table-foot"><button class="rv-add" onclick="addItem()">+ annual item</button></div>
-        </div>
-
-        <!-- Rules -->
-        <details class="section-card cp-details">
-            <summary class="section-heading">The rule</summary>
-            <p class="tax-hint">Months of cover is the money market balance divided by the monthly gap. Read the row that matches.</p>
-            <table class="data-table rv-rules">
-                <thead><tr><th style="text-align:left">Months of cover</th><th style="text-align:left">Managed accounts</th><th style="text-align:left">Action</th></tr></thead>
-                <tbody>
-                    <tr><td><span id="ruleFull1">24</span> or more</td><td>any</td><td>Nothing. Dividends keep accumulating.</td></tr>
-                    <tr><td><span id="ruleFloor1">12</span> to <span id="ruleFull2">24</span></td><td>within <span id="ruleDD1">10%</span> of their high</td><td>Sell enough to get back to <span id="ruleFull3">24</span>.</td></tr>
-                    <tr><td><span id="ruleFloor2">12</span> to <span id="ruleFull4">24</span></td><td>down more than <span id="ruleDD2">10%</span></td><td>Nothing. Keep drawing on the reserve.</td></tr>
-                    <tr><td>under <span id="ruleFloor3">12</span></td><td>any</td><td>Sell enough to get back to <span id="ruleRefill1">18</span>, whatever the market is doing.</td></tr>
-                </tbody>
-            </table>
-            <div class="cp-grid" style="padding-top:1rem">
-                <div class="cp-col">
-                    <div class="cp-field"><label>Full reserve, months</label><input type="number" id="rv_full" step="1" min="1" oninput="onInput()" style="width:80px"></div>
-                    <div class="cp-field"><label>Refill to, after a forced sale</label><input type="number" id="rv_refill" step="1" min="1" oninput="onInput()" style="width:80px"></div>
+            <section class="rv-step">
+                <div class="rv-step-num">1</div>
+                <div class="rv-step-body">
+                    <div class="rv-step-title">Write down three balances</div>
+                    <div class="rv-field">
+                        <label for="rv_mm">Money market</label>
+                        <input type="number" id="rv_mm" step="1000" placeholder="0" oninput="onInput()">
+                        <div class="rv-where">Schwab · the cash reserve account, as of today</div>
+                    </div>
+                    <div class="rv-field">
+                        <label for="rv_checking">Shared checking</label>
+                        <input type="number" id="rv_checking" step="100" placeholder="0" oninput="onInput()">
+                        <div class="rv-where" id="whereChecking">Bank · or the balance in the Planner's top-left box</div>
+                    </div>
+                    <div class="rv-field">
+                        <label for="rv_managed">Managed accounts</label>
+                        <input type="number" id="rv_managed" step="1000" placeholder="0" oninput="onInput()">
+                        <div class="rv-where">Fidelity · 1192 Joint + 5279 Hil, the accounts the distributions come from. Same set every month.</div>
+                    </div>
                 </div>
-                <div class="cp-col">
-                    <div class="cp-field"><label>Floor, months</label><input type="number" id="rv_floor" step="1" min="0" oninput="onInput()" style="width:80px"></div>
-                    <div class="cp-field"><label>Drawdown that pauses refills</label><input type="number" id="rv_dd" step="1" min="0" max="100" oninput="onInput()" style="width:80px"><span class="cp-pct">%</span></div>
+            </section>
+
+            <section class="rv-step">
+                <div class="rv-step-num">2</div>
+                <div class="rv-step-body">
+                    <div class="rv-step-title">Check what we spend</div>
+                    <div class="rv-field">
+                        <label for="rv_recurring">A month's expenses</label>
+                        <input type="number" id="rv_recurring" step="100" placeholder="0" oninput="onInput()">
+                        <div class="rv-where" id="whereExpenses">Planner · the Expenses total of the newest plan</div>
+                    </div>
+                    <div class="rv-line">
+                        <span>Annual items, per month</span>
+                        <span><b id="rv_annual_pm">$0</b> <button class="rv-link" onclick="openDialog('dlgItems', event)">edit list</button></span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="rv-step">
+                <div class="rv-step-num">3</div>
+                <div class="rv-step-body">
+                    <div class="rv-step-title">Check what comes in</div>
+                    <div class="rv-line">
+                        <span>Guaranteed income, per month</span>
+                        <span><b id="rv_income">$0</b> <button class="rv-link" onclick="openDialog('dlgIncome', event)">edit list</button></span>
+                    </div>
+                    <div class="rv-where" style="margin:-0.2rem 0 0.5rem">Annuity, wages, Social Security. Not the distributions.</div>
+                    <div class="rv-field">
+                        <label for="rv_dist">Monthly distributions</label>
+                        <input type="number" id="rv_dist" step="100" placeholder="0" oninput="onInput()">
+                        <div class="rv-where" id="whereDist">Fidelity · the fixed amount the managed accounts send to checking each month</div>
+                    </div>
+                    <div class="rv-toggle">
+                        <span>Distributions are</span>
+                        <label class="rv-switch"><input type="checkbox" id="rv_distOn" onchange="onInput()"><span></span></label>
+                        <b id="distState">on</b>
+                    </div>
+                </div>
+            </section>
+
+            <section class="rv-step">
+                <div class="rv-step-num">4</div>
+                <div class="rv-step-body">
+                    <div class="rv-step-title">Do what the card says, then save</div>
+                    <div class="rv-save-row">
+                        <button class="btn export-btn" onclick="saveToLog()">Save this month</button>
+                        <button class="rv-link" onclick="openDialog('dlgLog', event)">log</button>
+                        <span class="rv-saved" id="savedNote"></span>
+                    </div>
+                </div>
+            </section>
+        </aside>
+
+        <!-- ───────────── Right: the answer ───────────── -->
+        <main class="rv-main">
+            <div class="rv-action" id="actionCard">
+                <div class="rv-action-state" id="actionState">—</div>
+                <div class="rv-action-title" id="actionTitle">—</div>
+                <div class="rv-action-body" id="actionBody"></div>
+                <ol class="rv-action-steps" id="actionSteps"></ol>
+            </div>
+
+            <div class="rv-numbers">
+                <div class="rv-num">
+                    <div class="rv-num-label">Gap</div>
+                    <div class="rv-num-value" id="nGap">—</div>
+                    <div class="rv-num-detail" id="nGapDetail">spending the investments must cover</div>
+                </div>
+                <div class="rv-num">
+                    <div class="rv-num-label">Reserve</div>
+                    <div class="rv-num-value" id="nCover">—</div>
+                    <div class="rv-num-detail" id="nCoverDetail">—</div>
+                    <div class="rv-bar"><div class="rv-bar-fill" id="coverBar"></div><div class="rv-bar-mark" id="floorMark"></div></div>
+                </div>
+                <div class="rv-num">
+                    <div class="rv-num-label">Draw rate</div>
+                    <div class="rv-num-value" id="nRate">—</div>
+                    <div class="rv-num-detail" id="nRateDetail">—</div>
+                    <div class="rv-bar"><div class="rv-bar-fill" id="rateBar"></div><div class="rv-bar-mark" id="rateMark"></div></div>
+                </div>
+                <div class="rv-num">
+                    <div class="rv-num-label">From the reserve this month</div>
+                    <div class="rv-num-value" id="nTransfer">—</div>
+                    <div class="rv-num-detail" id="nTransferDetail">—</div>
                 </div>
             </div>
-        </details>
 
-        <!-- Log -->
-        <div class="section-card">
-            <div class="tax-section-header">
-                <h3 class="section-heading" style="margin:0">Log</h3>
-                <span class="tax-section-note">one row per monthly check-in</span>
+            <div class="rv-foot">
+                <div class="rv-foot-left" id="plannerText"></div>
+                <div class="rv-foot-right">
+                    <button class="rv-link" onclick="openDialog('dlgRule', event)">the rule</button>
+                    <button class="rv-link" onclick="openDialog('dlgSettings', event)">settings</button>
+                    <button class="rv-link" onclick="useplanner(true)">re-pull from Planner</button>
+                </div>
             </div>
-            <p class="tax-hint">The high-water mark for the managed accounts is the largest balance ever saved here. Delete a row to forget it.</p>
-            <div class="cp-table-wrap">
-                <table class="data-table" id="logTable">
-                    <thead>
-                        <tr>
-                            <th style="text-align:left">Month</th>
-                            <th class="num">Expenses</th>
-                            <th class="num">Income</th>
-                            <th class="num">Gap</th>
-                            <th class="num">Money market</th>
-                            <th class="num">Cover</th>
-                            <th class="num">Managed</th>
-                            <th class="num">Drawdown</th>
-                            <th class="num">Transfer</th>
-                            <th style="text-align:left">Action</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="logBody"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Notes -->
-        <div class="section-card cp-notes">
-            <h3 class="section-heading">Each month</h3>
-            <ol>
-                <li>Check the figures pulled from the Planner, then enter the money market and managed balances.</li>
-                <li>Read the action line. If it says sell, place the sale in the managed account that is furthest ahead, taxable first.</li>
-                <li>Carry the transfer figure into the weekly planner as the first-of-month deposit to checking.</li>
-                <li>Save the month to the log.</li>
-            </ol>
-            <p class="tax-hint">The transfer is the same every month on purpose. Checking builds up a float between the annual payments and spends it when they land, so "Checking should hold" rises toward each due date and drops after it. Dividends and interest from the taxable managed account should be set to pay out to the money market, not reinvest, so the reserve refills partly on its own.</p>
-        </div>
-
+        </main>
     </div>
+
+    <!-- ───────────── Popups ───────────── -->
+
+    <dialog class="rv-dlg" id="dlgItems">
+        <div class="rv-dlg-head"><h3>Annual and irregular expenses</h3><button class="rv-close" onclick="closeDialog('dlgItems')">×</button></div>
+        <p class="rv-dlg-hint">The big things the Planner does not carry month to month: long-term care premiums, quarterly tax estimates, the trip. One twelfth of each is added to the month's expenses. "Saved so far" is what checking should be holding toward it.</p>
+        <table class="rv-table" id="itemsTable">
+            <thead><tr><th>Item</th><th class="num">Per year</th><th>Every</th><th>Next due</th><th class="num">Per month</th><th class="num">Saved so far</th><th></th></tr></thead>
+            <tbody id="itemsBody"></tbody>
+        </table>
+        <div class="rv-dlg-foot"><button class="rv-add" onclick="addItem()">+ item</button><span id="annualTotal"></span></div>
+    </dialog>
+
+    <dialog class="rv-dlg" id="dlgIncome">
+        <div class="rv-dlg-head"><h3>Guaranteed income</h3><button class="rv-close" onclick="closeDialog('dlgIncome')">×</button></div>
+        <p class="rv-dlg-hint">Money that arrives every month from outside our investments: the annuity, wages while they last, Social Security when it starts. Distributions from the managed accounts do not belong here; they are what the reserve stands in for.</p>
+        <div id="incomeList"></div>
+        <div class="rv-dlg-foot"><button class="rv-add" onclick="addIncome()">+ income line</button><span id="incomeTotalNote"></span></div>
+    </dialog>
+
+    <dialog class="rv-dlg rv-dlg-wide" id="dlgLog">
+        <div class="rv-dlg-head"><h3>Log</h3><button class="rv-close" onclick="closeDialog('dlgLog')">×</button></div>
+        <p class="rv-dlg-hint">One row per saved check-in. The high-water mark for the managed accounts is the largest balance here.</p>
+        <div class="rv-table-wrap">
+            <table class="rv-table" id="logTable">
+                <thead><tr><th>Month</th><th class="num">Gap</th><th class="num">Reserve</th><th class="num">Cover</th><th class="num">Managed</th><th class="num">Rate</th><th>Distributions</th><th class="num">From reserve</th><th>Action</th><th></th></tr></thead>
+                <tbody id="logBody"></tbody>
+            </table>
+        </div>
+    </dialog>
+
+    <dialog class="rv-dlg" id="dlgRule">
+        <div class="rv-dlg-head"><h3>The rule</h3><button class="rv-close" onclick="closeDialog('dlgRule')">×</button></div>
+        <p class="rv-dlg-hint">Two questions every month. Is the draw rate inside its band? How many months does the reserve hold? Read the row that matches. The highlighted row is this month's.</p>
+        <table class="rv-table rv-rules" id="ruleTable">
+            <thead><tr><th>Draw rate</th><th>Distributions</th><th>Reserve</th><th>Action</th></tr></thead>
+            <tbody>
+                <tr data-row="0"><td>inside the band</td><td>on</td><td><span class="r-full">24</span> months or more</td><td>Nothing.</td></tr>
+                <tr data-row="1"><td>inside the band</td><td>on</td><td>under <span class="r-full">24</span></td><td>One-off sale from the managed accounts to top the reserve back up to <span class="r-full">24</span> months.</td></tr>
+                <tr data-row="2"><td>inside the band</td><td>paused</td><td>any</td><td>Restart the distributions, and top the reserve up to <span class="r-full">24</span> months.</td></tr>
+                <tr data-row="3"><td>above the band</td><td>on</td><td><span class="r-floor">12</span> or more</td><td>Pause the distributions. The reserve pays everything until the rate is back inside the band.</td></tr>
+                <tr data-row="4"><td>above the band</td><td>paused</td><td><span class="r-floor">12</span> or more</td><td>Hold. Keep paying from the reserve.</td></tr>
+                <tr data-row="5"><td>above the band</td><td>paused</td><td>under <span class="r-floor">12</span></td><td>Restart the distributions anyway. No top-up until the rate is back in the band.</td></tr>
+                <tr data-row="6"><td>any</td><td>on</td><td>under <span class="r-floor">12</span></td><td>One-off sale to bring the reserve to <span class="r-refill">18</span> months, whatever the market is doing.</td></tr>
+            </tbody>
+        </table>
+        <p class="rv-dlg-hint">The draw rate is the yearly gap divided by the managed accounts. The band is the rate on the day we set it, plus <span class="r-band">20</span>%. When the rate drops well under the baseline, that is a sign at the annual review that the distributions could rise.</p>
+    </dialog>
+
+    <dialog class="rv-dlg" id="dlgSettings">
+        <div class="rv-dlg-head"><h3>Settings</h3><button class="rv-close" onclick="closeDialog('dlgSettings')">×</button></div>
+        <div class="rv-set">
+            <label>Full reserve, months</label><input type="number" id="rv_full" step="1" min="1" oninput="onInput()">
+            <label>Floor, months</label><input type="number" id="rv_floor" step="1" min="0" oninput="onInput()">
+            <label>Refill to, after a forced sale</label><input type="number" id="rv_refill" step="1" min="1" oninput="onInput()">
+            <label>Guardrail band</label><span><input type="number" id="rv_band" step="5" min="0" max="100" oninput="onInput()" style="width:70px"> %</span>
+            <label>Baseline draw rate</label>
+            <span><input type="number" id="rv_baseline" step="0.1" min="0" oninput="onInput()" style="width:70px" placeholder="—"> % <button class="rv-link" onclick="setBaseline()">set to today's rate</button></span>
+        </div>
+        <p class="rv-dlg-hint">Set the baseline once, when the plan starts, and again at an annual review when the distributions change. It is today's yearly gap divided by the managed balance.</p>
+    </dialog>
+
+    <dialog class="rv-dlg rv-dlg-wide" id="dlgExplain">
+        <div class="rv-dlg-head"><h3>How our money works in retirement</h3><button class="rv-close" onclick="closeDialog('dlgExplain')">×</button></div>
+        <div class="rv-explain">
+            <p><b>Three pots.</b> A checking account that pays the bills. A money market account, the reserve, that holds two years of what the bills cost beyond our guaranteed income. And the managed accounts, invested for growth, where the rest of our money lives.</p>
+            <p><b>Every month, money arrives in checking from three places.</b> The annuity and any wages or Social Security, which come no matter what. A fixed distribution from the managed accounts, set once a year. And, if those two do not cover the month, a small top-up from the reserve.</p>
+            <p><b>The reserve exists for bad years.</b> If the market falls far enough, we stop the distributions so we are not selling investments while they are cheap, and we live off the reserve instead. Two years of cover is long enough for most downturns to pass. When the market recovers, we restart the distributions and refill the reserve.</p>
+            <p><b>One number tells us when.</b> The draw rate: what we take from the managed accounts in a year, as a share of what is in them. We set it when the plan starts. If it climbs more than a fifth above that, the pot has shrunk or spending has grown too much, and the card on this page says to pause. When it comes back inside the band, the card says to restart.</p>
+            <p><b>What the check-in is.</b> Once a month, type in three balances, confirm what we spend and what comes in, and read the card. It says exactly what to do, including who to call. Then save the month. The log keeps the history so anyone can see how we have been doing.</p>
+            <p><b>If one of us is not here.</b> The steps on the left do not change. The only phone calls this page ever asks for are to Fidelity or Schwab: pause the monthly distributions, restart them, or sell a stated amount into the money market. Anything bigger than that is an annual-review question, not a monthly one.</p>
+        </div>
+    </dialog>
 
     <div id="toast"></div>
     <script src="reserve.js"></script>
