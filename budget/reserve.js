@@ -468,6 +468,7 @@ function render() {
     $('rv_annual_pm').textContent = fmt(c.annualPm);
     $('rv_income').textContent = fmt(c.income);
     $('distState').textContent = s.distOn ? 'on' : 'paused';
+    $('spendAllTotal').textContent = '(' + fmt(c.expenses) + ')';
     $('incomeAllTotal').textContent = '(' + fmt(c.income + (s.distOn ? s.dist : 0)) + (s.distOn ? '' : ', distributions paused') + ')';
     $('annualTotal').textContent = c.annual > 0 ? fmt(c.annual) + ' a year' : '';
 
