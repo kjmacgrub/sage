@@ -31,7 +31,7 @@
         <aside class="rv-steps">
             <div class="rv-steps-head">
                 <div>
-                    <div class="rv-title">Monthly check-in</div>
+                    <div class="rv-title">Monthly check-in <select id="rvPerson" class="rv-person" onchange="switchPerson(this.value)"><option value="ken">Ken</option><option value="hilary">Hilary</option></select></div>
                     <label class="rv-month-label">for <input type="month" id="rvMonth" class="rv-month" onchange="onInput()"></label>
                 </div>
                 <button class="rv-icon-btn" title="How this works, for the family" onclick="openDialog('dlgExplain', event)">?</button>
@@ -40,21 +40,16 @@
             <section class="rv-step">
                 <div class="rv-step-num">1</div>
                 <div class="rv-step-body">
-                    <div class="rv-step-title">Write down three balances</div>
+                    <div class="rv-step-title">Write down my two balances</div>
                     <div class="rv-field">
                         <label for="rv_mm">Money market</label>
                         <input type="number" id="rv_mm" step="1000" placeholder="0" oninput="onInput()">
-                        <div class="rv-where">Schwab · the cash reserve account, as of today</div>
-                    </div>
-                    <div class="rv-field">
-                        <label for="rv_checking">Shared checking</label>
-                        <input type="number" id="rv_checking" step="100" placeholder="0" oninput="onInput()">
-                        <div class="rv-where" id="whereChecking">Bank · or the balance in the Planner's top-left box</div>
+                        <div class="rv-where">My cash reserve account, as of today</div>
                     </div>
                     <div class="rv-field">
                         <label for="rv_managed">Managed accounts</label>
                         <input type="number" id="rv_managed" step="1000" placeholder="0" oninput="onInput()">
-                        <div class="rv-where">Fidelity · 1192 Joint + 5279 Hil, the accounts the distributions come from. Same set every month.</div>
+                        <div class="rv-where">Everything of mine that is invested: taxable, IRA, Roth. Not the reserve. Same set every month.</div>
                     </div>
                 </div>
             </section>
@@ -62,14 +57,19 @@
             <section class="rv-step">
                 <div class="rv-step-num">2</div>
                 <div class="rv-step-body">
-                    <div class="rv-step-title">Check what we spend <span class="rv-step-total" id="spendAllTotal"></span></div>
+                    <div class="rv-step-title">Check what I pay <span class="rv-step-total" id="spendAllTotal"></span></div>
                     <div class="rv-field">
-                        <label for="rv_recurring">A month's expenses</label>
-                        <input type="number" id="rv_recurring" step="100" placeholder="0" oninput="onInput()">
-                        <div class="rv-where" id="whereExpenses">Planner · the Expenses total of the newest plan</div>
+                        <label for="rv_deposit">Deposit to shared checking</label>
+                        <input type="number" id="rv_deposit" step="100" placeholder="0" oninput="onInput()">
+                        <div class="rv-where" id="whereDeposit">The one number we agree on. Planner household total × my share.</div>
+                    </div>
+                    <div class="rv-field">
+                        <label for="rv_own">My own spending</label>
+                        <input type="number" id="rv_own" step="100" placeholder="0" oninput="onInput()">
+                        <div class="rv-where">What I spend from my own accounts in a month, outside the shared budget</div>
                     </div>
                     <div class="rv-line">
-                        <span>Annual items, per month</span>
+                        <span>My annual items, per month</span>
                         <span><b id="rv_annual_pm">$0</b> <button class="rv-link" onclick="openDialog('dlgItems', event)">edit list</button></span>
                     </div>
                 </div>
@@ -78,16 +78,16 @@
             <section class="rv-step">
                 <div class="rv-step-num">3</div>
                 <div class="rv-step-body">
-                    <div class="rv-step-title">Check what comes in <span class="rv-step-total" id="incomeAllTotal"></span></div>
+                    <div class="rv-step-title">Check what comes in to me <span class="rv-step-total" id="incomeAllTotal"></span></div>
                     <div class="rv-line">
                         <span>Guaranteed income, per month</span>
                         <span><b id="rv_income">$0</b> <button class="rv-link" onclick="openDialog('dlgIncome', event)">edit list</button></span>
                     </div>
-                    <div class="rv-where" style="margin:-0.2rem 0 0.5rem">Annuity, wages, Social Security. Not the distributions.</div>
+                    <div class="rv-where" style="margin:-0.2rem 0 0.5rem">My wages, pension or annuity, Social Security. Not the distributions.</div>
                     <div class="rv-field">
-                        <label for="rv_dist">Monthly distributions</label>
+                        <label for="rv_dist">My monthly distributions</label>
                         <input type="number" id="rv_dist" step="100" placeholder="0" oninput="onInput()">
-                        <div class="rv-where" id="whereDist">Fidelity · the fixed amount the managed accounts send to checking each month</div>
+                        <div class="rv-where" id="whereDist">The fixed amount my managed accounts pay out each month</div>
                     </div>
                 </div>
             </section>
@@ -183,7 +183,7 @@
 
     <dialog class="rv-dlg" id="dlgItems">
         <div class="rv-dlg-head"><h3>Annual and irregular expenses</h3><button class="rv-close" onclick="closeDialog('dlgItems')">×</button></div>
-        <p class="rv-dlg-hint">The big things the Planner does not carry month to month: long-term care premiums, quarterly tax estimates, the trip. One twelfth of each is added to the month's expenses. "Saved so far" is what checking should be holding toward it.</p>
+        <p class="rv-dlg-hint">My big irregular costs that the monthly budget does not carry: a long-term care premium, tax estimates, the trip. One twelfth of each is added to what I pay each month, and the reserve holds them. "Saved so far" is how much of this year's cost has accrued since it was last paid.</p>
         <table class="rv-table" id="itemsTable">
             <thead><tr><th>Item</th><th class="num">Per year</th><th>Every</th><th>Next due</th><th class="num">Per month</th><th class="num">Saved so far</th><th></th></tr></thead>
             <tbody id="itemsBody"></tbody>
@@ -193,7 +193,7 @@
 
     <dialog class="rv-dlg" id="dlgIncome">
         <div class="rv-dlg-head"><h3>Guaranteed income</h3><button class="rv-close" onclick="closeDialog('dlgIncome')">×</button></div>
-        <p class="rv-dlg-hint">Money that arrives every month from outside our investments: the annuity, wages while they last, Social Security when it starts. Distributions from the managed accounts do not belong here; they are what the reserve stands in for.</p>
+        <p class="rv-dlg-hint">Money that arrives to me every month from outside my investments: wages while they last, a pension or annuity, Social Security when it starts. Distributions from my managed accounts do not belong here; they are what the reserve stands in for.</p>
         <div id="incomeList"></div>
         <div class="rv-dlg-foot"><button class="rv-add" onclick="addIncome()">+ income line</button><span id="incomeTotalNote"></span></div>
     </dialog>
@@ -203,7 +203,7 @@
         <p class="rv-dlg-hint">One row per saved check-in. The high-water mark for the managed accounts is the largest balance here.</p>
         <div class="rv-table-wrap">
             <table class="rv-table" id="logTable">
-                <thead><tr><th>Month</th><th class="num">Gap</th><th class="num">Reserve</th><th class="num">Cover</th><th class="num">Managed</th><th class="num">Rate</th><th>Distributions</th><th class="num">From reserve</th><th>Action</th><th></th></tr></thead>
+                <thead><tr><th>Month</th><th class="num">I pay</th><th class="num">Gap</th><th class="num">Reserve</th><th class="num">Cover</th><th class="num">Managed</th><th class="num">Rate</th><th>Distributions</th><th class="num">From reserve</th><th>Action</th><th></th></tr></thead>
                 <tbody id="logBody"></tbody>
             </table>
         </div>
@@ -224,7 +224,7 @@
                 <tr data-row="6"><td>any</td><td>on</td><td>under <span class="r-floor">12</span></td><td>One-off sale to bring the reserve to <span class="r-refill">18</span> months, whatever the market is doing.</td></tr>
             </tbody>
         </table>
-        <p class="rv-dlg-hint">The draw rate is the yearly gap divided by the managed accounts. The band is the rate on the day we set it, plus <span class="r-band">20</span>%. When the rate drops well under the baseline, that is a sign at the annual review that the distributions could rise.</p>
+        <p class="rv-dlg-hint">The draw rate is my yearly gap divided by everything I have invested, the same measure as the familiar 4% rule. The band is the rate on the day we set it, plus <span class="r-band">20</span>%. When the rate drops well under the baseline, that is a sign at the annual review that the distributions could rise.</p>
     </dialog>
 
     <dialog class="rv-dlg" id="dlgSettings">
@@ -233,6 +233,7 @@
             <label>Full reserve, months</label><input type="number" id="rv_full" step="1" min="1" oninput="onInput()">
             <label>Floor, months</label><input type="number" id="rv_floor" step="1" min="0" oninput="onInput()">
             <label>Refill to, after a forced sale</label><input type="number" id="rv_refill" step="1" min="1" oninput="onInput()">
+            <label>My share of the household budget</label><span><input type="number" id="rv_share" step="5" min="0" max="100" oninput="onInput()" style="width:70px"> %</span>
             <label>Guardrail band</label><span><input type="number" id="rv_band" step="5" min="0" max="100" oninput="onInput()" style="width:70px"> %</span>
             <label>Baseline draw rate</label>
             <span><input type="number" id="rv_baseline" step="0.1" min="0" oninput="onInput()" style="width:70px" placeholder="—"> % <button class="rv-link" onclick="setBaseline()">set to today's rate</button></span>
@@ -241,14 +242,15 @@
     </dialog>
 
     <dialog class="rv-dlg rv-dlg-wide" id="dlgExplain">
-        <div class="rv-dlg-head"><h3>How our money works in retirement</h3><button class="rv-close" onclick="closeDialog('dlgExplain')">×</button></div>
+        <div class="rv-dlg-head"><h3>How my money works in retirement</h3><button class="rv-close" onclick="closeDialog('dlgExplain')">×</button></div>
         <div class="rv-explain">
-            <p><b>Three pots.</b> A checking account that pays the bills. A money market account, the reserve, that holds two years of what the bills cost beyond our guaranteed income. And the managed accounts, invested for growth, where the rest of our money lives.</p>
-            <p><b>Every month, money arrives in checking from three places.</b> The annuity and any wages or Social Security, which come no matter what. A fixed distribution from the managed accounts, set once a year. And, if those two do not cover the month, a small top-up from the reserve.</p>
-            <p><b>The reserve exists for bad years.</b> If the market falls far enough, we stop the distributions so we are not selling investments while they are cheap, and we live off the reserve instead. Two years of cover is long enough for most downturns to pass. When the market recovers, we restart the distributions and refill the reserve.</p>
-            <p><b>One number tells us when.</b> The draw rate: what we take from the managed accounts in a year, as a share of what is in them. We set it when the plan starts. If it climbs more than a fifth above that, the pot has shrunk or spending has grown too much, and the card on this page says to pause. When it comes back inside the band, the card says to restart.</p>
-            <p><b>What the check-in is.</b> Once a month, type in three balances, confirm what we spend and what comes in, and read the card. It says exactly what to do, including who to call. Then save the month. The log keeps the history so anyone can see how we have been doing.</p>
-            <p><b>If one of us is not here.</b> The steps on the left do not change. The only phone calls this page ever asks for are to Fidelity or Schwab: pause the monthly distributions, restart them, or sell a stated amount into the money market. Anything bigger than that is an annual-review question, not a monthly one.</p>
+            <p><b>Each of us runs our own side.</b> We each have a cash reserve, our own invested accounts, our own income, and a page like this one. The one thing we agree on together is how much each of us deposits into the shared checking account every month, which is our share of the household budget on the Planner.</p>
+            <p><b>Three pots on each side.</b> The shared checking account pays the bills. My money market, the reserve, holds two years of what I owe each month beyond my guaranteed income. My managed accounts, invested for growth, hold the rest.</p>
+            <p><b>Every month, money comes to me from three places.</b> Guaranteed income such as a pension, Social Security or wages, which arrives no matter what. A fixed distribution from my managed accounts, set once a year. And, if those two do not cover my deposit and my own spending, a top-up from my reserve.</p>
+            <p><b>The reserve exists for bad years.</b> If the market falls far enough, I stop the distributions so I am not selling investments while they are cheap, and live off the reserve instead. Two years of cover is long enough for most downturns to pass. When the market recovers, I restart the distributions and refill the reserve.</p>
+            <p><b>One number tells me when.</b> The draw rate: what I take from my investments in a year, as a share of what is in them. The familiar guidance is that about 4% is sustainable. I set a baseline when the plan starts. If the rate climbs more than a fifth above that, the pot has shrunk or spending has grown too much, and the card says to pause. When it comes back inside the band, the card says to restart.</p>
+            <p><b>What the check-in is.</b> Once a month, type in two balances, confirm what I pay and what comes in, and read the card. It says exactly what to do, including who to call. Then save the month. The log keeps the history.</p>
+            <p><b>If I am not here.</b> The steps on the left do not change. The only phone calls this page ever asks for are to the broker: pause the monthly distributions, restart them, or sell a stated amount into the money market. Anything bigger is an annual-review question, not a monthly one.</p>
         </div>
     </dialog>
 

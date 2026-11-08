@@ -276,3 +276,10 @@ body { overflow: hidden; }
 .rv-gauge-pointer.bad::after { background: var(--danger); }
 .rv-gauge-foot { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-secondary); margin-top: 1.2rem; font-variant-numeric: tabular-nums; }
 .rv-gauge-foot span:last-child { text-align: right; }
+
+/* ── Person selector ─────────────────────────────────────── */
+.rv-person {
+    font-family: var(--font); font-size: 1rem; font-weight: 700; color: var(--primary);
+    border: none; background: transparent; cursor: pointer; padding: 0 0.2rem; margin-left: 0.2rem;
+}
+.rv-person:focus { outline: none; }

@@ -13,23 +13,35 @@
 const API = 'http://localhost:5050';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-const DEFAULTS = {
+const PERSON_DEFAULTS = {
     settings: {
-        recurring: 0, mm: 0, checking: 0, managed: 0,
+        deposit: 0, own: 0, share: 50,
+        mm: 0, managed: 0,
         dist: 0, distOn: true,
         full: 24, refill: 18, floor: 12,
         band: 20, baseline: null,
         month: '',
     },
     income: [],
-    items: [{ name: 'Long-term care insurance', amount: 0, month: 1, freq: 1 }],
+    items: [],
     log: [],
 };
+const SEED = {
+    ken:    { income: [{ name: 'Wages: Ken', amount: 2800 }], items: [{ name: 'Long-term care insurance', amount: 0, month: 1, freq: 1 }] },
+    hilary: { income: [{ name: 'NY Life annuity', amount: 3714.73 }], items: [{ name: 'Long-term care insurance', amount: 0, month: 1, freq: 1 }] },
+};
 
-let state = JSON.parse(JSON.stringify(DEFAULTS));
+// everything saved: { people: { ken: {...}, hilary: {...} }, current: 'ken' }
+let store = { people: {}, current: 'ken' };
+let state = null;          // store.people[store.current]
 let planner = null;
 let _saveTimer = null;
 let _toastTimer = null;
+
+function freshPerson(who) {
+    const seed = SEED[who] || { income: [], items: [] };
+    return { settings: { ...PERSON_DEFAULTS.settings }, income: seed.income.map(r => ({ ...r })), items: seed.items.map(r => ({ ...r })), log: [] };
+}
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -112,14 +124,31 @@ async function load() {
     try {
         const data = await apiGet('/api/reserve');
         hideError();
-        if (data && data.settings) {
-            state.settings = Object.assign({}, DEFAULTS.settings, data.settings);
-            state.income = Array.isArray(data.income) ? data.income : [];
-            state.items = Array.isArray(data.items) ? data.items : state.items;
-            state.log = Array.isArray(data.log) ? data.log : [];
+        if (data && data.people) {
+            store = data;
+        } else if (data && data.settings) {
+            // first version held one household record: it becomes Ken's, minus the shared bits
+            const old = data;
+            const p = freshPerson('ken');
+            p.settings = Object.assign({}, PERSON_DEFAULTS.settings, old.settings);
+            delete p.settings.recurring; delete p.settings.checking;
+            p.settings.deposit = 0; p.settings.dist = 0;
+            p.settings.baseline = null;   // the denominator changed meaning: set it again
+            p.income = (old.income || []).filter(r => /ken|wages/i.test(r.name || ''));
+            if (!p.income.length) p.income = freshPerson('ken').income;
+            p.items = Array.isArray(old.items) && old.items.length ? old.items : p.items;
+            p.log = [];
+            store = { people: { ken: p }, current: 'ken' };
+            scheduleSave();
         }
     } catch (e) { showError(); }
+    if (!store.people.ken) store.people.ken = freshPerson('ken');
+    if (!store.people.hilary) store.people.hilary = freshPerson('hilary');
+    if (!store.people[store.current]) store.current = 'ken';
+    state = store.people[store.current];
+    state.settings = Object.assign({}, PERSON_DEFAULTS.settings, state.settings);
     if (!state.settings.month) state.settings.month = thisMonth();
+    $('rvPerson').value = store.current;
     await loadPlanner();
     useplanner(false);
     fillInputs();
@@ -128,11 +157,22 @@ async function load() {
     render();
 }
 
+function switchPerson(who) {
+    readInputs();
+    store.current = who;
+    if (!store.people[who]) store.people[who] = freshPerson(who);
+    state = store.people[who];
+    state.settings = Object.assign({}, PERSON_DEFAULTS.settings, state.settings);
+    if (!state.settings.month) state.settings.month = thisMonth();
+    useplanner(false);
+    fillInputs(); renderIncome(); renderItems(); render(); scheduleSave();
+}
+
 function scheduleSave() {
     clearTimeout(_saveTimer);
     _saveTimer = setTimeout(async () => {
         try {
-            await apiPut('/api/reserve', state);
+            await apiPut('/api/reserve', store);
             hideError();
             $('savedNote').textContent = 'saved';
             setTimeout(() => { $('savedNote').textContent = ''; }, 1500);
@@ -141,51 +181,37 @@ function scheduleSave() {
 }
 
 // ── Planner ─────────────────────────────────────────────────
-// The newest plan on the Planner tab is the current month: its expense total
-// and starting balance (checking) are suggestions here. The scheduled income
-// items are the timing-free list of what recurs monthly: draws from managed
-// accounts become the distributions figure, the rest seed guaranteed income.
-
-const MANAGED_RE = /managed|brokerage|ira|roth|schwab|fidelity:\d|money market|reserve/i;
+// The newest plan on the Planner tab is the household budget for the month.
+// Its expense total times my share is my deposit to shared checking.
 
 async function loadPlanner() {
     try {
-        const [plans, sched] = await Promise.all([
-            apiGet('/api/plans'),
-            apiGet('/api/scheduled-items').catch(() => []),
-        ]);
+        const plans = await apiGet('/api/plans');
         let plan = null;
         if (plans.length) {
             const newest = plans.slice().sort((a, b) => (a.plan_date < b.plan_date ? 1 : -1))[0];
             plan = await apiGet('/api/plans/' + newest.id);
         }
         const items = plan ? (plan.items || []) : [];
-        const monthly = sched.filter(i => i.item_type === 'income' && (i.frequency || 'monthly') === 'monthly' && num(i.amount) > 0);
-        const income = monthly.filter(i => !MANAGED_RE.test(i.source || '')).map(i => ({ name: i.source || 'Income', amount: num(i.amount) }));
-        const draws = monthly.filter(i => MANAGED_RE.test(i.source || '')).map(i => ({ name: i.source || 'Draw', amount: num(i.amount) }));
-        planner = {
-            date: plan ? plan.plan_date : null, label: plan ? plan.label : null,
+        planner = plan ? {
+            date: plan.plan_date, label: plan.label,
             expenses: items.filter(i => i.item_type !== 'income').reduce((a, i) => a + num(i.budget_amount), 0),
-            checking: plan ? num(plan.starting_balance) : 0,
-            income, draws, drawTotal: draws.reduce((a, i) => a + i.amount, 0),
-        };
+        } : null;
     } catch (e) { planner = null; }
 }
 
-// force=false fills only what is blank; force=true overwrites expenses and checking.
+function plannerDeposit() {
+    return planner ? Math.round(planner.expenses * (state.settings.share || 0) / 100) : 0;
+}
+
+// force=false fills only what is blank; force=true overwrites the deposit.
 function useplanner(force) {
     if (!planner) return;
     const s = state.settings;
-    if (planner.date) {
-        if (force || !s.recurring) s.recurring = planner.expenses;
-        if (force || !s.checking) s.checking = planner.checking;
-    }
-    if (!s.dist && planner.drawTotal) s.dist = planner.drawTotal;
-    const incomeBlank = !state.income.some(r => num(r.amount) > 0);
-    if (incomeBlank && planner.income.length) state.income = planner.income.map(r => ({ ...r }));
+    if (force || !s.deposit) s.deposit = plannerDeposit();
     if (force) {
         fillInputs(); render(); scheduleSave();
-        showToast('Pulled from the Planner, ' + (planner.label || planner.date));
+        showToast('Deposit set from the Planner, ' + (planner.label || planner.date));
     }
 }
 
@@ -193,12 +219,13 @@ function useplanner(force) {
 
 function fillInputs() {
     const s = state.settings;
-    $('rv_recurring').value = s.recurring || '';
+    $('rv_deposit').value = s.deposit || '';
+    $('rv_own').value = s.own || '';
     $('rv_mm').value = s.mm || '';
-    $('rv_checking').value = s.checking || '';
     $('rv_managed').value = s.managed || '';
     $('rv_dist').value = s.dist || '';
     $('rv_distOn').checked = !!s.distOn;
+    $('rv_share').value = s.share;
     $('rv_full').value = s.full;
     $('rv_refill').value = s.refill;
     $('rv_floor').value = s.floor;
@@ -209,12 +236,13 @@ function fillInputs() {
 
 function readInputs() {
     const s = state.settings;
-    s.recurring = num($('rv_recurring').value);
+    s.deposit = num($('rv_deposit').value);
+    s.own = num($('rv_own').value);
     s.mm = num($('rv_mm').value);
-    s.checking = num($('rv_checking').value);
     s.managed = num($('rv_managed').value);
     s.dist = num($('rv_dist').value);
     s.distOn = $('rv_distOn').checked;
+    s.share = Math.max(0, Math.min(100, num($('rv_share').value)));
     s.full = Math.max(1, num($('rv_full').value) || 24);
     s.refill = Math.max(1, num($('rv_refill').value) || 18);
     s.floor = Math.max(0, num($('rv_floor').value) || 0);
@@ -314,7 +342,7 @@ function compute() {
 
     const annual = state.items.reduce((a, it) => a + num(it.amount), 0);
     const annualPm = annual / 12;
-    const expenses = s.recurring + annualPm;
+    const expenses = s.deposit + s.own + annualPm;
     const income = state.income.reduce((a, r) => a + num(r.amount), 0);
     const gap = Math.max(0, expenses - income);
 
@@ -333,21 +361,16 @@ function compute() {
     // what the reserve sends to checking this month
     const transfer = gap <= 0 ? 0 : (s.distOn ? Math.max(0, gap - s.dist) : gap);
 
-    // checking's float: one month of expenses plus what has built up toward the annual items
-    const sink = state.items.reduce((a, it) => a + sinking(it, cur), 0);
-    const chkTarget = expenses + sink;
-    const chkVar = s.checking - chkTarget;
-
     // ── the rule ──
     let row = -1, cls = 'setup', state_ = 'Set-up', title = '', body = '', steps = [], sell = 0;
     const missing = [];
     if (!s.mm) missing.push('the money market balance');
     if (!s.managed) missing.push('the managed accounts balance');
-    if (!(gap > 0)) missing.push('a month\'s expenses above the guaranteed income');
+    if (!(gap > 0)) missing.push('what I pay each month, above my guaranteed income');
 
     if (missing.length) {
         title = 'Fill in ' + missing.join(', ').replace(/, ([^,]*)$/, ' and $1') + '.';
-        body = 'The card needs those before it can read the rule. Follow the steps on the left; each one says where the number comes from.';
+        body = 'The card needs those before it can read the rule. Follow the steps on the left; each one says where the number comes from. The managed accounts figure is everything of mine that is invested, so the draw rate reads like the familiar 4% rule.';
     } else if (s.baseline == null) {
         title = 'Set the baseline draw rate.';
         body = `Today's draw rate is ${pct(rate)}: the yearly gap of ${fmt(gap * 12)} divided by ${fmt(s.managed)} in the managed accounts. The rule compares every month against the rate on the day the plan started, so it needs that number once.`;
@@ -391,7 +414,7 @@ function compute() {
                 title = 'Pause the distributions.';
                 body = `The draw rate is ${pct(rate)}, above the band (${pct(upper)}). The managed accounts have fallen enough that each monthly distribution is selling too cheaply. The reserve holds ${fmt1(cover)} months and pays everything from here until the rate is back in the band.`;
                 steps = [`Call Fidelity or Schwab: pause the monthly distribution of ${fmt(s.dist)} until further notice.`,
-                         `Move ${fmt(gap)} a month from the money market to checking from now on; this page shows the figure each month.`,
+                         `Move ${fmt(gap)} a month from my money market from now on; this page shows the figure each month.`,
                          'Flip the "Distributions are" switch on the left to paused, then save the month.'];
             } else {
                 row = 6; cls = 'forced'; state_ = 'Reserve low';
@@ -405,7 +428,7 @@ function compute() {
                 row = 4; cls = 'hold'; state_ = 'Market down, holding';
                 title = 'Hold. Keep paying from the reserve.';
                 body = `The draw rate is ${pct(rate)}, still above the band (${pct(upper)}). The distributions stay paused and the reserve carries the month. It holds ${fmt1(cover)} months, about ${fmt1(Math.max(0, cover - s.floor))} above the floor. Nothing is sold.`;
-                steps = [`Move ${fmt(gap)} from the money market to checking.`, 'Trim discretionary spending where it is easy.', 'Save the month.'];
+                steps = [`Move ${fmt(gap)} from my money market to cover the month.`, 'Trim discretionary spending where it is easy.', 'Save the month.'];
             } else {
                 row = 5; cls = 'forced'; state_ = 'Reserve low';
                 title = 'Restart the distributions anyway.';
@@ -417,7 +440,7 @@ function compute() {
     }
 
     return { annual, annualPm, expenses, income, gap, target, cover, hwm, dd, rate, upper, lower, above, wellBelow,
-             transfer, sink, chkTarget, chkVar, row, cls, state: state_, title, body, steps, sell };
+             transfer, row, cls, state: state_, title, body, steps, sell };
 }
 
 // ── Render ──────────────────────────────────────────────────
@@ -436,7 +459,7 @@ function render() {
 
     // numbers
     $('nGap').textContent = fmt(c.gap);
-    $('nGapDetail').textContent = `${fmt(c.expenses)} a month out, ${fmt(c.income)} guaranteed in`;
+    $('nGapDetail').textContent = `${fmt(c.expenses)} a month I pay, ${fmt(c.income)} guaranteed in`;
 
     const coverEl = $('nCover');
     coverEl.textContent = c.gap > 0 && s.mm ? fmt1(c.cover) + ' months' : '—';
@@ -462,15 +485,16 @@ function render() {
     $('rv_annual_pm').textContent = fmt(c.annualPm);
     $('rv_income').textContent = fmt(c.income);
     $('spendAllTotal').textContent = '(' + fmt(c.expenses) + ')';
+    $('whereDeposit').textContent = planner ? `The one number we agree on. Planner ${fmt(planner.expenses)} × ${s.share}% = ${fmt(plannerDeposit())}` : 'The one number we agree on: my share of the household budget.';
     $('incomeAllTotal').textContent = '(' + fmt(c.income + (s.distOn ? s.dist : 0)) + (s.distOn ? '' : ', distributions paused') + ')';
     $('annualTotal').textContent = c.annual > 0 ? fmt(c.annual) + ' a year' : '';
 
-    // footer: planner + checking float
+    // footer: planner and the share
     const parts = [];
-    if (planner && planner.date) parts.push(`Planner ${esc(planner.label || planner.date)}: expenses ${fmt(planner.expenses)}, checking ${fmt(planner.checking)} as of that date`);
-    if (c.expenses > 0) {
-        const v = Math.abs(c.chkVar) < 1 ? 'on target' : c.chkVar > 0 ? fmt(c.chkVar) + ' over' : fmt(-c.chkVar) + ' short';
-        parts.push(`Checking should hold about ${fmt(c.chkTarget)} (a month of expenses plus ${fmt(c.sink)} saved toward annual items); it is ${v}`);
+    if (planner) {
+        const pd = plannerDeposit();
+        parts.push(`Planner ${esc(planner.label || planner.date)}: household expenses ${fmt(planner.expenses)} × ${s.share}% share = ${fmt(pd)}` +
+                   (Math.abs(pd - s.deposit) > 1 ? `, deposit entered as ${fmt(s.deposit)}` : ''));
     }
     if (c.hwm > 0 && c.dd > 0.5) parts.push(`Managed accounts ${pct(c.dd)} below their high of ${fmt(c.hwm)}`);
     $('plannerText').innerHTML = parts.join('<br>');
@@ -542,7 +566,7 @@ function renderLog() {
     body.innerHTML = '';
     const rows = state.log.slice().sort((a, b) => (a.month < b.month ? 1 : -1));
     if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="10" style="color:var(--text-secondary);text-align:center;padding:1rem">No check-ins saved yet.</td></tr>';
+        body.innerHTML = '<tr><td colspan="11" style="color:var(--text-secondary);text-align:center;padding:1rem">No check-ins saved yet.</td></tr>';
         return;
     }
     rows.forEach(r => {
@@ -550,6 +574,7 @@ function renderLog() {
         const tr = document.createElement('tr');
         tr.innerHTML =
             `<td>${monthLabel(r.month)}</td>` +
+            `<td class="num">${fmt(r.expenses)}</td>` +
             `<td class="num">${fmt(r.gap)}</td>` +
             `<td class="num">${fmt(r.mm)}</td>` +
             `<td class="num">${r.cover != null && isFinite(r.cover) ? fmt1(r.cover) : '—'}</td>` +
@@ -571,7 +596,7 @@ function saveToLog() {
         month: s.month, expenses: c.expenses, income: c.income, gap: c.gap,
         mm: s.mm, cover: isFinite(c.cover) ? c.cover : null, managed: s.managed, dd: c.dd,
         rate: c.rate, dist: s.dist, distOn: s.distOn,
-        transfer: c.transfer, sell: c.sell, action: c.title, checking: s.checking,
+        transfer: c.transfer, sell: c.sell, action: c.title,
     };
     const existing = state.log.findIndex(r => r.month === s.month);
     if (existing >= 0) state.log[existing] = row; else state.log.push(row);
