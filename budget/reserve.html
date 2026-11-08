@@ -14,10 +14,10 @@
     <nav class="tab-nav">
         <img src="/sage-logo.svg" class="nav-logo" alt="Sage">
         <a href="http://localhost:5050/" class="tab-link">Planner</a>
+        <a href="http://localhost:5050/reserve.html" class="tab-link active">Reserve</a>
         <a href="http://localhost:5050/dashboard.html" class="tab-link">Cash Flow</a>
         <a href="http://localhost:5050/tax.html" class="tab-link">Tax</a>
         <a href="http://localhost:5050/realestate.html" class="tab-link">Real Estate</a>
-        <a href="http://localhost:5050/reserve.html" class="tab-link active">Reserve</a>
         <a href="http://localhost:8000/" class="tab-link">Investments</a>
         <button class="theme-toggle" id="themeToggle" title="Toggle theme"></button>
     </nav>
@@ -97,7 +97,7 @@
                     <div class="rv-subhead">Balances</div>
                     <div class="cp-field"><label>Money market (reserve)</label><input type="number" id="rv_mm" step="1000" oninput="onInput()"></div>
                     <div class="cp-field"><label>Shared checking</label><input type="number" id="rv_checking" step="100" oninput="onInput()"></div>
-                    <div class="cp-field"><label>Managed accounts, total</label><input type="number" id="rv_managed" step="1000" oninput="onInput()" title="Everything invested for growth: taxable 70/30, IRAs, Roths. Used only to measure the drawdown from the high-water mark."></div>
+                    <div class="cp-field"><label>Managed accounts, total</label><input type="number" id="rv_managed" step="1000" oninput="onInput()" title="The accounts the reserve is refilled from: today the two Fidelity managed accounts, later the Schwab 70/30, plus the IRAs once draws come from them. Leave out the Roths, which are touched last and run differently. Keep the same set every month, since the high-water mark depends on it."></div>
                     <div class="cp-field"><label>High-water mark</label><span class="rv-computed" id="rv_hwm">—</span></div>
 
                     <div class="rv-subhead" style="margin-top:0.75rem">Checking</div>

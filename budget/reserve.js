@@ -140,7 +140,7 @@ function renderPlannerStrip() {
     if (!planner) { strip.style.display = 'none'; return; }
     strip.style.display = '';
     const parts = [];
-    if (planner.date) parts.push(`<strong>Planner, ${esc(planner.label || planner.date)}:</strong> expenses ${fmt(planner.expenses)} · checking ${fmt(planner.checking)}`);
+    if (planner.date) parts.push(`<strong>Planner, ${esc(planner.label || planner.date)}:</strong> expenses ${fmt(planner.expenses)} · checking ${fmt(planner.checking)} as of that date`);
     if (planner.income.length) parts.push(`<strong>Scheduled income:</strong> ${planner.income.map(i => esc(i.name) + ' ' + fmt(i.amount)).join(', ')}`);
     if (planner.draws.length) {
         const c = compute();
