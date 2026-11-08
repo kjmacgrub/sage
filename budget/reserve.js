@@ -104,56 +104,66 @@ async function load() {
 
 let planner = null;
 
+const MANAGED_RE = /managed|brokerage|ira|roth|schwab|fidelity:\d|money market|reserve/i;
+
 async function loadPlanner() {
     try {
-        const r = await fetch(API + '/api/plans');
-        if (!r.ok) return;
-        const plans = await r.json();
-        if (!plans.length) return;
-        const newest = plans.slice().sort((a, b) => (a.plan_date < b.plan_date ? 1 : -1))[0];
-        const r2 = await fetch(API + '/api/plans/' + newest.id);
-        if (!r2.ok) return;
-        const plan = await r2.json();
-        const items = plan.items || [];
-        const income = items.filter(i => i.item_type === 'income' && num(i.budget_amount) > 0)
-            .map(i => ({ name: i.label || i.category || 'Income', amount: num(i.budget_amount) }));
+        const [rp, rs] = await Promise.all([fetch(API + '/api/plans'), fetch(API + '/api/scheduled-items')]);
+        if (!rp.ok) return;
+        const plans = await rp.json();
+        const sched = rs.ok ? await rs.json() : [];
+        let plan = null;
+        if (plans.length) {
+            const newest = plans.slice().sort((a, b) => (a.plan_date < b.plan_date ? 1 : -1))[0];
+            const r2 = await fetch(API + '/api/plans/' + newest.id);
+            if (r2.ok) plan = await r2.json();
+        }
+        const items = plan ? (plan.items || []) : [];
+        // Scheduled income is the timing-free list of what recurs every month.
+        // Draws from managed accounts are the transfer, not income, so they are
+        // split out and shown for comparison instead.
+        const monthly = sched.filter(i => i.item_type === 'income' && (i.frequency || 'monthly') === 'monthly' && num(i.amount) > 0);
+        const income = monthly.filter(i => !MANAGED_RE.test(i.source || '')).map(i => ({ name: i.source || 'Income', amount: num(i.amount) }));
+        const draws = monthly.filter(i => MANAGED_RE.test(i.source || '')).map(i => ({ name: i.source || 'Draw', amount: num(i.amount) }));
         planner = {
-            date: plan.plan_date, label: plan.label,
+            date: plan ? plan.plan_date : null, label: plan ? plan.label : null,
             expenses: items.filter(i => i.item_type !== 'income').reduce((a, i) => a + num(i.budget_amount), 0),
-            incomeTotal: income.reduce((a, i) => a + i.amount, 0),
-            income, checking: num(plan.starting_balance),
+            checking: plan ? num(plan.starting_balance) : 0,
+            income, draws, drawTotal: draws.reduce((a, i) => a + i.amount, 0),
         };
     } catch (e) { planner = null; }
+    renderPlannerStrip();
+}
+
+function renderPlannerStrip() {
     const strip = $('plannerStrip');
     if (!planner) { strip.style.display = 'none'; return; }
     strip.style.display = '';
-    $('plannerText').innerHTML = `<strong>Planner, ${esc(planner.label || planner.date)}:</strong> expenses ${fmt(planner.expenses)} · income ${fmt(planner.incomeTotal)} (${planner.income.map(i => esc(i.name)).join(', ') || 'none'}) · checking ${fmt(planner.checking)}`;
+    const parts = [];
+    if (planner.date) parts.push(`<strong>Planner, ${esc(planner.label || planner.date)}:</strong> expenses ${fmt(planner.expenses)} · checking ${fmt(planner.checking)}`);
+    if (planner.income.length) parts.push(`<strong>Scheduled income:</strong> ${planner.income.map(i => esc(i.name) + ' ' + fmt(i.amount)).join(', ')}`);
+    if (planner.draws.length) {
+        const c = compute();
+        parts.push(`<strong>Drawing now:</strong> ${fmt(planner.drawTotal)} a month from ${planner.draws.map(i => esc(i.name)).join(' and ')} · the rule says ${fmt(c.transfer)}`);
+    }
+    $('plannerText').innerHTML = parts.join('<br>');
 }
 
 // force=false fills only what is blank; force=true overwrites with the plan.
 function useplanner(force) {
     if (!planner) return;
     const s = state.settings;
-    if (force || !s.recurring) s.recurring = planner.expenses;
-    if (force || !s.checking) s.checking = planner.checking;
+    if (planner.date) {
+        if (force || !s.recurring) s.recurring = planner.expenses;
+        if (force || !s.checking) s.checking = planner.checking;
+    }
+    // the income list belongs to this page; it is only seeded when empty
     const incomeBlank = !state.income.some(r => num(r.amount) > 0);
-    if ((force || incomeBlank) && planner.income.length) state.income = planner.income.map(r => ({ ...r }));
+    if (incomeBlank && planner.income.length) state.income = planner.income.map(r => ({ ...r }));
     if (force) {
         fillInputs(); renderIncome(); render(); scheduleSave();
         showToast('Filled from the Planner, ' + (planner.label || planner.date));
     }
-}
-
-function scheduleSave() {
-    clearTimeout(_saveTimer);
-    _saveTimer = setTimeout(async () => {
-        try {
-            await apiPut(state);
-            hideError();
-            $('savedNote').textContent = 'saved';
-            setTimeout(() => { $('savedNote').textContent = ''; }, 1500);
-        } catch (e) { showError(); }
-    }, 500);
 }
 
 // ── Inputs ──────────────────────────────────────────────────
@@ -367,6 +377,7 @@ function render() {
     document.querySelectorAll('.rv-rules tbody tr').forEach((tr, i) => tr.classList.toggle('active', c.gap > 0 && i === c.ruleRow));
 
     renderLog();
+    renderPlannerStrip();
 }
 
 function renderLog() {

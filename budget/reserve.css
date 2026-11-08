@@ -157,6 +157,7 @@
 /* ── Planner strip ────────────────────────────────────────── */
 
 .rv-planner {
+    line-height: 1.6;
     display: flex;
     align-items: center;
     justify-content: space-between;
