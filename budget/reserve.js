@@ -89,10 +89,59 @@ async function load() {
         showError();
     }
     if (!state.settings.month) state.settings.month = thisMonth();
+    await loadPlanner();
+    useplanner(false);
     fillInputs();
     renderIncome();
     renderItems();
     render();
+}
+
+// ── Planner ─────────────────────────────────────────────────
+// The newest plan on the Planner tab is the current month: its expense total
+// is the recurring monthly figure, its income lines are the guaranteed income,
+// and its starting balance is checking.
+
+let planner = null;
+
+async function loadPlanner() {
+    try {
+        const r = await fetch(API + '/api/plans');
+        if (!r.ok) return;
+        const plans = await r.json();
+        if (!plans.length) return;
+        const newest = plans.slice().sort((a, b) => (a.plan_date < b.plan_date ? 1 : -1))[0];
+        const r2 = await fetch(API + '/api/plans/' + newest.id);
+        if (!r2.ok) return;
+        const plan = await r2.json();
+        const items = plan.items || [];
+        const income = items.filter(i => i.item_type === 'income' && num(i.budget_amount) > 0)
+            .map(i => ({ name: i.label || i.category || 'Income', amount: num(i.budget_amount) }));
+        planner = {
+            date: plan.plan_date, label: plan.label,
+            expenses: items.filter(i => i.item_type !== 'income').reduce((a, i) => a + num(i.budget_amount), 0),
+            incomeTotal: income.reduce((a, i) => a + i.amount, 0),
+            income, checking: num(plan.starting_balance),
+        };
+    } catch (e) { planner = null; }
+    const strip = $('plannerStrip');
+    if (!planner) { strip.style.display = 'none'; return; }
+    strip.style.display = '';
+    $('plannerText').innerHTML = `<strong>Planner, ${esc(planner.label || planner.date)}:</strong> expenses ${fmt(planner.expenses)} · income ${fmt(planner.incomeTotal)} (${planner.income.map(i => esc(i.name)).join(', ') || 'none'}) · checking ${fmt(planner.checking)}`;
+}
+
+// force=false fills only what is blank; force=true overwrites with the plan.
+function useplanner(force) {
+    if (!planner) return;
+    const s = state.settings;
+    if (force || !s.recurring) s.recurring = planner.expenses;
+    if (force || !s.checking) s.checking = planner.checking;
+    const incomeBlank = !state.income.some(r => num(r.amount) > 0);
+    if ((force || incomeBlank) && planner.income.length) state.income = planner.income.map(r => ({ ...r }));
+    if (force) {
+        fillInputs(); renderIncome(); render(); scheduleSave();
+        showToast('Filled from the Planner, ' + (planner.label || planner.date));
+    }
 }
 
 function scheduleSave() {
@@ -236,6 +285,8 @@ function compute() {
     if (gap <= 0) {
         action = 'Nothing to do. Guaranteed income covers the expenses, so there is no gap for the reserve to fill.';
         cls = 'ok';
+    } else if (s.mm <= 0) {
+        action = 'Enter the money market balance to read the rule.'; ruleRow = -1; cls = 'hold';
     } else if (cover >= s.full) {
         action = 'Do nothing.'; ruleRow = 0; cls = 'ok';
     } else if (cover >= s.floor) {
@@ -281,7 +332,7 @@ function render() {
     card.className = 'section-card rv-action ' + c.cls;
     $('actionTitle').textContent = c.sell > 0 ? fmt(c.sell) + ' — ' + c.action : c.action;
     let body = '';
-    if (c.gap <= 0) {
+    if (c.gap <= 0 || c.ruleRow === -1) {
         body = '';
     } else if (c.ruleRow === 0) {
         body = `The reserve holds ${fmt1(c.cover)} months of the gap, at or above the ${s.full}-month target. Dividends and interest keep landing in it.`;

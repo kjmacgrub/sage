@@ -153,3 +153,19 @@
 .data-table tr:last-child td { border-bottom: none; }
 .section-card > .data-table { width: calc(100% - 4rem); margin: 0 2rem; }
 #logTable { width: 100%; margin: 0; }
+
+/* ── Planner strip ────────────────────────────────────────── */
+
+.rv-planner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 0 2rem 1rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: var(--radius-sm);
+    background: var(--primary-light);
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}

@@ -76,7 +76,11 @@
                 <h3 class="section-heading" style="margin:0">This month</h3>
                 <span class="tax-section-note" id="savedNote"></span>
             </div>
-            <p class="tax-hint">Type in the balances from the statements and this month's expense total from the Planner. Everything else is worked out below.</p>
+            <p class="tax-hint">The expense total, income lines and checking balance come from the newest plan on the Planner tab and fill in anything left blank. Type in the money market and managed balances from the statements. Everything else is worked out below.</p>
+            <div class="rv-planner" id="plannerStrip" style="display:none">
+                <span id="plannerText"></span>
+                <button class="rv-add" onclick="useplanner(true)">Pull from the Planner again</button>
+            </div>
             <div class="cp-grid">
                 <div class="cp-col">
                     <div class="rv-subhead">Expenses</div>
@@ -187,7 +191,7 @@
         <div class="section-card cp-notes">
             <h3 class="section-heading">Each month</h3>
             <ol>
-                <li>Enter the three balances and the month's expense total from the Planner.</li>
+                <li>Check the figures pulled from the Planner, then enter the money market and managed balances.</li>
                 <li>Read the action line. If it says sell, place the sale in the managed account that is furthest ahead, taxable first.</li>
                 <li>Carry the transfer figure into the weekly planner as the first-of-month deposit to checking.</li>
                 <li>Save the month to the log.</li>
