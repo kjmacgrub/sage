@@ -76,11 +76,11 @@
                 <h3 class="section-heading" style="margin:0">This month</h3>
                 <span class="tax-section-note" id="savedNote"></span>
             </div>
-            <p class="tax-hint">Type in the balances from the statements and this month's recurring expense figure from the Cash Flow forecast. Everything else is worked out below.</p>
+            <p class="tax-hint">Type in the balances from the statements and this month's expense total from the Planner. Everything else is worked out below.</p>
             <div class="cp-grid">
                 <div class="cp-col">
                     <div class="rv-subhead">Expenses</div>
-                    <div class="cp-field"><label>Recurring monthly expenses</label><input type="number" id="rv_recurring" step="100" oninput="onInput()" title="Next month's total from the Cash Flow forecast: rent, insurance, groceries, taxes, discretionary. Not the annual items listed below."></div>
+                    <div class="cp-field"><label>Recurring monthly expenses</label><input type="number" id="rv_recurring" step="100" oninput="onInput()" title="The month's expense total from the Planner: rent, insurance, groceries, taxes, discretionary. Not the annual items listed below, which this page carries instead."></div>
                     <div class="cp-field"><label>Annual items, per month</label><span class="rv-computed" id="rv_annual_pm">—</span></div>
                     <div class="cp-field"><label>All-in monthly expenses</label><span class="rv-computed rv-strong" id="rv_expenses">—</span></div>
 
@@ -111,7 +111,7 @@
                 <h3 class="section-heading" style="margin:0">Annual and irregular expenses</h3>
                 <span class="tax-section-note" id="annualTotal"></span>
             </div>
-            <p class="tax-hint">Things the monthly forecast cannot see until they land: long-term care premiums, quarterly tax estimates, the big trip. Each year's total divided by twelve is added to the monthly expenses so the reserve and the transfer are smooth, and checking builds a float toward each one between due dates.</p>
+            <p class="tax-hint">The large and irregular expenses the monthly Planner does not carry: long-term care premiums, quarterly tax estimates, the big trip. This is where they are budgeted. Each year's total divided by twelve is added to the monthly expenses so the reserve and the transfer are smooth, and checking builds a float toward each one between due dates.</p>
             <table class="data-table rv-items" id="itemsTable">
                 <thead>
                     <tr>
@@ -187,7 +187,7 @@
         <div class="section-card cp-notes">
             <h3 class="section-heading">Each month</h3>
             <ol>
-                <li>Enter the three balances and the recurring expense figure from the Cash Flow forecast.</li>
+                <li>Enter the three balances and the month's expense total from the Planner.</li>
                 <li>Read the action line. If it says sell, place the sale in the managed account that is furthest ahead, taxable first.</li>
                 <li>Carry the transfer figure into the weekly planner as the first-of-month deposit to checking.</li>
                 <li>Save the month to the log.</li>
