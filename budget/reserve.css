@@ -61,6 +61,7 @@ body { overflow: hidden; }
 }
 .rv-step-body { flex: 1; min-width: 0; }
 .rv-step-title { font-size: 0.92rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.4rem; }
+.rv-step-total { font-weight: 500; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 
 .rv-field { display: grid; grid-template-columns: 1fr 130px; gap: 0 0.6rem; align-items: center; margin-bottom: 0.35rem; }
 .rv-field > label { font-size: 0.85rem; color: var(--text-primary); }
