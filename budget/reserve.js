@@ -442,10 +442,6 @@ function render() {
     coverEl.textContent = c.gap > 0 && s.mm ? fmt1(c.cover) + ' months' : '—';
     coverEl.className = 'rv-num-value ' + (c.gap > 0 && s.mm ? (c.cover < s.floor ? 'bad' : c.cover < s.full ? 'warn' : 'good') : '');
     $('nCoverDetail').textContent = c.gap > 0 ? `${fmt(s.mm)} in the money market; target ${fmt(c.target)}` : '—';
-    const coverPct = c.gap > 0 && isFinite(c.cover) ? Math.min(100, c.cover / s.full * 100) : 0;
-    $('coverBar').style.width = coverPct + '%';
-    $('coverBar').className = 'rv-bar-fill ' + (c.cover < s.floor ? 'bad' : c.cover < s.full ? 'warn' : '');
-    $('floorMark').style.left = Math.min(100, s.floor / s.full * 100) + '%';
 
     const rateEl = $('nRate');
     rateEl.textContent = c.rate > 0 ? pct(c.rate) : '—';
@@ -453,11 +449,9 @@ function render() {
     $('nRateDetail').textContent = c.upper != null
         ? `baseline ${pct(s.baseline)}, pause above ${pct(c.upper)}`
         : (c.rate > 0 ? 'no baseline set yet' : 'yearly gap ÷ managed accounts');
-    const rateScale = c.upper != null ? c.upper * 1.25 : (c.rate || 1) * 1.5;
-    $('rateBar').style.width = Math.min(100, c.rate / rateScale * 100) + '%';
-    $('rateBar').className = 'rv-bar-fill ' + (c.above ? 'bad' : '');
-    $('rateMark').style.left = (c.upper != null ? Math.min(100, c.upper / rateScale * 100) : 100) + '%';
-    $('rateMark').style.display = c.upper != null ? '' : 'none';
+
+    renderGauges(c);
+    renderDistBox(c);
 
     $('nTransfer').textContent = fmt(c.transfer);
     $('nTransferDetail').textContent = c.gap <= 0 ? 'nothing needed'
@@ -467,7 +461,6 @@ function render() {
     // left column computed bits
     $('rv_annual_pm').textContent = fmt(c.annualPm);
     $('rv_income').textContent = fmt(c.income);
-    $('distState').textContent = s.distOn ? 'on' : 'paused';
     $('spendAllTotal').textContent = '(' + fmt(c.expenses) + ')';
     $('incomeAllTotal').textContent = '(' + fmt(c.income + (s.distOn ? s.dist : 0)) + (s.distOn ? '' : ', distributions paused') + ')';
     $('annualTotal').textContent = c.annual > 0 ? fmt(c.annual) + ' a year' : '';
@@ -490,6 +483,58 @@ function render() {
     document.querySelectorAll('#ruleTable tbody tr').forEach(tr => tr.classList.toggle('active', Number(tr.dataset.row) === c.row));
 
     renderLog();
+}
+
+// ── Gauges and the distributions box on the card ───────────
+
+function renderGauges(c) {
+    const s = state.settings;
+    const px = v => Math.max(0, Math.min(100, v)) + '%';
+
+    // draw rate: scale runs to a little past the pause line (or past today's rate)
+    const hasRate = c.rate > 0;
+    const scale = c.upper != null ? Math.max(c.upper, c.rate) * 1.3 : Math.max(c.rate, 1) * 1.6;
+    $('gRateVal').textContent = hasRate ? pct(c.rate) : '—';
+    const band = $('gRateBand');
+    if (c.upper != null) {
+        band.style.display = '';
+        band.style.left = px(Math.max(0, c.lower) / scale * 100);
+        band.style.width = px((c.upper - Math.max(0, c.lower)) / scale * 100);
+        $('gRateBase').style.display = ''; $('gRateBase').style.left = px(s.baseline / scale * 100);
+        $('gRateUpper').style.display = ''; $('gRateUpper').style.left = px(c.upper / scale * 100);
+    } else {
+        band.style.display = 'none'; $('gRateBase').style.display = 'none'; $('gRateUpper').style.display = 'none';
+    }
+    const ptr = $('gRatePtr');
+    ptr.style.display = hasRate ? '' : 'none';
+    ptr.style.left = px(c.rate / scale * 100);
+    ptr.className = 'rv-gauge-pointer' + (c.above ? ' bad' : '');
+    $('gRateFoot').innerHTML = c.upper != null
+        ? `<span>0%</span><span>band ${pct(Math.max(0, c.lower))} to ${pct(c.upper)} · a year's gap ${fmt(c.gap * 12)} on ${fmt(s.managed)}</span>`
+        : `<span>0%</span><span>${hasRate ? 'set a baseline in settings to draw the band' : 'needs the managed balance and a gap'}</span>`;
+
+    // reserve: scale runs to a little past the target
+    const hasCover = c.gap > 0 && s.mm > 0 && isFinite(c.cover);
+    const cscale = s.full * 1.3;
+    $('gCoverVal').textContent = hasCover ? fmt1(c.cover) + ' months' : '—';
+    const fill = $('gCoverFill');
+    fill.style.width = hasCover ? px(c.cover / cscale * 100) : '0%';
+    fill.className = 'rv-gauge-fill' + (hasCover ? (c.cover < s.floor ? ' bad' : c.cover < s.full ? ' warn' : '') : '');
+    $('gCoverFloor').style.left = px(s.floor / cscale * 100);
+    $('gCoverFull').style.left = px(s.full / cscale * 100);
+    $('gCoverFoot').innerHTML = c.gap > 0
+        ? `<span>${fmt(s.mm)} in the money market</span><span>floor ${s.floor} mo ${fmt(c.gap * s.floor)} · target ${s.full} mo ${fmt(c.target)}</span>`
+        : `<span>—</span><span>needs a gap</span>`;
+}
+
+function renderDistBox(c) {
+    const s = state.settings;
+    $('distState').textContent = s.distOn ? 'on' : 'paused';
+    const words = {
+        0: 'Continue distributions', 1: 'Continue distributions', 2: 'Restart distributions',
+        3: 'Pause distributions', 4: 'Stay paused', 5: 'Restart distributions', 6: 'Continue distributions',
+    };
+    $('distAction').textContent = c.row in words ? words[c.row] : (s.distOn ? 'Running' : 'Paused');
 }
 
 function renderLog() {

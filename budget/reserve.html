@@ -89,11 +89,6 @@
                         <input type="number" id="rv_dist" step="100" placeholder="0" oninput="onInput()">
                         <div class="rv-where" id="whereDist">Fidelity · the fixed amount the managed accounts send to checking each month</div>
                     </div>
-                    <div class="rv-toggle">
-                        <span>Distributions are</span>
-                        <label class="rv-switch"><input type="checkbox" id="rv_distOn" onchange="onInput()"><span></span></label>
-                        <b id="distState">on</b>
-                    </div>
                 </div>
             </section>
 
@@ -113,10 +108,41 @@
         <!-- ───────────── Right: the answer ───────────── -->
         <main class="rv-main">
             <div class="rv-action" id="actionCard">
-                <div class="rv-action-state" id="actionState">—</div>
+                <div class="rv-action-head">
+                    <div class="rv-action-state" id="actionState">—</div>
+                    <div class="rv-dist" id="distBox">
+                        <div class="rv-dist-label">Distributions</div>
+                        <div class="rv-dist-row">
+                            <label class="rv-switch"><input type="checkbox" id="rv_distOn" onchange="onInput()"><span></span></label>
+                            <b id="distState">on</b>
+                        </div>
+                        <div class="rv-dist-action" id="distAction"></div>
+                    </div>
+                </div>
                 <div class="rv-action-title" id="actionTitle">—</div>
                 <div class="rv-action-body" id="actionBody"></div>
                 <ol class="rv-action-steps" id="actionSteps"></ol>
+                <div class="rv-gauges">
+                    <div class="rv-gauge" id="gRate">
+                        <div class="rv-gauge-head"><span>Draw rate</span><span id="gRateVal">—</span></div>
+                        <div class="rv-gauge-track">
+                            <div class="rv-gauge-band" id="gRateBand"></div>
+                            <div class="rv-gauge-tick base" id="gRateBase"><span>baseline</span></div>
+                            <div class="rv-gauge-tick limit" id="gRateUpper"><span>pause</span></div>
+                            <div class="rv-gauge-pointer" id="gRatePtr"></div>
+                        </div>
+                        <div class="rv-gauge-foot" id="gRateFoot"></div>
+                    </div>
+                    <div class="rv-gauge" id="gCover">
+                        <div class="rv-gauge-head"><span>Reserve</span><span id="gCoverVal">—</span></div>
+                        <div class="rv-gauge-track">
+                            <div class="rv-gauge-fill" id="gCoverFill"></div>
+                            <div class="rv-gauge-tick limit" id="gCoverFloor"><span>floor</span></div>
+                            <div class="rv-gauge-tick base" id="gCoverFull"><span>target</span></div>
+                        </div>
+                        <div class="rv-gauge-foot" id="gCoverFoot"></div>
+                    </div>
+                </div>
             </div>
 
             <div class="rv-numbers">
@@ -129,13 +155,11 @@
                     <div class="rv-num-label">Reserve</div>
                     <div class="rv-num-value" id="nCover">—</div>
                     <div class="rv-num-detail" id="nCoverDetail">—</div>
-                    <div class="rv-bar"><div class="rv-bar-fill" id="coverBar"></div><div class="rv-bar-mark" id="floorMark"></div></div>
                 </div>
                 <div class="rv-num">
                     <div class="rv-num-label">Draw rate</div>
                     <div class="rv-num-value" id="nRate">—</div>
                     <div class="rv-num-detail" id="nRateDetail">—</div>
-                    <div class="rv-bar"><div class="rv-bar-fill" id="rateBar"></div><div class="rv-bar-mark" id="rateMark"></div></div>
                 </div>
                 <div class="rv-num">
                     <div class="rv-num-label">From the reserve this month</div>
