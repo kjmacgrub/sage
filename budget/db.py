@@ -525,3 +525,33 @@ def annual_summary(year):
 
     conn.close()
     return {"year": year, "months": result}
+
+
+# ── Reserve (two-year cash bucket) ───────────────────────────────────────
+# One JSON blob: {"settings": {...}, "income": [...], "items": [...], "log": [...]}
+
+def _ensure_reserve(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS reserve (
+            id    INTEGER PRIMARY KEY CHECK (id = 1),
+            data  TEXT NOT NULL
+        )
+    """)
+
+
+def get_reserve():
+    import json
+    conn = get_conn()
+    _ensure_reserve(conn)
+    row = conn.execute("SELECT data FROM reserve WHERE id = 1").fetchone()
+    conn.close()
+    return json.loads(row["data"]) if row else {}
+
+
+def set_reserve(data: dict):
+    import json
+    conn = get_conn()
+    _ensure_reserve(conn)
+    conn.execute("INSERT OR REPLACE INTO reserve(id, data) VALUES(1, ?)", (json.dumps(data),))
+    conn.commit()
+    conn.close()

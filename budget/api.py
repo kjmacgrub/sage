@@ -522,6 +522,19 @@ def tax_income():
     return jsonify({"year": year, "rows": rows})
 
 
+# ── Reserve (two-year cash bucket) ───────────────────────────────────────
+
+@app.route("/api/reserve", methods=["GET"])
+def reserve_get():
+    return jsonify(db.get_reserve())
+
+@app.route("/api/reserve", methods=["PUT"])
+def reserve_put():
+    data = request.get_json() or {}
+    db.set_reserve(data)
+    return jsonify({"ok": True})
+
+
 # ── Category Map (legacy, kept for dashboard.js compat) ──────────────────
 
 @app.route("/api/category_map", methods=["GET"])

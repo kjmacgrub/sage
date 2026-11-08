@@ -14,6 +14,7 @@
 - `index.html` + `app.js` + `styles.css` — Budget Planner (pure client-side, localStorage)
 - `dashboard.html` + `dashboard.js` + `dashboard.css` — Cash Flow dashboard (reads Quicken CSV)
 - `tax.html` + `tax.js` + `tax.css` — Tax estimator
+- `reserve.html` + `reserve.js` + `reserve.css` — Reserve: the two-year cash bucket checked once a month (gap = all-in expenses − guaranteed income; months of cover; sell/hold rule; smooth transfer to checking; annual items with a sinking-fund float; monthly log). One JSON blob in the `reserve` table via `/api/reserve` GET/PUT.
 - `api.py` — Flask API (port 5050), serves dashboard data
 - `query.py` — Quicken CSV parsing logic
 - `db.py` — SQLite helpers

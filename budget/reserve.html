@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sage — Reserve</title>
+    <link rel="icon" type="image/svg+xml" href="/sage-favicon.svg">
+    <script>(function(){var p=new URLSearchParams(location.search),t=p.get('theme')||localStorage.getItem('sage-theme')||'dark';if(p.get('theme'))localStorage.setItem('sage-theme',t);document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="tax.css">
+    <link rel="stylesheet" href="reserve.css">
+</head>
+<body>
+    <nav class="tab-nav">
+        <img src="/sage-logo.svg" class="nav-logo" alt="Sage">
+        <a href="http://localhost:5050/" class="tab-link">Planner</a>
+        <a href="http://localhost:5050/dashboard.html" class="tab-link">Cash Flow</a>
+        <a href="http://localhost:5050/tax.html" class="tab-link">Tax</a>
+        <a href="http://localhost:5050/realestate.html" class="tab-link">Real Estate</a>
+        <a href="http://localhost:5050/reserve.html" class="tab-link active">Reserve</a>
+        <a href="http://localhost:8000/" class="tab-link">Investments</a>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme"></button>
+    </nav>
+
+    <div class="container">
+
+        <div class="error-banner" id="errorBanner">
+            Could not connect to the API. Make sure it's running:<br>
+            <code>python3 budget/api.py</code>
+        </div>
+
+        <!-- Summary cards -->
+        <div class="tax-summary-row rv-summary">
+            <div class="tax-card">
+                <div class="tax-card-label">Monthly gap</div>
+                <div class="tax-card-value" id="cardGap">—</div>
+                <div class="tax-card-detail" id="cardGapDetail"></div>
+            </div>
+            <div class="tax-card">
+                <div class="tax-card-label">Reserve target</div>
+                <div class="tax-card-value" id="cardTarget">—</div>
+                <div class="tax-card-detail" id="cardTargetDetail"></div>
+            </div>
+            <div class="tax-card">
+                <div class="tax-card-label">Months of cover</div>
+                <div class="tax-card-value" id="cardCover">—</div>
+                <div class="tax-card-detail" id="cardCoverDetail"></div>
+            </div>
+            <div class="tax-card">
+                <div class="tax-card-label">Managed drawdown</div>
+                <div class="tax-card-value" id="cardDD">—</div>
+                <div class="tax-card-detail" id="cardDDDetail"></div>
+            </div>
+            <div class="tax-card">
+                <div class="tax-card-label">Transfer to checking</div>
+                <div class="tax-card-value success" id="cardTransfer">—</div>
+                <div class="tax-card-detail" id="cardTransferDetail"></div>
+            </div>
+        </div>
+
+        <!-- Action -->
+        <div class="section-card rv-action" id="actionCard">
+            <div class="rv-action-title" id="actionTitle">—</div>
+            <div class="rv-action-body" id="actionBody"></div>
+            <div class="rv-action-foot">
+                <label class="rv-month-label">Check-in for
+                    <input type="month" id="rvMonth" class="rv-month" onchange="onInput()">
+                </label>
+                <button class="btn export-btn" onclick="saveToLog()">Save this month to the log</button>
+            </div>
+        </div>
+
+        <!-- Inputs -->
+        <div class="section-card">
+            <div class="tax-section-header">
+                <h3 class="section-heading" style="margin:0">This month</h3>
+                <span class="tax-section-note" id="savedNote"></span>
+            </div>
+            <p class="tax-hint">Type in the balances from the statements and this month's recurring expense figure from the Cash Flow forecast. Everything else is worked out below.</p>
+            <div class="cp-grid">
+                <div class="cp-col">
+                    <div class="rv-subhead">Expenses</div>
+                    <div class="cp-field"><label>Recurring monthly expenses</label><input type="number" id="rv_recurring" step="100" oninput="onInput()" title="Next month's total from the Cash Flow forecast: rent, insurance, groceries, taxes, discretionary. Not the annual items listed below."></div>
+                    <div class="cp-field"><label>Annual items, per month</label><span class="rv-computed" id="rv_annual_pm">—</span></div>
+                    <div class="cp-field"><label>All-in monthly expenses</label><span class="rv-computed rv-strong" id="rv_expenses">—</span></div>
+
+                    <div class="rv-subhead" style="margin-top:0.75rem">Guaranteed income, per month</div>
+                    <div id="incomeList"></div>
+                    <div class="cp-field"><label></label><button class="rv-add" onclick="addIncome()">+ income line</button></div>
+                    <div class="cp-field"><label>Total guaranteed income</label><span class="rv-computed rv-strong" id="rv_income">—</span></div>
+                </div>
+                <div class="cp-col">
+                    <div class="rv-subhead">Balances</div>
+                    <div class="cp-field"><label>Money market (reserve)</label><input type="number" id="rv_mm" step="1000" oninput="onInput()"></div>
+                    <div class="cp-field"><label>Shared checking</label><input type="number" id="rv_checking" step="100" oninput="onInput()"></div>
+                    <div class="cp-field"><label>Managed accounts, total</label><input type="number" id="rv_managed" step="1000" oninput="onInput()" title="Everything invested for growth: taxable 70/30, IRAs, Roths. Used only to measure the drawdown from the high-water mark."></div>
+                    <div class="cp-field"><label>High-water mark</label><span class="rv-computed" id="rv_hwm">—</span></div>
+
+                    <div class="rv-subhead" style="margin-top:0.75rem">Checking</div>
+                    <div class="cp-field"><label>One month of expenses</label><span class="rv-computed" id="rv_chk_base">—</span></div>
+                    <div class="cp-field"><label>Saved toward annual items</label><span class="rv-computed" id="rv_chk_sink">—</span></div>
+                    <div class="cp-field"><label>Checking should hold</label><span class="rv-computed rv-strong" id="rv_chk_target">—</span></div>
+                    <div class="cp-field"><label>Checking is</label><span class="rv-computed" id="rv_chk_var">—</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Annual items -->
+        <div class="section-card">
+            <div class="tax-section-header">
+                <h3 class="section-heading" style="margin:0">Annual and irregular expenses</h3>
+                <span class="tax-section-note" id="annualTotal"></span>
+            </div>
+            <p class="tax-hint">Things the monthly forecast cannot see until they land: long-term care premiums, quarterly tax estimates, the big trip. Each year's total divided by twelve is added to the monthly expenses so the reserve and the transfer are smooth, and checking builds a float toward each one between due dates.</p>
+            <table class="data-table rv-items" id="itemsTable">
+                <thead>
+                    <tr>
+                        <th style="text-align:left">Item</th>
+                        <th class="num">Per year</th>
+                        <th>Every</th>
+                        <th>Next due</th>
+                        <th class="num">Per month</th>
+                        <th class="num" title="How much should have been set aside toward this item since it was last paid">Saved so far</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="itemsBody"></tbody>
+            </table>
+            <div class="rv-table-foot"><button class="rv-add" onclick="addItem()">+ annual item</button></div>
+        </div>
+
+        <!-- Rules -->
+        <details class="section-card cp-details">
+            <summary class="section-heading">The rule</summary>
+            <p class="tax-hint">Months of cover is the money market balance divided by the monthly gap. Read the row that matches.</p>
+            <table class="data-table rv-rules">
+                <thead><tr><th style="text-align:left">Months of cover</th><th style="text-align:left">Managed accounts</th><th style="text-align:left">Action</th></tr></thead>
+                <tbody>
+                    <tr><td><span id="ruleFull1">24</span> or more</td><td>any</td><td>Nothing. Dividends keep accumulating.</td></tr>
+                    <tr><td><span id="ruleFloor1">12</span> to <span id="ruleFull2">24</span></td><td>within <span id="ruleDD1">10%</span> of their high</td><td>Sell enough to get back to <span id="ruleFull3">24</span>.</td></tr>
+                    <tr><td><span id="ruleFloor2">12</span> to <span id="ruleFull4">24</span></td><td>down more than <span id="ruleDD2">10%</span></td><td>Nothing. Keep drawing on the reserve.</td></tr>
+                    <tr><td>under <span id="ruleFloor3">12</span></td><td>any</td><td>Sell enough to get back to <span id="ruleRefill1">18</span>, whatever the market is doing.</td></tr>
+                </tbody>
+            </table>
+            <div class="cp-grid" style="padding-top:1rem">
+                <div class="cp-col">
+                    <div class="cp-field"><label>Full reserve, months</label><input type="number" id="rv_full" step="1" min="1" oninput="onInput()" style="width:80px"></div>
+                    <div class="cp-field"><label>Refill to, after a forced sale</label><input type="number" id="rv_refill" step="1" min="1" oninput="onInput()" style="width:80px"></div>
+                </div>
+                <div class="cp-col">
+                    <div class="cp-field"><label>Floor, months</label><input type="number" id="rv_floor" step="1" min="0" oninput="onInput()" style="width:80px"></div>
+                    <div class="cp-field"><label>Drawdown that pauses refills</label><input type="number" id="rv_dd" step="1" min="0" max="100" oninput="onInput()" style="width:80px"><span class="cp-pct">%</span></div>
+                </div>
+            </div>
+        </details>
+
+        <!-- Log -->
+        <div class="section-card">
+            <div class="tax-section-header">
+                <h3 class="section-heading" style="margin:0">Log</h3>
+                <span class="tax-section-note">one row per monthly check-in</span>
+            </div>
+            <p class="tax-hint">The high-water mark for the managed accounts is the largest balance ever saved here. Delete a row to forget it.</p>
+            <div class="cp-table-wrap">
+                <table class="data-table" id="logTable">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left">Month</th>
+                            <th class="num">Expenses</th>
+                            <th class="num">Income</th>
+                            <th class="num">Gap</th>
+                            <th class="num">Money market</th>
+                            <th class="num">Cover</th>
+                            <th class="num">Managed</th>
+                            <th class="num">Drawdown</th>
+                            <th class="num">Transfer</th>
+                            <th style="text-align:left">Action</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="logBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="section-card cp-notes">
+            <h3 class="section-heading">Each month</h3>
+            <ol>
+                <li>Enter the three balances and the recurring expense figure from the Cash Flow forecast.</li>
+                <li>Read the action line. If it says sell, place the sale in the managed account that is furthest ahead, taxable first.</li>
+                <li>Carry the transfer figure into the weekly planner as the first-of-month deposit to checking.</li>
+                <li>Save the month to the log.</li>
+            </ol>
+            <p class="tax-hint">The transfer is the same every month on purpose. Checking builds up a float between the annual payments and spends it when they land, so "Checking should hold" rises toward each due date and drops after it. Dividends and interest from the taxable managed account should be set to pay out to the money market, not reinvest, so the reserve refills partly on its own.</p>
+        </div>
+
+    </div>
+
+    <div id="toast"></div>
+    <script src="reserve.js"></script>
+    <script>
+        (function() {
+            var btn = document.getElementById('themeToggle');
+            function sync() { btn.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '☾'; }
+            btn.addEventListener('click', function() {
+                var t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', t);
+                localStorage.setItem('sage-theme', t);
+                sync();
+            });
+            document.querySelectorAll('.tab-link').forEach(function(a) {
+                a.addEventListener('click', function() {
+                    var t = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var u = new URL(a.href); u.searchParams.set('theme', t); a.href = u.toString();
+                });
+            });
+            sync();
+        })();
+    </script>
+</body>
+</html>

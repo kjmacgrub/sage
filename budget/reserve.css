@@ -1,0 +1,155 @@
+/* ============================================================
+   Reserve — reserve.css
+   Extends styles.css and tax.css (cards, cp-grid, cp-field)
+   ============================================================ */
+
+.rv-summary { grid-template-columns: repeat(5, 1fr); margin-bottom: 1rem; }
+.tax-card-detail { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.3rem; }
+
+/* ── Action card ──────────────────────────────────────────── */
+
+.rv-action { border-left-color: var(--primary); margin-bottom: 1rem; }
+.rv-action.sell  { border-left-color: var(--warning); }
+.rv-action.forced { border-left-color: var(--danger); }
+.rv-action.hold  { border-left-color: var(--text-secondary); }
+
+.rv-action-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.4rem;
+}
+.rv-action-body {
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    max-width: 70ch;
+}
+.rv-action-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+.rv-month-label { font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem; }
+.rv-month {
+    font-family: var(--font);
+    font-size: 0.9rem;
+    padding: 0.3rem 0.5rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
+/* ── Inputs ───────────────────────────────────────────────── */
+
+.rv-subhead {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    margin: 0.25rem 0 0.25rem;
+}
+.rv-computed {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    padding: 0.35rem 0;
+}
+.rv-computed.rv-strong { color: var(--text-primary); font-weight: 600; }
+.rv-computed.neg { color: var(--danger); }
+.rv-computed.pos { color: var(--income-accent); }
+
+.cp-field input[type="text"] {
+    font-family: var(--font);
+    font-size: 0.95rem;
+    padding: 0.35rem 0.5rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+    width: 200px;
+}
+.cp-field input[type="text"]:focus { outline: none; border-color: var(--primary); }
+
+.rv-income-row input[type="text"] { width: 200px; text-align: right; }
+.rv-income-row input[type="number"] { width: 120px; }
+
+.rv-add {
+    font-family: var(--font);
+    font-size: 0.8rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.rv-add:hover { color: var(--primary); border-color: var(--primary); }
+
+.rv-del {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0 0.3rem;
+    line-height: 1;
+}
+.rv-del:hover { color: var(--danger); }
+
+/* ── Tables ───────────────────────────────────────────────── */
+
+.rv-items input, .rv-items select {
+    font-family: var(--font);
+    font-size: 0.9rem;
+    padding: 0.3rem 0.45rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+}
+.rv-items input:focus, .rv-items select:focus { outline: none; border-color: var(--primary); }
+.rv-items input[type="text"] { width: 100%; min-width: 180px; }
+.rv-items input[type="number"] { width: 110px; text-align: right; }
+.rv-items td.num { font-variant-numeric: tabular-nums; }
+.rv-table-foot { padding: 0.5rem 2rem 1.25rem; }
+
+.rv-rules td, .rv-rules th { padding: 0.5rem 0.75rem; }
+.rv-rules tr.active td { background: var(--primary-light); font-weight: 600; }
+
+#logTable td.num { font-variant-numeric: tabular-nums; }
+#logTable td.action { font-size: 0.85rem; color: var(--text-secondary); }
+
+@media (max-width: 900px) {
+    .rv-summary { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Table basics (data-table lives in dashboard.css, not loaded here) ── */
+
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.data-table th {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+}
+.data-table th.num { text-align: right; }
+.data-table td {
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+.data-table td.num { text-align: right; }
+.data-table tr:last-child td { border-bottom: none; }
+.section-card > .data-table { width: calc(100% - 4rem); margin: 0 2rem; }
+#logTable { width: 100%; margin: 0; }
