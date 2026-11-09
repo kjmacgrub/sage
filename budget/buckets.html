@@ -32,13 +32,12 @@
             <div class="rv-head-left">
                 <span class="rv-title">Monthly check-in</span>
                 <div class="rv-people" id="rvPeople" role="tablist">
-                    <button class="rv-person-tile" data-who="ken" role="tab" onclick="switchPerson('ken')">Ken</button>
-                    <button class="rv-person-tile" data-who="hilary" role="tab" onclick="switchPerson('hilary')">Hilary</button>
+                    <button class="rv-person-tile" data-who="ken" role="tab" title="Click again for this month's numbers" onclick="personClick('ken')">Ken</button>
+                    <button class="rv-person-tile" data-who="hilary" role="tab" title="Click again for this month's numbers" onclick="personClick('hilary')">Hilary</button>
                 </div>
                 <label class="rv-month-label">for <input type="month" id="rvMonth" class="rv-month" onchange="onInput()"></label>
             </div>
             <div class="rv-head-right">
-                <button class="btn export-btn rv-open-btn" id="openDrawerBtn" onclick="openDrawer()">Enter this month's numbers</button>
                 <button class="rv-icon-btn" title="How this works, for the family" onclick="openDialog('dlgExplain', event)">?</button>
             </div>
         </header>
@@ -90,7 +89,7 @@
             <div class="rv-drawer-title">This month's numbers <span class="rv-drawer-who" id="drawerWho"></span></div>
             <button class="rv-close" title="Close" onclick="closeDrawer()">×</button>
         </div>
-        <p class="rv-drawer-hint">Four steps. Each one says where the number comes from. When they are in, close this and read the card.</p>
+        <p class="rv-drawer-hint">Four steps. Each one says where the number comes from. When they are in, save, close this and read the card. Click my name at the top to open or close it.</p>
 
         <section class="rv-step">
             <div class="rv-step-num">1</div>

@@ -34,17 +34,18 @@ body { overflow: hidden; }
 }
 .rv-person-tile:hover { color: var(--text-primary); }
 .rv-person-tile.active { background: var(--primary); color: #fff; box-shadow: var(--shadow); }
+.rv-person-tile { position: relative; }
+.rv-person-tile.needed::after {
+    content: ''; position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--warning); border: 2px solid var(--surface);
+}
+.rv-person-tile.active.open { box-shadow: 0 0 0 3px var(--primary-light); }
 .rv-month-label { font-size: 0.85rem; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 0.4rem; }
 .rv-month {
     font-family: var(--font); font-size: 0.85rem; padding: 0.15rem 0.4rem;
     border: 1px solid var(--border); border-radius: var(--radius-sm);
     background: var(--surface); color: var(--text-primary);
 }
-.rv-open-btn { padding: 0.45rem 1rem; font-size: 0.88rem; }
-.rv-open-btn { background: var(--surface); color: var(--text-primary); border: 1.5px solid var(--border); }
-.rv-open-btn:hover { background: var(--background); color: var(--text-primary); }
-.rv-open-btn.needed, .rv-open-btn.needed:hover { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-light); }
-.rv-open-btn.needed:hover { background: var(--primary-hover); }
 .rv-icon-btn {
     width: 30px; height: 30px; border-radius: 50%;
     border: 1.5px solid var(--border); background: transparent;

@@ -121,12 +121,18 @@ document.addEventListener('click', ev => {
 });
 
 // ── The drawer with this month's numbers ────────────────────
-// Hidden by default. The header button is highlighted while the month
-// still needs attention (a bucket balance missing, or not yet saved); the
-// drawer closes when the month is saved.
+// Hidden by default. Clicking the selected person's name opens and closes
+// it; clicking the other name switches person with the drawer closed. A dot
+// on the name shows the month still needs attention (a bucket balance
+// missing, not yet saved, or changed since it was saved).
 
-function openDrawer() { $('drawer').classList.add('open'); $('drawerBackdrop').classList.add('open'); }
-function closeDrawer() { $('drawer').classList.remove('open'); $('drawerBackdrop').classList.remove('open'); }
+function openDrawer() { $('drawer').classList.add('open'); $('drawerBackdrop').classList.add('open'); syncPersonTiles(); }
+function closeDrawer() { $('drawer').classList.remove('open'); $('drawerBackdrop').classList.remove('open'); syncPersonTiles(); }
+function drawerOpen() { return $('drawer').classList.contains('open'); }
+function personClick(who) {
+    if (who === store.current) { if (drawerOpen()) closeDrawer(); else openDrawer(); }
+    else switchPerson(who);
+}
 function savedRow() { return state.log.find(r => r.month === state.settings.month) || null; }
 function monthSaved() { return !!savedRow(); }
 // the saved row no longer matches what is on the page
@@ -141,10 +147,8 @@ function drawerNeeded(c) {
     return !s.mm || !s.managed || !monthSaved() || (c ? monthStale(c) : false);
 }
 function syncDrawerButton(c) {
-    const btn = $('openDrawerBtn');
     const needed = drawerNeeded(c);
-    btn.textContent = needed ? "Enter this month's numbers" : "This month's numbers";
-    btn.classList.toggle('needed', needed);
+    document.querySelectorAll('.rv-person-tile').forEach(b => b.classList.toggle('needed', needed && b.dataset.who === store.current));
     $('drawerWho').textContent = NAMES[store.current] || '';
 }
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeDrawer(); });
@@ -190,12 +194,14 @@ async function load() {
 }
 
 function syncPersonTiles() {
-    document.querySelectorAll('.rv-person-tile').forEach(b => b.classList.toggle('active', b.dataset.who === store.current));
+    const open = $('drawer').classList.contains('open');
+    document.querySelectorAll('.rv-person-tile').forEach(b => { const me = b.dataset.who === store.current; b.classList.toggle('active', me); b.classList.toggle('open', me && open); });
 }
 
 function switchPerson(who) {
     if (who === store.current) return;
     readInputs();
+    closeDrawer();
     store.current = who;
     if (!store.people[who]) store.people[who] = freshPerson(who);
     state = store.people[who];
