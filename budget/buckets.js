@@ -1,14 +1,19 @@
 // ============================================================
-// Reserve — the two-year cash bucket, checked once a month
+// Buckets — the three-bucket plan, checked once a month
 // ============================================================
 //
-// Three balances are typed in from statements. The page works out the gap
-// (all-in expenses minus guaranteed income), the reserve's months of cover,
-// the draw rate (yearly gap / managed accounts) against its guardrail band,
-// and reads the rule table to say exactly what to do. The distributions are
-// the fixed monthly amount the managed accounts send to checking; the rule
+// Spending bucket: the shared checking account that pays the bills.
+// Cash bucket: my money market, two years of my draw, where the big yearly
+// bills wait. Growth bucket: everything of mine that is invested.
+//
+// Two bucket balances are typed in from statements. The page works out my
+// draw (all-in monthly spending minus guaranteed income; `gap` in the code
+// and in saved data), the Cash bucket's months of cover, the draw rate
+// (yearly draw / Growth bucket) against its guardrail band, and reads the
+// rule table to say exactly what to do. The distributions are the fixed
+// monthly amount the Growth bucket pays into the Spending bucket; the rule
 // pauses and restarts them. Everything is saved as one JSON blob through
-// /api/reserve.
+// /api/reserve (the route and table keep their original name).
 
 const API = 'http://localhost:5050';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -30,6 +35,7 @@ const SEED = {
     ken:    { income: [{ name: 'Wages: Ken', amount: 2800 }], items: [{ name: 'Long-term care insurance', amount: 0, freq: 1, start: '2026-01', end: '2035-12' }] },
     hilary: { income: [{ name: 'NY Life annuity', amount: 3714.73 }], items: [{ name: 'Long-term care insurance', amount: 0, freq: 1, start: '2026-01', end: '2035-12' }] },
 };
+const NAMES = { ken: 'Ken', hilary: 'Hilary' };
 
 // everything saved: { people: { ken: {...}, hilary: {...} }, current: 'ken' }
 let store = { people: {}, current: 'ken' };
@@ -114,6 +120,27 @@ document.addEventListener('click', ev => {
     }
 });
 
+// ── The drawer with this month's numbers ────────────────────
+// It opens on its own when the month has not been saved yet or a bucket
+// balance is missing, closes when the month is saved, and can be reopened
+// from the header any time.
+
+function openDrawer() { $('drawer').classList.add('open'); $('drawerBackdrop').classList.add('open'); }
+function closeDrawer() { $('drawer').classList.remove('open'); $('drawerBackdrop').classList.remove('open'); }
+function monthSaved() { return state.log.some(r => r.month === state.settings.month); }
+function drawerNeeded() {
+    const s = state.settings;
+    return !s.mm || !s.managed || !monthSaved();
+}
+function syncDrawerButton() {
+    const btn = $('openDrawerBtn');
+    const needed = drawerNeeded();
+    btn.textContent = needed ? "Enter this month's numbers" : "This month's numbers";
+    btn.classList.toggle('needed', needed);
+    $('drawerWho').textContent = NAMES[store.current] || '';
+}
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeDrawer(); });
+
 // ── Load / save ─────────────────────────────────────────────
 
 async function load() {
@@ -129,7 +156,7 @@ async function load() {
             p.settings = Object.assign({}, PERSON_DEFAULTS.settings, old.settings);
             delete p.settings.recurring; delete p.settings.checking;
             p.settings.deposit = 0; p.settings.dist = 0;
-            p.settings.baseline = null;   // the denominator changed meaning: set it again
+            p.settings.baseline = null;
             p.income = (old.income || []).filter(r => /ken|wages/i.test(r.name || ''));
             if (!p.income.length) p.income = freshPerson('ken').income;
             p.items = Array.isArray(old.items) && old.items.length ? old.items : p.items;
@@ -152,6 +179,7 @@ async function load() {
     renderIncome();
     renderItems();
     render();
+    if (drawerNeeded()) openDrawer();
 }
 
 function switchPerson(who) {
@@ -164,6 +192,7 @@ function switchPerson(who) {
     normalizeItems();
     useplanner(false);
     fillInputs(); renderIncome(); renderItems(); render(); scheduleSave();
+    if (drawerNeeded()) openDrawer(); else closeDrawer();
 }
 
 function scheduleSave() {
@@ -180,7 +209,7 @@ function scheduleSave() {
 
 // ── Planner ─────────────────────────────────────────────────
 // The newest plan on the Planner tab is the household budget for the month.
-// Its expense total times my share is my deposit to shared checking.
+// Its expense total times my share is my deposit to the Spending bucket.
 
 async function loadPlanner() {
     try {
@@ -262,7 +291,7 @@ function onInput() {
 function setBaseline() {
     readInputs();
     const c = compute();
-    if (!(c.rate > 0)) { showToast('Enter the managed balance and a gap first'); return; }
+    if (!(c.rate > 0)) { showToast('Enter the Growth bucket balance and a draw first'); return; }
     state.settings.baseline = Math.round(c.rate * 100) / 100;
     fillInputs(); render(); scheduleSave();
     showToast('Baseline set to ' + pct(state.settings.baseline));
@@ -386,8 +415,8 @@ function dueThisMonth(it, ym) {
     const cur = Number(ym.split('-')[1]) || 1;
     return ((cur - first) % period + period) % period === 0 ? num(it.amount) / freq : 0;
 }
-// What the money market is holding for an item right now: the twelfths
-// saved since the last payment, or the whole bill in the month it is due.
+// What the Cash bucket is holding for an item right now: the twelfths saved
+// since the last payment, or the whole bill in the month it is due.
 function earmark(it, ym) { return sinking(it, ym) + dueThisMonth(it, ym); }
 
 // ── Calculation ─────────────────────────────────────────────
@@ -401,12 +430,13 @@ function compute() {
     const annualPm = annual / 12;
     const expenses = s.deposit + s.own + annualPm;
     const income = state.income.reduce((a, r) => a + num(r.amount), 0);
+    // my draw: what my buckets have to supply each month
     const gap = Math.max(0, expenses - income);
-    // the part of the gap that goes to checking every month; the twelfths
-    // of the annual items stay in the money market until each bill is due
+    // the part of the draw that goes to the Spending bucket every month; the
+    // twelfths of the annual items stay in the Cash bucket until each bill is due
     const regularGap = Math.max(0, s.deposit + s.own - income);
 
-    // what the money market is holding for the annual items, and what falls due now
+    // what the Cash bucket is holding for the annual items, and what falls due now
     const earmarked = active.reduce((a, it) => a + earmark(it, ym), 0);
     const due = active.map(it => ({ name: it.name || 'annual item', amount: dueThisMonth(it, ym) })).filter(d => d.amount > 0);
     const dueTotal = due.reduce((a, d) => a + d.amount, 0);
@@ -424,51 +454,51 @@ function compute() {
     const above = upper != null && rate > upper;
     const wellBelow = lower != null && rate > 0 && rate < lower;
 
-    // what the reserve sends to checking this month: the regular part of the
-    // gap (less the distribution while it runs) plus any annual bill due now
+    // what the Cash bucket sends to the Spending bucket this month: the regular
+    // part of the draw (less the distribution while it runs) plus any bill due
     const monthly = s.distOn ? Math.max(0, regularGap - s.dist) : regularGap;
     const transfer = monthly + dueTotal;
 
     // ── the rule ──
     let row = -1, cls = 'setup', state_ = 'Set-up', title = '', body = '', steps = [], sell = 0;
     const missing = [];
-    if (!s.mm) missing.push('the money market balance');
-    if (!s.managed) missing.push('the managed accounts balance');
+    if (!s.mm) missing.push('the Cash bucket balance');
+    if (!s.managed) missing.push('the Growth bucket balance');
     if (!(gap > 0)) missing.push('what I pay each month, above my guaranteed income');
 
     if (missing.length) {
         title = 'Fill in ' + missing.join(', ').replace(/, ([^,]*)$/, ' and $1') + '.';
-        body = 'The card needs those before it can read the rule. Follow the steps on the left; each one says where the number comes from. The managed accounts figure is everything of mine that is invested, so the draw rate reads like the familiar 4% rule.';
+        body = 'The card needs those before it can read the rule. Open "Enter this month\'s numbers" at the top right; each step says where the number comes from. The Growth bucket is everything of mine that is invested, so the draw rate reads like the familiar 4% rule.';
     } else if (!above) {
         if (!s.distOn) {
             row = 2; cls = 'restart'; state_ = 'Recovered';
             sell = Math.max(0, target - free);
-            title = 'Restart the distributions' + (sell > 0 ? ` and sell ${fmt(sell)} to refill the reserve.` : '.');
-            body = (upper != null ? `The draw rate is ${pct(rate)}, back inside the band (under ${pct(upper)}). ` : '') + `The managed accounts can carry the monthly amount again, and the reserve${sell > 0 ? ` is at ${fmt1(cover)} months and should go back to ${s.full}` : ' is full'}.`;
+            title = 'Restart the distributions' + (sell > 0 ? ` and sell ${fmt(sell)} to refill the Cash bucket.` : '.');
+            body = (upper != null ? `The draw rate is ${pct(rate)}, back inside the band (under ${pct(upper)}). ` : '') + `The Growth bucket can carry the monthly amount again, and the Cash bucket${sell > 0 ? ` is at ${fmt1(cover)} months and should go back to ${s.full}` : ' is full'}.`;
             steps = [`Call Fidelity or Schwab: restart the monthly distribution of ${fmt(s.dist)} to checking.`];
-            if (sell > 0) steps.push(`Same call: sell ${fmt(sell)} from the managed accounts and move it to the money market.`);
-            steps.push('Flip the "Distributions are" switch on the left to on, then save the month.');
+            if (sell > 0) steps.push(`Same call: sell ${fmt(sell)} from the Growth bucket and move it to the Cash bucket.`);
+            steps.push('Flip the distributions switch on the card to on, then save the month.');
         } else if (cover < s.floor) {
-            row = 6; cls = 'forced'; state_ = 'Reserve low';
+            row = 6; cls = 'forced'; state_ = 'Cash bucket low';
             sell = Math.max(0, gap * s.refill - free);
-            title = `Sell ${fmt(sell)} to bring the reserve to ${s.refill} months.`;
-            body = `The reserve is down to ${fmt1(cover)} months, under the ${s.floor}-month floor, while the distributions are running. Something other than the market is draining it, so it gets refilled now whatever the market is doing.`;
-            steps = [`Call Fidelity or Schwab: sell ${fmt(sell)} from the managed accounts and move it to the money market.`,
-                     'Look at why the reserve fell: are the distributions set too low for the gap? Note it for the annual review.',
+            title = `Sell ${fmt(sell)} to bring the Cash bucket to ${s.refill} months.`;
+            body = `The Cash bucket is down to ${fmt1(cover)} months, under the ${s.floor}-month floor, while the distributions are running. Something other than the market is draining it, so it gets refilled now whatever the market is doing.`;
+            steps = [`Call Fidelity or Schwab: sell ${fmt(sell)} from the Growth bucket and move it to the Cash bucket.`,
+                     'Look at why the Cash bucket fell: are the distributions set too low for the draw? Note it for the annual review.',
                      'Save the month.'];
         } else if (cover < s.full) {
             row = 1; cls = 'topup'; state_ = 'Normal, top up';
             sell = Math.max(0, target - free);
-            title = `Sell ${fmt(sell)} to top the reserve back up to ${s.full} months.`;
-            body = (upper != null ? `The draw rate is ${pct(rate)}, inside the band. ` : '') + `The reserve holds ${fmt1(cover)} months against a target of ${s.full} (${fmt(target)}). It is refilled now.`;
-            steps = [`Call Fidelity or Schwab, or place it online: sell ${fmt(sell)} from the managed accounts and move it to the money market.`,
+            title = `Sell ${fmt(sell)} to top the Cash bucket back up to ${s.full} months.`;
+            body = (upper != null ? `The draw rate is ${pct(rate)}, inside the band. ` : '') + `The Cash bucket holds ${fmt1(cover)} months against a target of ${s.full} (${fmt(target)}). It is refilled now.`;
+            steps = [`Call Fidelity or Schwab, or place it online: sell ${fmt(sell)} from the Growth bucket and move it to the Cash bucket.`,
                      'Save the month.'];
         } else {
             row = 0; cls = 'ok'; state_ = 'Normal';
             title = 'Nothing to do this month.';
             body = upper != null
-                ? `The draw rate is ${pct(rate)}, inside the band (under ${pct(upper)}). The reserve holds ${fmt1(cover)} months, at or above the ${s.full}-month target. The distributions keep running.`
-                : `The reserve holds ${fmt1(cover)} months, at or above the ${s.full}-month target. The distributions keep running.`;
+                ? `The draw rate is ${pct(rate)}, inside the band (under ${pct(upper)}). The Cash bucket holds ${fmt1(cover)} months, at or above the ${s.full}-month target. The distributions keep running.`
+                : `The Cash bucket holds ${fmt1(cover)} months, at or above the ${s.full}-month target. The distributions keep running.`;
             steps = ['Save the month.'];
             if (wellBelow) steps.unshift(`The rate is well under the ${pct(s.baseline)} baseline. Note for the annual review: the distributions could rise.`);
         }
@@ -477,38 +507,38 @@ function compute() {
             if (cover >= s.floor) {
                 row = 3; cls = 'pause'; state_ = 'Market down';
                 title = 'Pause the distributions.';
-                body = `The draw rate is ${pct(rate)}, above the band (${pct(upper)}). The managed accounts have fallen enough that each monthly distribution is selling too cheaply. The reserve holds ${fmt1(cover)} months and pays everything from here until the rate is back in the band.`;
+                body = `The draw rate is ${pct(rate)}, above the band (${pct(upper)}). The Growth bucket has fallen enough that each monthly distribution is selling too cheaply. The Cash bucket holds ${fmt1(cover)} months and pays everything from here until the rate is back in the band.`;
                 steps = [`Call Fidelity or Schwab: pause the monthly distribution of ${fmt(s.dist)} until further notice.`,
-                         `Move ${fmt(monthly)} a month from my money market from now on; this page shows the figure each month.`,
-                         'Flip the "Distributions are" switch on the left to paused, then save the month.'];
+                         `Move ${fmt(monthly)} a month from the Cash bucket from now on; this page shows the figure each month.`,
+                         'Flip the distributions switch on the card to paused, then save the month.'];
             } else {
-                row = 6; cls = 'forced'; state_ = 'Reserve low';
+                row = 6; cls = 'forced'; state_ = 'Cash bucket low';
                 sell = Math.max(0, gap * s.refill - free);
-                title = `Sell ${fmt(sell)} to bring the reserve to ${s.refill} months.`;
-                body = `The reserve is under the ${s.floor}-month floor at ${fmt1(cover)} months. Even in a down market it has to be refilled; a thin reserve is the bigger risk.`;
-                steps = [`Call Fidelity or Schwab: sell ${fmt(sell)} from the managed accounts and move it to the money market.`, 'Save the month.'];
+                title = `Sell ${fmt(sell)} to bring the Cash bucket to ${s.refill} months.`;
+                body = `The Cash bucket is under the ${s.floor}-month floor at ${fmt1(cover)} months. Even in a down market it has to be refilled; a thin Cash bucket is the bigger risk.`;
+                steps = [`Call Fidelity or Schwab: sell ${fmt(sell)} from the Growth bucket and move it to the Cash bucket.`, 'Save the month.'];
             }
         } else {
             if (cover >= s.floor) {
                 row = 4; cls = 'hold'; state_ = 'Market down, holding';
-                title = 'Hold. Keep paying from the reserve.';
-                body = `The draw rate is ${pct(rate)}, still above the band (${pct(upper)}). The distributions stay paused and the reserve carries the month. It holds ${fmt1(cover)} months, about ${fmt1(Math.max(0, cover - s.floor))} above the floor. Nothing is sold.`;
-                steps = [`Move ${fmt(monthly)} from my money market to cover the month.`, 'Trim discretionary spending where it is easy.', 'Save the month.'];
+                title = 'Hold. Keep paying from the Cash bucket.';
+                body = `The draw rate is ${pct(rate)}, still above the band (${pct(upper)}). The distributions stay paused and the Cash bucket carries the month. It holds ${fmt1(cover)} months, about ${fmt1(Math.max(0, cover - s.floor))} above the floor. Nothing is sold.`;
+                steps = [`Move ${fmt(monthly)} from the Cash bucket to cover the month.`, 'Trim discretionary spending where it is easy.', 'Save the month.'];
             } else {
-                row = 5; cls = 'forced'; state_ = 'Reserve low';
+                row = 5; cls = 'forced'; state_ = 'Cash bucket low';
                 title = 'Restart the distributions anyway.';
-                body = `The reserve is down to ${fmt1(cover)} months, under the ${s.floor}-month floor, and the market has not recovered. The distributions come back on so the reserve stops draining. No top-up until the rate is back in the band.`;
+                body = `The Cash bucket is down to ${fmt1(cover)} months, under the ${s.floor}-month floor, and the market has not recovered. The distributions come back on so the Cash bucket stops draining. No top-up until the rate is back in the band.`;
                 steps = [`Call Fidelity or Schwab: restart the monthly distribution of ${fmt(s.dist)} to checking.`,
-                         'Flip the "Distributions are" switch on the left to on, then save the month.'];
+                         'Flip the distributions switch on the card to on, then save the month.'];
             }
         }
     }
 
     if (!missing.length && dueTotal > 0) {
-        steps.unshift(`Move ${fmt(dueTotal)} from my money market to checking for the ${due.map(d => d.name).join(' and ')} due this month. The reserve has been holding it.`);
+        steps.unshift(`Move ${fmt(dueTotal)} from the Cash bucket to checking for the ${due.map(d => d.name).join(' and ')} due this month. The Cash bucket has been holding it.`);
     }
     if (!missing.length && s.baseline == null) {
-        steps.push('No baseline yet, so only the reserve rows of the rule apply. Set it in settings around mid-2027, once the lump sum and condo proceeds are invested.');
+        steps.push('No baseline yet, so only the Cash bucket rows of the rule apply. Set it in settings around mid-2027, once the lump sum and condo proceeds are invested.');
     }
 
     return { annual, annualPm, expenses, income, gap, regularGap, earmarked, due, dueTotal, free, target, cover, hwm, dd, rate, upper, lower, above, wellBelow,
@@ -521,7 +551,7 @@ function render() {
     const s = state.settings;
     const c = compute();
 
-    // action card
+    // the card
     const card = $('actionCard');
     card.className = 'rv-action ' + c.cls;
     $('actionState').textContent = c.state;
@@ -529,15 +559,15 @@ function render() {
     $('actionBody').textContent = c.body;
     $('actionSteps').innerHTML = c.steps.map(t => `<li>${esc(t)}</li>`).join('');
 
-    renderGauges(c);
     renderDistBox(c);
     renderFlow(c);
+    syncDrawerButton();
 
-    // left column computed bits
+    // drawer computed bits
     $('rv_annual_pm').textContent = fmt(c.annualPm);
     $('rv_income').textContent = fmt(c.income);
     $('spendAllTotal').textContent = '(' + fmt(c.expenses) + ')';
-    $('whereDeposit').textContent = planner ? `The one number we agree on. Planner ${fmt(planner.expenses)} × ${s.share}% = ${fmt(plannerDeposit())}` : 'The one number we agree on: my share of the household budget.';
+    $('whereDeposit').textContent = planner ? `Shared checking. The one number we agree on: Planner ${fmt(planner.expenses)} × ${s.share}% = ${fmt(plannerDeposit())}` : 'Shared checking. The one number we agree on: my share of the household budget.';
     $('incomeAllTotal').textContent = '(' + fmt(c.income + (s.distOn ? s.dist : 0)) + (s.distOn ? '' : ', distributions paused') + ')';
     $('annualTotal').textContent = c.annual > 0 ? fmt(c.annual) + ' a year' : '';
 
@@ -548,7 +578,7 @@ function render() {
         parts.push(`Planner ${esc(planner.label || planner.date)}: household expenses ${fmt(planner.expenses)} × ${s.share}% share = ${fmt(pd)}` +
                    (Math.abs(pd - s.deposit) > 1 ? `, deposit entered as ${fmt(s.deposit)}` : ''));
     }
-    if (c.hwm > 0 && c.dd > 0.5) parts.push(`Managed accounts ${pct(c.dd)} below their high of ${fmt(c.hwm)}`);
+    if (c.hwm > 0 && c.dd > 0.5) parts.push(`Growth bucket ${pct(c.dd)} below its high of ${fmt(c.hwm)}`);
     $('plannerText').innerHTML = parts.join('<br>');
 
     // rule table labels + highlight
@@ -561,111 +591,111 @@ function render() {
     renderLog();
 }
 
-// ── Gauges and the distributions box on the card ───────────
-
-function renderGauges(c) {
-    const s = state.settings;
-    const px = v => Math.max(0, Math.min(100, v)) + '%';
-
-    // reserve: scale runs to a little past the target
-    const hasCover = c.gap > 0 && s.mm > 0 && isFinite(c.cover);
-    const cscale = s.full * 1.3;
-    $('gCoverVal').textContent = hasCover ? fmt1(c.cover) + ' months' : '—';
-    const fill = $('gCoverFill');
-    fill.style.width = hasCover ? px(c.cover / cscale * 100) : '0%';
-    fill.className = 'rv-gauge-fill' + (hasCover ? (c.cover < s.floor ? ' bad' : c.cover < s.full ? ' warn' : '') : '');
-    $('gCoverFloor').style.left = px(s.floor / cscale * 100);
-    $('gCoverFull').style.left = px(s.full / cscale * 100);
-    $('gCoverFoot').innerHTML = c.gap > 0
-        ? `<span>${c.earmarked > 0 ? `${fmt(c.free)} free in the money market, ${fmt(c.earmarked)} held for annual items` : `${fmt(s.mm)} in the money market`}</span><span>floor ${s.floor} mo ${fmt(c.gap * s.floor)} · target ${s.full} mo ${fmt(c.target)}</span>`
-        : `<span>—</span><span>needs a gap</span>`;
-}
-
-// ── The flow picture ────────────────────────────────────────
-// Three pots on the left feed one column on the right: what I pay each
+// ── The picture ─────────────────────────────────────────────
+// Guaranteed income and the two buckets of mine on the left feed the
+// Spending bucket on the right: a column whose height is what I pay each
 // month, stacked from what covers it. Guaranteed income first, then the
-// fixed distribution, then the reserve. The top two of those are the gap.
+// fixed distribution, then the Cash bucket. Everything above guaranteed
+// income is my draw. The Cash bucket tile carries its months-of-cover gauge.
 function renderFlow(c) {
     const s = state.settings;
     const svg = $('flowSvg');
-    const W = 1100, H = 200;
     const expenses = c.expenses;
     const guar = Math.min(c.income, expenses);
     const distUse = s.distOn ? Math.min(s.dist, Math.max(0, expenses - guar)) : 0;
     const resUse = Math.max(0, expenses - guar - distUse);
     const ok = expenses > 0;
 
-    // boxes
-    const A = { x: 14, y: 10, w: 240, h: 56 };     // guaranteed income
-    const B = { x: 14, y: 136, w: 240, h: 56 };    // managed accounts
-    const C = { x: 440, y: 136, w: 260, h: 56 };   // money market
-    // column
-    const col = { x: 880, w: 46, y: 56, h: 124 };
+    // tiles
+    const A = { x: 20, y: 24, w: 280, h: 74 };      // guaranteed income
+    const B = { x: 20, y: 226, w: 280, h: 86 };     // Growth bucket
+    const C = { x: 400, y: 196, w: 310, h: 116 };   // Cash bucket, with its gauge
+    // the Spending bucket column
+    const col = { x: 880, w: 64, y: 86, h: 206 };
     const seg = (amt) => ok ? col.h * amt / expenses : 0;
     const hG = seg(guar), hD = seg(distUse), hR = seg(resUse);
     const yG = col.y, yD = yG + hG, yR = yD + hD;
     const midG = yG + hG / 2, midD = yD + hD / 2, midR = yR + hR / 2;
-    const endX = col.x - 6;
+    const endX = col.x - 7;
 
-    const box = (b, cls, label, value, sub) =>
-        `<g class="rv-flow-box ${cls}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="8"/>` +
-        `<text class="rv-flow-label" x="${b.x + 12}" y="${b.y + 17}">${esc(label)}</text>` +
-        `<text class="rv-flow-value" x="${b.x + 12}" y="${b.y + 36}">${esc(value)}</text>` +
-        `<text class="rv-flow-sub" x="${b.x + 12}" y="${b.y + 50}">${esc(sub)}</text></g>`;
+    const tile = (b, cls, label, value, sub) =>
+        `<g class="rv-flow-box ${cls}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="10"/>` +
+        `<text class="rv-flow-label ${cls.split(' ')[0]}" x="${b.x + 16}" y="${b.y + 22}">${esc(label)}</text>` +
+        `<text class="rv-flow-value" x="${b.x + 16}" y="${b.y + 47}">${esc(value)}</text>` +
+        (sub ? `<text class="rv-flow-sub" x="${b.x + 16}" y="${b.y + 65}">${esc(sub)}</text>` : '') + `</g>`;
+    const head = cls => `url(#flowHead-${/off/.test(cls) ? 'off' : cls.split(' ')[0]})`;
     const curve = (x0, y0, x1, y1, cls, label, bend, shift) => {
         const c1x = x0 + (x1 - x0) * (bend || 0.45), c2x = x1 - (x1 - x0) * (bend || 0.45);
-        const mx = (x0 + 3 * c1x + 3 * c2x + x1) / 8, my = (y0 + 3 * y0 + 3 * y1 + y1) / 8;
-        return `<path class="rv-flow-arrow ${cls}" marker-end="url(#flowHead-${/off/.test(cls) ? 'off' : cls.split(' ')[0]})" d="M ${x0} ${y0} C ${c1x} ${y0}, ${c2x} ${y1}, ${x1} ${y1}"/>` +
-               (label ? `<text class="rv-flow-arrow-label ${cls}" x="${mx + (shift || 0)}" y="${my - 9}" text-anchor="middle">${esc(label)}</text>` : '');
+        const mx = (x0 + 3 * c1x + 3 * c2x + x1) / 8, my = (y0 + y1) / 2;
+        return `<path class="rv-flow-arrow ${cls}" marker-end="${head(cls)}" d="M ${x0} ${y0} C ${c1x} ${y0}, ${c2x} ${y1}, ${x1} ${y1}"/>` +
+               (label ? `<text class="rv-flow-arrow-label ${cls}" x="${mx + (shift || 0)}" y="${my - 10}" text-anchor="middle">${esc(label)}</text>` : '');
     };
 
     let out = '';
-    // defs: arrow head
     out += '<defs>' + ['income', 'managed', 'reserve', 'off'].map(k =>
-        `<marker id="flowHead-${k}" class="${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"/></marker>`).join('') + '</defs>';
+        `<marker id="flowHead-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"/></marker>`).join('') + '</defs>';
 
-    // guaranteed income box
+    // guaranteed income
     const incomeNames = state.income.filter(r => num(r.amount) > 0).map(r => r.name).filter(Boolean);
-    out += box(A, 'income', 'Guaranteed income', c.income > 0 ? fmt(c.income) + ' a month' : 'none yet',
-               incomeNames.length ? incomeNames.slice(0, 3).join(', ') : 'pension, wages, Social Security');
-    // managed accounts box
-    out += box(B, 'managed' + (c.above ? ' bad' : ''), 'Managed accounts', s.managed > 0 ? fmt(s.managed) : 'enter the balance',
-               c.rate > 0 ? `draw rate ${pct(c.rate)}` + (c.upper != null ? ` · pause above ${pct(c.upper)}` : ' · no baseline yet') : 'everything of mine that is invested');
-    // money market box
-    out += box(C, 'reserve', 'Money market, my reserve', s.mm > 0 ? fmt(s.mm) + (ok && isFinite(c.cover) ? ` · ${fmt1(c.cover)} months` : '') : 'enter the balance',
-               c.earmarked > 0 ? `${fmt(c.free)} free · ${fmt(c.earmarked)} held for bills` : (ok ? `target ${fmt(c.target)}, ${s.full} months` : 'two years of the gap'));
+    out += tile(A, 'income', 'Guaranteed income', c.income > 0 ? fmt(c.income) + ' a month' : 'none yet',
+                incomeNames.length ? incomeNames.slice(0, 3).join(', ') : 'pension, wages, Social Security');
+    // Growth bucket
+    out += tile(B, 'managed' + (c.above ? ' bad' : ''), 'Growth bucket', s.managed > 0 ? fmt(s.managed) : 'enter the balance',
+                c.rate > 0 ? `draw rate ${pct(c.rate)}` + (c.upper != null ? ` · pause above ${pct(c.upper)}` : ' · no baseline yet') : 'everything of mine that is invested');
+    if (c.rate > 0) out += `<text class="rv-flow-sub" x="${B.x + 16}" y="${B.y + 78}">${esc(c.hwm > 0 && c.dd > 0.5 ? `${pct(c.dd)} below its high of ${fmt(c.hwm)}` : 'my yearly draw ÷ this balance')}</text>`;
+
+    // Cash bucket, with the months-of-cover gauge inside
+    const hasCover = ok && s.mm > 0 && isFinite(c.cover);
+    out += tile(C, 'reserve', 'Cash bucket', s.mm > 0 ? fmt(s.mm) + (hasCover ? ` · ${fmt1(c.cover)} months` : '') : 'enter the balance',
+                c.earmarked > 0 ? `${fmt(c.free)} free · ${fmt(c.earmarked)} held for bills` : (ok ? `${s.full} months of my draw is ${fmt(c.target)}` : 'two years of my draw'));
+    {
+        const gx = C.x + 16, gw = C.w - 32, gy = C.y + 80, gh = 10;
+        const cscale = s.full * 1.3;
+        const px = v => gx + Math.max(0, Math.min(1, v / cscale)) * gw;
+        out += `<rect class="rv-flow-track" x="${gx}" y="${gy}" width="${gw}" height="${gh}" rx="5"/>`;
+        if (hasCover) {
+            const fw = Math.max(0, px(c.cover) - gx);
+            const fcls = c.cover < s.floor ? ' bad' : c.cover < s.full ? ' warn' : '';
+            out += `<rect class="rv-flow-fill${fcls}" x="${gx}" y="${gy}" width="${fw}" height="${gh}" rx="5"/>`;
+        }
+        const fx = px(s.floor), tx = px(s.full);
+        out += `<line class="rv-flow-tick limit" x1="${fx}" y1="${gy - 4}" x2="${fx}" y2="${gy + gh + 4}"/>` +
+               `<text class="rv-flow-tick-label limit" x="${fx}" y="${gy + gh + 17}" text-anchor="middle">floor ${s.floor}</text>` +
+               `<line class="rv-flow-tick" x1="${tx}" y1="${gy - 4}" x2="${tx}" y2="${gy + gh + 4}"/>` +
+               `<text class="rv-flow-tick-label" x="${tx}" y="${gy + gh + 17}" text-anchor="middle">target ${s.full}</text>`;
+    }
 
     // arrows
     if (ok && guar > 0) out += curve(A.x + A.w, A.y + A.h / 2, endX, midG, 'income', `${fmt(guar)} a month`);
-    // managed → column: the distribution
     if (ok) {
+        // the distribution: up from the top of the Growth bucket, over the Cash bucket, into the column
         const over = (y1, cls, label) => {
-            // up from the top of the managed box, flat above the money market, down into the column
-            const x0 = B.x + B.w - 50, y0 = B.y, cy = 72, c2x = C.x + C.w + 60;
+            const x0 = B.x + B.w - 60, y0 = B.y, cy = 150, c2x = C.x + C.w + 50;
             const mx = (x0 + 3 * x0 + 3 * c2x + endX) / 8, my = (y0 + 3 * cy + 3 * cy + y1) / 8;
-            return `<path class="rv-flow-arrow ${cls}" marker-end="url(#flowHead-${/off/.test(cls) ? 'off' : 'managed'})" d="M ${x0} ${y0} C ${x0} ${cy}, ${c2x} ${cy}, ${endX} ${y1}"/>` +
-                   `<text class="rv-flow-arrow-label ${cls}" x="${mx}" y="${my - 9}" text-anchor="middle">${esc(label)}</text>`;
+            return `<path class="rv-flow-arrow ${cls}" marker-end="${head(cls)}" d="M ${x0} ${y0} C ${x0} ${cy}, ${c2x} ${cy}, ${endX} ${y1}"/>` +
+                   `<text class="rv-flow-arrow-label ${cls}" x="${mx}" y="${my - 10}" text-anchor="middle">${esc(label)}</text>`;
         };
         if (s.distOn && s.dist > 0 && distUse > 0) out += over(midD, 'managed', `distribution ${fmt(s.dist)} a month`);
         else if (!s.distOn) out += over(Math.max(col.y + 8, yD), 'managed off', 'distributions paused');
     }
-    // managed → money market: refills
-    out += `<path class="rv-flow-arrow managed ${c.sell > 0 ? '' : 'off'}" marker-end="url(#flowHead-${c.sell > 0 ? 'managed' : 'off'})" d="M ${B.x + B.w} ${B.y + 34} L ${C.x - 6} ${C.y + 34}"/>` +
-           `<text class="rv-flow-arrow-label managed ${c.sell > 0 ? '' : 'off'}" x="${(B.x + B.w + C.x) / 2}" y="${B.y + 25}" text-anchor="middle">${esc(c.sell > 0 ? `sell ${fmt(c.sell)} now` : 'sell to refill')}</text>`;
-    // money market → column
+    // Growth → Cash: refills
+    out += `<path class="rv-flow-arrow managed ${c.sell > 0 ? '' : 'off'}" marker-end="url(#flowHead-${c.sell > 0 ? 'managed' : 'off'})" d="M ${B.x + B.w} ${B.y + 44} L ${C.x - 7} ${B.y + 44}"/>` +
+           `<text class="rv-flow-arrow-label managed ${c.sell > 0 ? '' : 'off'}" x="${(B.x + B.w + C.x) / 2}" y="${B.y + 34}" text-anchor="middle">${esc(c.sell > 0 ? `sell ${fmt(c.sell)} now` : 'sell to refill')}</text>`;
+    // Cash → Spending
     if (ok) {
         if (resUse > 0 || c.dueTotal > 0) {
             const label = c.dueTotal > 0 ? (resUse > 0 ? `${fmt(c.monthly)} + ${fmt(c.dueTotal)} bills due` : `${fmt(c.dueTotal)} for bills due`) : `${fmt(c.monthly)} a month`;
-            out += curve(C.x + C.w, C.y + C.h / 2, endX, resUse > 0 ? midR : col.y + col.h - 8, 'reserve', label, 0.5, -14);
+            out += curve(C.x + C.w, C.y + 44, endX, resUse > 0 ? midR : col.y + col.h - 8, 'reserve', label, 0.5, -16);
         } else {
-            out += curve(C.x + C.w, C.y + C.h / 2, endX, col.y + col.h - 8, 'reserve off', 'nothing needed this month', 0.5, -14);
+            out += curve(C.x + C.w, C.y + 44, endX, col.y + col.h - 8, 'reserve off', 'nothing needed this month', 0.5, -16);
         }
     }
 
-    // the column
-    out += `<text class="rv-flow-label" x="${col.x}" y="22">Deposit to shared checking</text>`;
-    out += `<text class="rv-flow-value big" x="${col.x}" y="44">${esc(ok ? fmt(expenses) : '—')}</text>`;
-    out += `<rect class="rv-flow-col-bg" x="${col.x}" y="${col.y}" width="${col.w}" height="${col.h}" rx="6"/>`;
+    // the Spending bucket
+    out += `<text class="rv-flow-label" x="${col.x}" y="30">Spending bucket</text>`;
+    out += `<text class="rv-flow-sub" x="${col.x}" y="46">shared checking · my deposit</text>`;
+    out += `<text class="rv-flow-value big" x="${col.x}" y="72">${esc(ok ? fmt(expenses) + ' a month' : '—')}</text>`;
+    out += `<rect class="rv-flow-col-bg" x="${col.x}" y="${col.y}" width="${col.w}" height="${col.h}" rx="8"/>`;
     if (ok) {
         if (hG > 0) out += `<rect class="rv-flow-seg income" x="${col.x}" y="${yG}" width="${col.w}" height="${hG}"/>`;
         if (hD > 0) out += `<rect class="rv-flow-seg managed" x="${col.x}" y="${yD}" width="${col.w}" height="${hD}"/>`;
@@ -674,22 +704,22 @@ function renderFlow(c) {
         const labels = [];
         if (guar > 0) labels.push({ y: midG, cls: 'income', text: `guaranteed ${fmt(guar)}` });
         if (distUse > 0) labels.push({ y: midD, cls: 'managed', text: `distribution ${fmt(distUse)}` });
-        if (resUse > 0) labels.push({ y: midR, cls: 'reserve', text: `from the reserve ${fmt(resUse)}` });
+        if (resUse > 0) labels.push({ y: midR, cls: 'reserve', text: `from the Cash bucket ${fmt(resUse)}` });
         for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 18);
         for (let i = labels.length - 1; i >= 0; i--) {
             const maxY = col.y + col.h - (labels.length - 1 - i) * 18;
             if (labels[i].y > maxY) labels[i].y = maxY;
             if (i < labels.length - 1 && labels[i].y > labels[i + 1].y - 18) labels[i].y = labels[i + 1].y - 18;
         }
-        labels.forEach(l => { out += `<text class="rv-flow-seg-label ${l.cls}" x="${col.x + col.w + 18}" y="${l.y + 4}">${esc(l.text)}</text>`; });
-        // the gap bracket
+        labels.forEach(l => { out += `<text class="rv-flow-seg-label ${l.cls}" x="${col.x + col.w + 20}" y="${l.y + 4}">${esc(l.text)}</text>`; });
+        // the draw bracket
         if (c.gap > 0 && yD < col.y + col.h) {
-            const bx = col.x + col.w + 8, y0 = yD, y1 = col.y + col.h;
-            out += `<path class="rv-flow-bracket" d="M ${bx - 3} ${y0} L ${bx} ${y0} L ${bx} ${y1} L ${bx - 3} ${y1}"/>`;
+            const bx = col.x + col.w + 9, y0 = yD, y1 = col.y + col.h;
+            out += `<path class="rv-flow-bracket" d="M ${bx - 4} ${y0} L ${bx} ${y0} L ${bx} ${y1} L ${bx - 4} ${y1}"/>`;
         }
-        out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 17}">${esc(c.gap > 0 ? `the gap: ${fmt(c.gap)} a month` : 'no gap: income covers it')}</text>`;
+        out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 20}">${esc(c.gap > 0 ? `my draw: ${fmt(c.gap)} a month` : 'no draw: income covers it')}</text>`;
     } else {
-        out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 17}">fill in the steps on the left</text>`;
+        out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 20}">enter this month's numbers</text>`;
     }
     svg.innerHTML = out;
 }
@@ -745,7 +775,8 @@ function saveToLog() {
     if (existing >= 0) state.log[existing] = row; else state.log.push(row);
     render();
     scheduleSave();
-    showToast((existing >= 0 ? 'Updated ' : 'Saved ') + monthLabel(s.month));
+    showToast((existing >= 0 ? 'Updated ' : 'Saved ') + monthLabel(s.month) + '. Now read the card.');
+    closeDrawer();
 }
 
 function removeLog(i) {
