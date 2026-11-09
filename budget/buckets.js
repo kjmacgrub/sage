@@ -638,10 +638,10 @@ function renderFlow(c) {
 
     // tiles, top to bottom in the order their flows arrive at the column
     const C = { x: 20, y: 8, w: 340, h: 106 };      // Cash bucket, with its gauge
-    const B = { x: 20, y: 150, w: 340, h: 84 };     // Growth bucket
-    const A = { x: 20, y: 254, w: 340, h: 70 };     // guaranteed income
+    const B = { x: 20, y: 134, w: 340, h: 106 };    // Growth bucket, with its gauge
+    const A = { x: 20, y: 262, w: 340, h: 70 };     // guaranteed income
     // the Spending bucket column: income at the bottom, cash at the top
-    const col = { x: 1000, w: 64, y: 86, h: 206 };
+    const col = { x: 1000, w: 64, y: 86, h: 226 };
     // the draw collector: the Cash bucket and the distribution land here,
     // and together they are the draw, which then goes into the column
     const D = { x: 800, w: col.x - 26 - 800 };
@@ -676,7 +676,7 @@ function renderFlow(c) {
     {
         // a vertical gauge at the right of the tile: months of cover filling
         // from the bottom, the floor mark below the target mark
-        const bw = 16, bx = C.x + C.w - 74, by = C.y + 10, bh = C.h - 20;
+        const bw = 16, bx = C.x + C.w - 90, by = C.y + 10, bh = C.h - 20;
         const cscale = s.full * 1.3;
         const yAt = v => by + bh - Math.max(0, Math.min(1, v / cscale)) * bh;
         out += `<rect class="rv-flow-track" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="5"/>`;
@@ -691,10 +691,35 @@ function renderFlow(c) {
                `<line class="rv-flow-tick limit" x1="${bx - 4}" y1="${fy}" x2="${bx + bw + 4}" y2="${fy}"/>` +
                `<text class="rv-flow-tick-label limit" x="${bx + bw + 8}" y="${fy + 4}">floor ${s.floor}</text>`;
     }
-    // Growth bucket
+    // Growth bucket, with the draw-rate gauge inside
     out += tile(B, 'managed' + (c.above ? ' bad' : ''), 'Growth bucket', s.managed > 0 ? fmt(s.managed) : 'enter the balance',
-                c.rate > 0 ? `draw rate ${pct(c.rate)}` + (c.upper != null ? ` · pause above ${pct(c.upper)}` : ' · no baseline yet') : 'everything of mine that is invested');
+                c.rate > 0 ? `draw rate ${pct(c.rate)}` + (c.upper != null ? ` · baseline ${pct(s.baseline)}` : ' · no baseline yet') : 'everything of mine that is invested');
     if (c.rate > 0) out += `<text class="rv-flow-sub" x="${B.x + 16}" y="${B.y + 78}">${esc(c.hwm > 0 && c.dd > 0.5 ? `${pct(c.dd)} below its high of ${fmt(c.hwm)}` : 'my yearly draw ÷ this balance')}</text>`;
+    {
+        // a vertical gauge at the right of the tile: the draw rate filling from
+        // the bottom, the guardrail band shaded over it. The top edge is the
+        // pause line and acts; the bottom edge only flags the annual review.
+        const bw = 16, bx = B.x + B.w - 90, by = B.y + 10, bh = B.h - 20;
+        const rscale = Math.max(c.upper != null ? c.upper * 1.35 : 0, c.rate * 1.15, 0.1);
+        const yAt = v => by + bh - Math.max(0, Math.min(1, v / rscale)) * bh;
+        out += `<rect class="rv-flow-track" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="5"/>`;
+        if (c.upper != null) {
+            const uy = yAt(c.upper), ly = yAt(c.lower), my = yAt(s.baseline);
+            out += `<rect class="rv-flow-band" x="${bx}" y="${uy}" width="${bw}" height="${ly - uy}"/>` +
+                   `<line class="rv-flow-tick faint" x1="${bx}" y1="${my}" x2="${bx + bw}" y2="${my}"/>` +
+                   `<line class="rv-flow-tick limit" x1="${bx - 4}" y1="${uy}" x2="${bx + bw + 4}" y2="${uy}"/>` +
+                   `<text class="rv-flow-tick-label limit" x="${bx + bw + 8}" y="${uy + 4}">pause ${pct(c.upper)}</text>` +
+                   `<line class="rv-flow-tick soft" x1="${bx - 4}" y1="${ly}" x2="${bx + bw + 4}" y2="${ly}"/>` +
+                   `<text class="rv-flow-tick-label" x="${bx + bw + 8}" y="${ly + 4}">review ${pct(c.lower)}</text>`;
+        }
+        if (c.rate > 0) {
+            // this month's rate is a marker across the track, not a fill: a rate
+            // is a reading, and the question is where it sits against the band
+            const ry = yAt(c.rate);
+            out += `<rect class="rv-flow-mark${c.above ? ' bad' : ''}" x="${bx - 6}" y="${ry - 3.5}" width="${bw + 12}" height="7" rx="3.5"/>`;
+            if (c.upper == null) out += `<text class="rv-flow-tick-label" x="${bx + bw + 8}" y="${ry + 4}">${pct(c.rate)}</text>`;
+        }
+    }
     // guaranteed income
     const incomeNames = state.income.filter(r => num(r.amount) > 0).map(r => r.name).filter(Boolean);
     out += tile(A, 'income', 'Guaranteed income', c.income > 0 ? fmt(c.income) + ' a month' : 'none yet',
