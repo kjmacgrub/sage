@@ -134,7 +134,10 @@ body { overflow: hidden; }
 .rv-flow-seg.managed { fill: #4a6fa5; }
 .rv-flow-seg.reserve { fill: var(--primary); }
 .rv-flow-seg-label { font-size: 13px; font-weight: 600; fill: var(--text-primary); }
-.rv-flow-bracket { fill: none; stroke: var(--text-secondary); stroke-width: 1.5; }
+.rv-flow-draw { fill: var(--background); stroke: var(--text-secondary); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.rv-flow-label.draw { fill: var(--text-primary); }
+.rv-flow-arrow.draw { stroke: var(--text-secondary); stroke-width: 3.5; }
+#flowHead-draw path { fill: var(--text-secondary); }
 /* the months-of-cover gauge inside the Cash bucket tile */
 .rv-flow-track { fill: var(--border-light); }
 .rv-flow-fill { fill: var(--primary); }

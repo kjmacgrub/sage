@@ -618,12 +618,16 @@ function renderFlow(c) {
     const B = { x: 20, y: 150, w: 280, h: 86 };     // Growth bucket
     const A = { x: 20, y: 254, w: 280, h: 70 };     // guaranteed income
     // the Spending bucket column: income at the bottom, cash at the top
-    const col = { x: 880, w: 64, y: 86, h: 206 };
+    const col = { x: 1000, w: 64, y: 86, h: 206 };
+    // the draw collector: the Cash bucket and the distribution land here,
+    // and together they are the draw, which then goes into the column
+    const D = { x: 800, w: col.x - 10 - 800 };
     const seg = (amt) => ok ? col.h * amt / expenses : 0;
     const hG = seg(guar), hD = seg(distUse), hR = seg(resUse);
     const yG = col.y + col.h - hG, yD = yG - hD, yR = yD - hR;
     const midG = yG + hG / 2, midD = yD + hD / 2, midR = yR + hR / 2;
-    const endX = col.x - 7;
+    const endX = col.x - 7;          // where the income arrow lands
+    const drawX = D.x - 7;           // where the draw arrows land
 
     const tile = (b, cls, label, value, sub) =>
         `<g class="rv-flow-box ${cls}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="10"/>` +
@@ -639,7 +643,7 @@ function renderFlow(c) {
     };
 
     let out = '';
-    out += '<defs>' + ['income', 'managed', 'reserve', 'off'].map(k =>
+    out += '<defs>' + ['income', 'managed', 'reserve', 'draw', 'off'].map(k =>
         `<marker id="flowHead-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"/></marker>`).join('') + '</defs>';
 
     // Cash bucket, with the months-of-cover gauge inside
@@ -682,14 +686,14 @@ function renderFlow(c) {
     if (ok) {
         // Cash → Spending: the top of the column
         if (resUse > 0 || c.dueTotal > 0) {
-            const label = c.dueTotal > 0 ? (resUse > 0 ? `${fmt(c.monthly)} + ${fmt(c.dueTotal)} bills due` : `${fmt(c.dueTotal)} for bills due`) : `${fmt(c.monthly)} a month`;
-            out += curve(C.x + C.w, C.y + 58, endX, resUse > 0 ? midR : col.y + 8, 'reserve', label, 0.5, -16);
+            const label = c.dueTotal > 0 ? `${fmt(c.transfer)} with bills due` : `${fmt(c.monthly)} a month`;
+            out += curve(C.x + C.w, C.y + 58, c.gap > 0 ? drawX : endX, resUse > 0 ? midR : col.y + 8, 'reserve', label, 0.5);
         } else {
-            out += curve(C.x + C.w, C.y + 58, endX, col.y + 8, 'reserve off', 'nothing needed this month', 0.5, -16);
+            out += curve(C.x + C.w, C.y + 58, c.gap > 0 ? drawX : endX, col.y + 8, 'reserve off', 'nothing needed', 0.5);
         }
         // Growth → Spending: the distribution, into the middle
-        if (s.distOn && s.dist > 0 && distUse > 0) out += curve(B.x + B.w, B.y + B.h / 2, endX, midD, 'managed', `distribution ${fmt(s.dist)} a month`, 0.4);
-        else if (!s.distOn) out += curve(B.x + B.w, B.y + B.h / 2, endX, Math.min(col.y + col.h - 8, yD), 'managed off', 'distributions paused', 0.4);
+        if (s.distOn && s.dist > 0 && distUse > 0) out += curve(B.x + B.w, B.y + B.h / 2, drawX, midD, 'managed', `distribution ${fmt(s.dist)} a month`, 0.4);
+        else if (!s.distOn) out += curve(B.x + B.w, B.y + B.h / 2, c.gap > 0 ? drawX : endX, Math.min(col.y + col.h - 8, yD), 'managed off', 'distributions paused', 0.4);
         // income → Spending: the foundation
         if (guar > 0) out += curve(A.x + A.w, A.y + A.h / 2, endX, midG, 'income', `${fmt(guar)} a month`, 0.4);
     }
@@ -715,12 +719,23 @@ function renderFlow(c) {
             if (i < labels.length - 1 && labels[i].y > labels[i + 1].y - 18) labels[i].y = labels[i + 1].y - 18;
         }
         labels.forEach(l => { out += `<text class="rv-flow-seg-label ${l.cls}" x="${col.x + col.w + 20}" y="${l.y + 4}">${esc(l.text)}</text>`; });
-        // the draw bracket: everything above the guaranteed income
+        // the draw collector: spans the top two layers, left of the column
         if (c.gap > 0 && yG > col.y) {
-            const bx = col.x + col.w + 9, y0 = col.y, y1 = yG;
-            out += `<path class="rv-flow-bracket" d="M ${bx - 4} ${y0} L ${bx} ${y0} L ${bx} ${y1} L ${bx - 4} ${y1}"/>`;
+            const y0 = col.y, y1 = yG, hh = y1 - y0, cy = (y0 + y1) / 2;
+            out += `<rect class="rv-flow-draw" x="${D.x}" y="${y0}" width="${D.w}" height="${hh}" rx="8"/>`;
+            out += `<path class="rv-flow-arrow draw" marker-end="url(#flowHead-draw)" d="M ${D.x + D.w} ${cy} L ${col.x - 3} ${cy}"/>`;
+            const cx = D.x + D.w / 2;
+            if (hh >= 44) {
+                out += `<text class="rv-flow-label draw" x="${cx}" y="${cy - 4}" text-anchor="middle">My draw</text>` +
+                       `<text class="rv-flow-value" x="${cx}" y="${cy + 16}" text-anchor="middle">${esc(fmt(c.gap) + ' a month')}</text>`;
+            } else if (hh >= 20) {
+                out += `<text class="rv-flow-seg-label" x="${cx}" y="${cy + 5}" text-anchor="middle">${esc('my draw ' + fmt(c.gap))}</text>`;
+            } else {
+                out += `<text class="rv-flow-seg-label" x="${cx}" y="${y0 - 6}" text-anchor="middle">${esc('my draw ' + fmt(c.gap))}</text>`;
+            }
+        } else {
+            out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 20}">no draw: income covers it</text>`;
         }
-        out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 20}">${esc(c.gap > 0 ? `my draw: ${fmt(c.gap)} a month` : 'no draw: income covers it')}</text>`;
     } else {
         out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 20}">enter this month's numbers</text>`;
     }
