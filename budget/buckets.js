@@ -621,7 +621,7 @@ function renderFlow(c) {
     const col = { x: 1000, w: 64, y: 86, h: 206 };
     // the draw collector: the Cash bucket and the distribution land here,
     // and together they are the draw, which then goes into the column
-    const D = { x: 800, w: col.x - 10 - 800 };
+    const D = { x: 800, w: col.x - 26 - 800 };
     const seg = (amt) => ok ? col.h * amt / expenses : 0;
     const hG = seg(guar), hD = seg(distUse), hR = seg(resUse);
     const yG = col.y + col.h - hG, yD = yG - hD, yR = yD - hR;
@@ -723,7 +723,9 @@ function renderFlow(c) {
         if (c.gap > 0 && yG > col.y) {
             const y0 = col.y, y1 = yG, hh = y1 - y0, cy = (y0 + y1) / 2;
             out += `<rect class="rv-flow-draw" x="${D.x}" y="${y0}" width="${D.w}" height="${hh}" rx="8"/>`;
-            out += `<path class="rv-flow-arrow draw" marker-end="url(#flowHead-draw)" d="M ${D.x + D.w} ${cy} L ${col.x - 3} ${cy}"/>`;
+            // a bracket between the draw total and the two layers it is made of
+            const bx = col.x - 11;
+            out += `<path class="rv-flow-bracket" d="M ${bx + 5} ${y0} L ${bx} ${y0} L ${bx} ${y1} L ${bx + 5} ${y1}"/>`;
             const cx = D.x + D.w / 2;
             if (hh >= 44) {
                 out += `<text class="rv-flow-label draw" x="${cx}" y="${cy - 4}" text-anchor="middle">My draw</text>` +
