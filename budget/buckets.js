@@ -583,7 +583,7 @@ function render() {
     $('rv_annual_pm').textContent = fmt(c.annualPm);
     $('rv_income').textContent = fmt(c.income);
     $('spendAllTotal').textContent = '(' + fmt(c.expenses) + ')';
-    $('whereDeposit').textContent = planner ? `Shared checking. The one number we agree on: Planner ${fmt(planner.expenses)} × ${s.share}% = ${fmt(plannerDeposit())}` : 'Shared checking. The one number we agree on: my share of the household budget.';
+    $('whereDeposit').textContent = planner ? `Shared checking: Planner ${fmt(planner.expenses)} × ${s.share}% = ${fmt(plannerDeposit())}` : 'Shared checking: my share of the household budget.';
     $('incomeAllTotal').textContent = '(' + fmt(c.income + (s.distOn ? s.dist : 0)) + (s.distOn ? '' : ', distributions paused') + ')';
     $('annualTotal').textContent = c.annual > 0 ? fmt(c.annual) + ' a year' : '';
 
