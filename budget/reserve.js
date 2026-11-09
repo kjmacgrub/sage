@@ -610,7 +610,7 @@ function renderGauges(c) {
 function renderFlow(c) {
     const s = state.settings;
     const svg = $('flowSvg');
-    const W = 900, H = 210;
+    const W = 1100, H = 200;
     const expenses = c.expenses;
     const guar = Math.min(c.income, expenses);
     const distUse = s.distOn ? Math.min(s.dist, Math.max(0, expenses - guar)) : 0;
@@ -618,11 +618,11 @@ function renderFlow(c) {
     const ok = expenses > 0;
 
     // boxes
-    const A = { x: 14, y: 12, w: 222, h: 56 };     // guaranteed income
-    const B = { x: 14, y: 138, w: 200, h: 56 };    // managed accounts
-    const C = { x: 372, y: 138, w: 240, h: 56 };   // money market
+    const A = { x: 14, y: 10, w: 240, h: 56 };     // guaranteed income
+    const B = { x: 14, y: 136, w: 240, h: 56 };    // managed accounts
+    const C = { x: 440, y: 136, w: 260, h: 56 };   // money market
     // column
-    const col = { x: 700, w: 46, y: 58, h: 128 };
+    const col = { x: 880, w: 46, y: 56, h: 124 };
     const seg = (amt) => ok ? col.h * amt / expenses : 0;
     const hG = seg(guar), hD = seg(distUse), hR = seg(resUse);
     const yG = col.y, yD = yG + hG, yR = yD + hD;
@@ -661,16 +661,23 @@ function renderFlow(c) {
     if (ok && guar > 0) out += curve(A.x + A.w, A.y + A.h / 2, endX, midG, 'income', `${fmt(guar)} a month`);
     // managed → column: the distribution
     if (ok) {
-        if (s.distOn && s.dist > 0 && distUse > 0) out += curve(B.x + B.w, B.y + 12, endX, midD, 'managed', `distribution ${fmt(s.dist)} a month`, 0.55);
-        else if (!s.distOn) out += curve(B.x + B.w, B.y + 12, endX, Math.max(col.y + 8, yD), 'managed off', 'distributions paused', 0.55);
+        const over = (y1, cls, label) => {
+            // up from the top of the managed box, flat above the money market, down into the column
+            const x0 = B.x + B.w - 50, y0 = B.y, cy = 72, c2x = C.x + C.w + 60;
+            const mx = (x0 + 3 * x0 + 3 * c2x + endX) / 8, my = (y0 + 3 * cy + 3 * cy + y1) / 8;
+            return `<path class="rv-flow-arrow ${cls}" marker-end="url(#flowHead-${/off/.test(cls) ? 'off' : 'managed'})" d="M ${x0} ${y0} C ${x0} ${cy}, ${c2x} ${cy}, ${endX} ${y1}"/>` +
+                   `<text class="rv-flow-arrow-label ${cls}" x="${mx}" y="${my - 9}" text-anchor="middle">${esc(label)}</text>`;
+        };
+        if (s.distOn && s.dist > 0 && distUse > 0) out += over(midD, 'managed', `distribution ${fmt(s.dist)} a month`);
+        else if (!s.distOn) out += over(Math.max(col.y + 8, yD), 'managed off', 'distributions paused');
     }
     // managed → money market: refills
-    out += `<path class="rv-flow-arrow managed ${c.sell > 0 ? '' : 'off'}" marker-end="url(#flowHead-${c.sell > 0 ? 'managed' : 'off'})" d="M ${B.x + B.w} ${B.y + 40} L ${C.x - 6} ${C.y + 40}"/>` +
-           `<text class="rv-flow-arrow-label managed" x="${(B.x + B.w + C.x) / 2}" y="${B.y + 31}" text-anchor="middle">${esc(c.sell > 0 ? `sell ${fmt(c.sell)} now` : 'sell to refill')}</text>`;
+    out += `<path class="rv-flow-arrow managed ${c.sell > 0 ? '' : 'off'}" marker-end="url(#flowHead-${c.sell > 0 ? 'managed' : 'off'})" d="M ${B.x + B.w} ${B.y + 34} L ${C.x - 6} ${C.y + 34}"/>` +
+           `<text class="rv-flow-arrow-label managed ${c.sell > 0 ? '' : 'off'}" x="${(B.x + B.w + C.x) / 2}" y="${B.y + 25}" text-anchor="middle">${esc(c.sell > 0 ? `sell ${fmt(c.sell)} now` : 'sell to refill')}</text>`;
     // money market → column
     if (ok) {
         if (resUse > 0 || c.dueTotal > 0) {
-            const label = (resUse > 0 ? `${fmt(c.monthly)} a month` : 'nothing for the month') + (c.dueTotal > 0 ? ` + ${fmt(c.dueTotal)} bills due` : '');
+            const label = c.dueTotal > 0 ? (resUse > 0 ? `${fmt(c.monthly)} + ${fmt(c.dueTotal)} bills due` : `${fmt(c.dueTotal)} for bills due`) : `${fmt(c.monthly)} a month`;
             out += curve(C.x + C.w, C.y + C.h / 2, endX, resUse > 0 ? midR : col.y + col.h - 8, 'reserve', label, 0.5, -14);
         } else {
             out += curve(C.x + C.w, C.y + C.h / 2, endX, col.y + col.h - 8, 'reserve off', 'nothing needed this month', 0.5, -14);
@@ -690,11 +697,11 @@ function renderFlow(c) {
         if (guar > 0) labels.push({ y: midG, cls: 'income', text: `guaranteed ${fmt(guar)}` });
         if (distUse > 0) labels.push({ y: midD, cls: 'managed', text: `distribution ${fmt(distUse)}` });
         if (resUse > 0) labels.push({ y: midR, cls: 'reserve', text: `from the reserve ${fmt(resUse)}` });
-        for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 16);
+        for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 18);
         for (let i = labels.length - 1; i >= 0; i--) {
-            const maxY = col.y + col.h - (labels.length - 1 - i) * 16;
+            const maxY = col.y + col.h - (labels.length - 1 - i) * 18;
             if (labels[i].y > maxY) labels[i].y = maxY;
-            if (i < labels.length - 1 && labels[i].y > labels[i + 1].y - 16) labels[i].y = labels[i + 1].y - 16;
+            if (i < labels.length - 1 && labels[i].y > labels[i + 1].y - 18) labels[i].y = labels[i + 1].y - 18;
         }
         labels.forEach(l => { out += `<text class="rv-flow-seg-label ${l.cls}" x="${col.x + col.w + 18}" y="${l.y + 4}">${esc(l.text)}</text>`; });
         // the gap bracket
@@ -702,7 +709,7 @@ function renderFlow(c) {
             const bx = col.x + col.w + 8, y0 = yD, y1 = col.y + col.h;
             out += `<path class="rv-flow-bracket" d="M ${bx - 3} ${y0} L ${bx} ${y0} L ${bx} ${y1} L ${bx - 3} ${y1}"/>`;
         }
-        out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 17}">${esc(c.gap > 0 ? `the gap: ${fmt(c.gap)} a month beyond guaranteed income` : 'guaranteed income covers everything')}</text>`;
+        out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 17}">${esc(c.gap > 0 ? `the gap: ${fmt(c.gap)} a month` : 'no gap: income covers it')}</text>`;
     } else {
         out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 17}">fill in the steps on the left</text>`;
     }
