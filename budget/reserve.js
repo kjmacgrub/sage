@@ -27,8 +27,8 @@ const PERSON_DEFAULTS = {
     log: [],
 };
 const SEED = {
-    ken:    { income: [{ name: 'Wages: Ken', amount: 2800 }], items: [{ name: 'Long-term care insurance', amount: 0, month: 1, freq: 1 }] },
-    hilary: { income: [{ name: 'NY Life annuity', amount: 3714.73 }], items: [{ name: 'Long-term care insurance', amount: 0, month: 1, freq: 1 }] },
+    ken:    { income: [{ name: 'Wages: Ken', amount: 2800 }], items: [{ name: 'Long-term care insurance', amount: 0, freq: 1, start: '2026-01', end: '2035-12' }] },
+    hilary: { income: [{ name: 'NY Life annuity', amount: 3714.73 }], items: [{ name: 'Long-term care insurance', amount: 0, freq: 1, start: '2026-01', end: '2035-12' }] },
 };
 
 // everything saved: { people: { ken: {...}, hilary: {...} }, current: 'ken' }
@@ -60,10 +60,6 @@ function monthLabel(ym) {
     if (!ym) return '';
     const [y, m] = ym.split('-').map(Number);
     return MONTHS[m - 1] + ' ' + y;
-}
-function currentMonthNumber() {
-    const ym = state.settings.month || thisMonth();
-    return Number(ym.split('-')[1]) || (new Date().getMonth() + 1);
 }
 
 async function apiGet(url) {
@@ -148,6 +144,7 @@ async function load() {
     state = store.people[store.current];
     state.settings = Object.assign({}, PERSON_DEFAULTS.settings, state.settings);
     if (!state.settings.month) state.settings.month = thisMonth();
+    normalizeItems();
     $('rvPerson').value = store.current;
     await loadPlanner();
     useplanner(false);
@@ -164,6 +161,7 @@ function switchPerson(who) {
     state = store.people[who];
     state.settings = Object.assign({}, PERSON_DEFAULTS.settings, state.settings);
     if (!state.settings.month) state.settings.month = thisMonth();
+    normalizeItems();
     useplanner(false);
     fillInputs(); renderIncome(); renderItems(); render(); scheduleSave();
 }
@@ -249,7 +247,9 @@ function readInputs() {
     s.band = Math.max(0, num($('rv_band').value) || 0);
     const b = $('rv_baseline').value;
     s.baseline = b === '' ? null : num(b);
+    const prevMonth = s.month;
     s.month = $('rvMonth').value || thisMonth();
+    if (s.month !== prevMonth) renderItems();
 }
 
 function onInput() {
@@ -294,42 +294,86 @@ function addIncome() { state.income.push({ name: '', amount: 0 }); renderIncome(
 function removeIncome(i) { state.income.splice(i, 1); renderIncome(); render(); scheduleSave(); }
 
 // annual items
+// Each item: amount per year, paid `freq` times a year, from `start` (the
+// month of the first or next payment, YYYY-MM) until `end` (the last payment,
+// blank for no end). An item counts only in the months it is running.
+const FREQS = [[1, 'year'], [2, 'half year'], [4, 'quarter']];
+
+function normalizeItems() {
+    const ym = state.settings.month || thisMonth();
+    const y = Number(ym.split('-')[0]), cm = Number(ym.split('-')[1]);
+    state.items.forEach(it => {
+        if (!it.start && it.month) {
+            const m = Number(it.month) || 1;
+            it.start = (m <= cm ? y : y - 1) + '-' + String(m).padStart(2, '0');
+        }
+        if (!it.start) it.start = ym;
+        if (it.end == null) it.end = '';
+        delete it.month;
+    });
+}
+function itemStatus(it, ym) {
+    if (it.start && it.start > ym) return 'later';
+    if (it.end && it.end < ym) return 'ended';
+    return 'on';
+}
+function activeItems(ym) { return state.items.filter(it => itemStatus(it, ym) === 'on'); }
+function itemNote(it, ym) {
+    const st = itemStatus(it, ym);
+    if (st === 'later') return 'starts ' + monthLabel(it.start);
+    if (st === 'ended') return 'ended ' + monthLabel(it.end);
+    return it.end ? 'until ' + monthLabel(it.end) : 'ongoing';
+}
+
 function renderItems() {
     const body = $('itemsBody');
     body.innerHTML = '';
-    const cur = currentMonthNumber();
+    const ym = state.settings.month || thisMonth();
     state.items.forEach((it, i) => {
         const tr = document.createElement('tr');
-        const opts = MONTHS.map((m, k) => `<option value="${k + 1}" ${Number(it.month) === k + 1 ? 'selected' : ''}>${m}</option>`).join('');
+        tr.dataset.i = i;
         const freq = Number(it.freq) || 1;
-        const fopts = [[1, 'year'], [2, 'half year'], [4, 'quarter']].map(([v, l]) => `<option value="${v}" ${freq === v ? 'selected' : ''}>${l}</option>`).join('');
+        const fopts = FREQS.map(([v, l]) => `<option value="${v}" ${freq === v ? 'selected' : ''}>${l}</option>`).join('');
         tr.innerHTML =
             `<td><input type="text" value="${esc(it.name)}" placeholder="Item" oninput="itemChange(${i},'name',this.value)"></td>` +
             `<td class="num"><input type="number" step="100" value="${it.amount || ''}" placeholder="0" oninput="itemChange(${i},'amount',this.value)"></td>` +
             `<td><select onchange="itemChange(${i},'freq',this.value)">${fopts}</select></td>` +
-            `<td><select onchange="itemChange(${i},'month',this.value)">${opts}</select></td>` +
-            `<td class="num">${fmt(num(it.amount) / 12)}</td>` +
-            `<td class="num">${fmt(sinking(it, cur))}</td>` +
+            `<td><input type="month" value="${esc(it.start || '')}" onchange="itemChange(${i},'start',this.value)"></td>` +
+            `<td><input type="month" value="${esc(it.end || '')}" placeholder="no end" onchange="itemChange(${i},'end',this.value)"></td>` +
+            `<td class="num c-pm"></td>` +
+            `<td class="num c-saved"></td>` +
             `<td><button class="rv-del" title="Remove" onclick="removeItem(${i})">×</button></td>`;
         body.appendChild(tr);
+        refreshItemRow(tr, it, ym);
     });
 }
+// Update only the computed cells, so a field being typed in keeps its focus.
+function refreshItemRow(tr, it, ym) {
+    const on = itemStatus(it, ym) === 'on';
+    tr.classList.toggle('rv-row-off', !on);
+    tr.querySelector('.c-pm').textContent = on ? fmt(num(it.amount) / 12) : '—';
+    tr.querySelector('.c-saved').innerHTML = (on ? fmt(sinking(it, ym)) : '—') + `<span class="rv-row-note">${esc(itemNote(it, ym))}</span>`;
+}
 function itemChange(i, key, val) {
-    state.items[i][key] = key === 'name' ? val : num(val);
-    if (key !== 'name') renderItems();
+    const it = state.items[i];
+    it[key] = (key === 'name' || key === 'start' || key === 'end') ? val : num(val);
+    if (key === 'start' && !val) it.start = state.settings.month || thisMonth();
+    const tr = $('itemsBody').querySelector(`tr[data-i="${i}"]`);
+    if (tr) refreshItemRow(tr, it, state.settings.month || thisMonth());
     render(); scheduleSave();
 }
-function addItem() { state.items.push({ name: '', amount: 0, month: currentMonthNumber(), freq: 1 }); renderItems(); scheduleSave(); }
+function addItem() { state.items.push({ name: '', amount: 0, freq: 1, start: state.settings.month || thisMonth(), end: '' }); renderItems(); scheduleSave(); }
 function removeItem(i) { state.items.splice(i, 1); renderItems(); render(); scheduleSave(); }
 
 // How much should have been saved toward an item by the check-in month. The
-// amount is per year, paid `freq` times a year starting in `month`. Twelfths
-// accumulate from the month after each payment; in a payment month the float
-// has just been spent.
-function sinking(it, cur) {
+// amount is per year, paid `freq` times a year, with the payment months set
+// by `start`. Twelfths accumulate from the month after each payment; in a
+// payment month the float has just been spent.
+function sinking(it, ym) {
     const freq = [1, 2, 4].includes(Number(it.freq)) ? Number(it.freq) : 1;
     const period = 12 / freq;
-    const first = Number(it.month) || 1;
+    const first = Number((it.start || '').split('-')[1]) || 1;
+    const cur = Number(ym.split('-')[1]) || 1;
     const elapsed = ((cur - first) % period + period) % period;
     return num(it.amount) * elapsed / 12;
 }
@@ -338,9 +382,8 @@ function sinking(it, cur) {
 
 function compute() {
     const s = state.settings;
-    const cur = currentMonthNumber();
 
-    const annual = state.items.reduce((a, it) => a + num(it.amount), 0);
+    const annual = activeItems(s.month || thisMonth()).reduce((a, it) => a + num(it.amount), 0);
     const annualPm = annual / 12;
     const expenses = s.deposit + s.own + annualPm;
     const income = state.income.reduce((a, r) => a + num(r.amount), 0);

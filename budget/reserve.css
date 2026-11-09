@@ -197,6 +197,10 @@ body { overflow: hidden; }
 .rv-table input:focus, .rv-table select:focus { outline: none; border-color: var(--primary); }
 .rv-table input[type="text"] { width: 100%; min-width: 160px; box-sizing: border-box; }
 .rv-table input[type="number"] { width: 100px; text-align: right; }
+.rv-table input[type="month"] { width: 140px; }
+.rv-row-off td { color: var(--text-secondary); }
+.rv-row-off input, .rv-row-off select { opacity: 0.6; }
+.rv-row-note { display: block; font-size: 0.68rem; color: var(--text-secondary); font-weight: 400; }
 .rv-table-wrap { max-height: 60vh; overflow: auto; }
 .rv-rules tr.active td { background: var(--primary-light); font-weight: 600; }
 #logTable td.action { font-size: 0.8rem; color: var(--text-secondary); }

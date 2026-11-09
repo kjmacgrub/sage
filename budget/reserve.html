@@ -181,11 +181,11 @@
 
     <!-- ───────────── Popups ───────────── -->
 
-    <dialog class="rv-dlg" id="dlgItems">
+    <dialog class="rv-dlg rv-dlg-wide" id="dlgItems">
         <div class="rv-dlg-head"><h3>Annual and irregular expenses</h3><button class="rv-close" onclick="closeDialog('dlgItems')">×</button></div>
-        <p class="rv-dlg-hint">My big irregular costs that the monthly budget does not carry: a long-term care premium, tax estimates, the trip. One twelfth of each is added to what I pay each month, and the reserve holds them. "Saved so far" is how much of this year's cost has accrued since it was last paid.</p>
+        <p class="rv-dlg-hint">My big irregular costs that the monthly budget does not carry: a long-term care premium, tax estimates, the trip. One twelfth of each is added to what I pay each month, and the reserve holds them. "Starts" is the month of the next payment; "Ends" is the last one, blank if it goes on. An item only counts while it is running. "Saved so far" is how much of this year's cost has accrued since it was last paid.</p>
         <table class="rv-table" id="itemsTable">
-            <thead><tr><th>Item</th><th class="num">Per year</th><th>Every</th><th>Next due</th><th class="num">Per month</th><th class="num">Saved so far</th><th></th></tr></thead>
+            <thead><tr><th>Item</th><th class="num">Per year</th><th>Every</th><th>Starts</th><th>Ends</th><th class="num">Per month</th><th class="num">Saved so far</th><th></th></tr></thead>
             <tbody id="itemsBody"></tbody>
         </table>
         <div class="rv-dlg-foot"><button class="rv-add" onclick="addItem()">+ item</button><span id="annualTotal"></span></div>
