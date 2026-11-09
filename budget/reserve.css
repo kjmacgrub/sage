@@ -137,6 +137,7 @@ body { overflow: hidden; }
 .rv-flow-box.income rect  { stroke: var(--income-accent); }
 .rv-flow-box.managed rect { stroke: #4a6fa5; }
 .rv-flow-box.reserve rect { stroke: var(--primary); }
+.rv-flow-box.bad rect { stroke: var(--danger); stroke-width: 2.5; }
 .rv-flow-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; fill: var(--text-secondary); }
 .rv-flow-value { font-size: 16px; font-weight: 700; fill: var(--text-primary); }
 .rv-flow-value.big { font-size: 20px; }
@@ -267,7 +268,7 @@ body { overflow: hidden; }
 
 /* ── Gauges ──────────────────────────────────────────────── */
 
-.rv-gauges { margin-top: auto; padding-top: 0.6rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem 2.5rem; }
+.rv-gauges { margin-top: auto; padding-top: 0.6rem; display: grid; grid-template-columns: 1fr; }
 .rv-gauge-head { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.3rem; }
 .rv-gauge-head span:last-child { font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; font-size: 0.95rem; }
 .rv-gauge-track { position: relative; height: 14px; border-radius: 7px; background: var(--border-light); }

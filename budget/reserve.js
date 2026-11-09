@@ -567,28 +567,6 @@ function renderGauges(c) {
     const s = state.settings;
     const px = v => Math.max(0, Math.min(100, v)) + '%';
 
-    // draw rate: scale runs to a little past the pause line (or past today's rate)
-    const hasRate = c.rate > 0;
-    const scale = c.upper != null ? Math.max(c.upper, c.rate) * 1.3 : Math.max(c.rate, 1) * 1.6;
-    $('gRateVal').textContent = hasRate ? pct(c.rate) : '—';
-    const band = $('gRateBand');
-    if (c.upper != null) {
-        band.style.display = '';
-        band.style.left = px(Math.max(0, c.lower) / scale * 100);
-        band.style.width = px((c.upper - Math.max(0, c.lower)) / scale * 100);
-        $('gRateBase').style.display = ''; $('gRateBase').style.left = px(s.baseline / scale * 100);
-        $('gRateUpper').style.display = ''; $('gRateUpper').style.left = px(c.upper / scale * 100);
-    } else {
-        band.style.display = 'none'; $('gRateBase').style.display = 'none'; $('gRateUpper').style.display = 'none';
-    }
-    const ptr = $('gRatePtr');
-    ptr.style.display = hasRate ? '' : 'none';
-    ptr.style.left = px(c.rate / scale * 100);
-    ptr.className = 'rv-gauge-pointer' + (c.above ? ' bad' : '');
-    $('gRateFoot').innerHTML = c.upper != null
-        ? `<span>0%</span><span>band ${pct(Math.max(0, c.lower))} to ${pct(c.upper)} · a year's gap ${fmt(c.gap * 12)} on ${fmt(s.managed)}</span>`
-        : `<span>0%</span><span>${hasRate ? 'set a baseline in settings to draw the band' : 'needs the managed balance and a gap'}</span>`;
-
     // reserve: scale runs to a little past the target
     const hasCover = c.gap > 0 && s.mm > 0 && isFinite(c.cover);
     const cscale = s.full * 1.3;
@@ -651,8 +629,8 @@ function renderFlow(c) {
     out += box(A, 'income', 'Guaranteed income', c.income > 0 ? fmt(c.income) + ' a month' : 'none yet',
                incomeNames.length ? incomeNames.slice(0, 3).join(', ') : 'pension, wages, Social Security');
     // managed accounts box
-    out += box(B, 'managed', 'Managed accounts', s.managed > 0 ? fmt(s.managed) : 'enter the balance',
-               c.rate > 0 ? `draw rate ${pct(c.rate)}` + (c.upper != null ? ` · pause above ${pct(c.upper)}` : '') : 'everything of mine that is invested');
+    out += box(B, 'managed' + (c.above ? ' bad' : ''), 'Managed accounts', s.managed > 0 ? fmt(s.managed) : 'enter the balance',
+               c.rate > 0 ? `draw rate ${pct(c.rate)}` + (c.upper != null ? ` · pause above ${pct(c.upper)}` : ' · no baseline yet') : 'everything of mine that is invested');
     // money market box
     out += box(C, 'reserve', 'Money market, my reserve', s.mm > 0 ? fmt(s.mm) + (ok && isFinite(c.cover) ? ` · ${fmt1(c.cover)} months` : '') : 'enter the balance',
                c.earmarked > 0 ? `${fmt(c.free)} free · ${fmt(c.earmarked)} held for bills` : (ok ? `target ${fmt(c.target)}, ${s.full} months` : 'two years of the gap'));
@@ -685,7 +663,7 @@ function renderFlow(c) {
     }
 
     // the column
-    out += `<text class="rv-flow-label" x="${col.x}" y="22">What I pay each month</text>`;
+    out += `<text class="rv-flow-label" x="${col.x}" y="22">Deposit to shared checking</text>`;
     out += `<text class="rv-flow-value big" x="${col.x}" y="44">${esc(ok ? fmt(expenses) : '—')}</text>`;
     out += `<rect class="rv-flow-col-bg" x="${col.x}" y="${col.y}" width="${col.w}" height="${col.h}" rx="6"/>`;
     if (ok) {
