@@ -127,14 +127,22 @@ document.addEventListener('click', ev => {
 
 function openDrawer() { $('drawer').classList.add('open'); $('drawerBackdrop').classList.add('open'); }
 function closeDrawer() { $('drawer').classList.remove('open'); $('drawerBackdrop').classList.remove('open'); }
-function monthSaved() { return state.log.some(r => r.month === state.settings.month); }
-function drawerNeeded() {
-    const s = state.settings;
-    return !s.mm || !s.managed || !monthSaved();
+function savedRow() { return state.log.find(r => r.month === state.settings.month) || null; }
+function monthSaved() { return !!savedRow(); }
+// the saved row no longer matches what is on the page
+function monthStale(c) {
+    const r = savedRow(), s = state.settings;
+    if (!r) return false;
+    return num(r.mm) !== s.mm || num(r.managed) !== s.managed || num(r.dist) !== s.dist || (r.distOn !== false) !== !!s.distOn
+        || Math.abs(num(r.expenses) - c.expenses) > 1 || Math.abs(num(r.income) - c.income) > 1;
 }
-function syncDrawerButton() {
+function drawerNeeded(c) {
+    const s = state.settings;
+    return !s.mm || !s.managed || !monthSaved() || (c ? monthStale(c) : false);
+}
+function syncDrawerButton(c) {
     const btn = $('openDrawerBtn');
-    const needed = drawerNeeded();
+    const needed = drawerNeeded(c);
     btn.textContent = needed ? "Enter this month's numbers" : "This month's numbers";
     btn.classList.toggle('needed', needed);
     $('drawerWho').textContent = NAMES[store.current] || '';
@@ -539,6 +547,8 @@ function compute() {
         }
     }
 
+    const saved = !!state.log.find(r => r.month === ym);
+    if (saved) steps = steps.filter(t => t !== 'Save the month.');
     if (!missing.length && dueTotal > 0) {
         steps.unshift(`Move ${fmt(dueTotal)} from the Cash bucket to checking for the ${due.map(d => d.name).join(' and ')} due this month. The Cash bucket has been holding it.`);
     }
@@ -566,7 +576,8 @@ function render() {
 
     renderDistBox(c);
     renderFlow(c);
-    syncDrawerButton();
+    syncDrawerButton(c);
+    renderSaveBox(c);
 
     // drawer computed bits
     $('rv_annual_pm').textContent = fmt(c.annualPm);
@@ -742,6 +753,19 @@ function renderFlow(c) {
         out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 20}">enter this month's numbers</text>`;
     }
     svg.innerHTML = out;
+}
+
+function renderSaveBox(c) {
+    const s = state.settings;
+    const r = savedRow();
+    const stale = monthStale(c);
+    const btn = $('saveBtn'), note = $('saveNote');
+    btn.textContent = r ? 'Save again' : 'Save this month';
+    btn.classList.toggle('quiet', !!r && !stale);
+    note.className = 'rv-save-note' + (stale ? ' stale' : '');
+    note.textContent = !r ? `${monthLabel(s.month)} not saved yet`
+        : stale ? 'numbers changed since it was saved'
+        : `${monthLabel(s.month)} saved`;
 }
 
 function renderDistBox(c) {

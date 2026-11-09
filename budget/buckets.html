@@ -51,13 +51,19 @@
                 <div class="rv-action-body" id="actionBody"></div>
                 <ol class="rv-action-steps" id="actionSteps"></ol>
             </div>
-            <div class="rv-dist" id="distBox">
-                <div class="rv-dist-label">Distributions</div>
-                <div class="rv-dist-row">
-                    <label class="rv-switch"><input type="checkbox" id="rv_distOn" onchange="onInput()"><span></span></label>
-                    <b id="distState">on</b>
+            <div class="rv-action-side">
+                <div class="rv-dist" id="distBox">
+                    <div class="rv-dist-label">Distributions</div>
+                    <div class="rv-dist-row">
+                        <label class="rv-switch"><input type="checkbox" id="rv_distOn" onchange="onInput()"><span></span></label>
+                        <b id="distState">on</b>
+                    </div>
+                    <div class="rv-dist-action" id="distAction"></div>
                 </div>
-                <div class="rv-dist-action" id="distAction"></div>
+                <div class="rv-save">
+                    <button class="btn export-btn" id="saveBtn" onclick="saveToLog()">Save this month</button>
+                    <div class="rv-save-note" id="saveNote"></div>
+                </div>
             </div>
         </section>
 

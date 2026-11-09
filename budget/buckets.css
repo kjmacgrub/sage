@@ -81,6 +81,13 @@ body { overflow: hidden; }
 .rv-action-steps li { margin-bottom: 0.25rem; }
 .rv-action-steps:empty { display: none; }
 
+.rv-action-side { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; flex-shrink: 0; }
+.rv-save { text-align: right; }
+.rv-save .btn { padding: 0.45rem 0.9rem; font-size: 0.85rem; }
+.rv-save .btn.quiet { background: var(--surface); color: var(--text-secondary); border: 1.5px solid var(--border); }
+.rv-save .btn.quiet:hover { background: var(--background); color: var(--text-primary); }
+.rv-save-note { font-size: 0.74rem; color: var(--text-secondary); margin-top: 0.3rem; }
+.rv-save-note.stale { color: var(--warning); font-weight: 600; }
 .rv-dist {
     text-align: right; padding: 0.5rem 0.8rem; border-radius: var(--radius-sm);
     background: var(--background); border: 1px solid var(--border-light); min-width: 160px; flex-shrink: 0;
