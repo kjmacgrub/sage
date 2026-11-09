@@ -172,7 +172,7 @@ async function load() {
     state.settings = Object.assign({}, PERSON_DEFAULTS.settings, state.settings);
     if (!state.settings.month) state.settings.month = thisMonth();
     normalizeItems();
-    $('rvPerson').value = store.current;
+    syncPersonTiles();
     await loadPlanner();
     useplanner(false);
     fillInputs();
@@ -182,7 +182,12 @@ async function load() {
     if (drawerNeeded()) openDrawer();
 }
 
+function syncPersonTiles() {
+    document.querySelectorAll('.rv-person-tile').forEach(b => b.classList.toggle('active', b.dataset.who === store.current));
+}
+
 function switchPerson(who) {
+    if (who === store.current) return;
     readInputs();
     store.current = who;
     if (!store.people[who]) store.people[who] = freshPerson(who);
@@ -191,6 +196,7 @@ function switchPerson(who) {
     if (!state.settings.month) state.settings.month = thisMonth();
     normalizeItems();
     useplanner(false);
+    syncPersonTiles();
     fillInputs(); renderIncome(); renderItems(); render(); scheduleSave();
     if (drawerNeeded()) openDrawer(); else closeDrawer();
 }

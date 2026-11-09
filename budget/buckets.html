@@ -31,7 +31,10 @@
         <header class="rv-head">
             <div class="rv-head-left">
                 <span class="rv-title">Monthly check-in</span>
-                <select id="rvPerson" class="rv-person" onchange="switchPerson(this.value)"><option value="ken">Ken</option><option value="hilary">Hilary</option></select>
+                <div class="rv-people" id="rvPeople" role="tablist">
+                    <button class="rv-person-tile" data-who="ken" role="tab" onclick="switchPerson('ken')">Ken</button>
+                    <button class="rv-person-tile" data-who="hilary" role="tab" onclick="switchPerson('hilary')">Hilary</button>
+                </div>
                 <label class="rv-month-label">for <input type="month" id="rvMonth" class="rv-month" onchange="onInput()"></label>
             </div>
             <div class="rv-head-right">

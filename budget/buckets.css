@@ -24,14 +24,16 @@ body { overflow: hidden; }
 /* ── Header strip ────────────────────────────────────────── */
 
 .rv-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-.rv-head-left { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.rv-head-left { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .rv-head-right { display: flex; align-items: center; gap: 0.6rem; }
 .rv-title { font-size: 1.15rem; font-weight: 700; color: var(--text-primary); }
-.rv-person {
-    font-family: var(--font); font-size: 1.15rem; font-weight: 700; color: var(--primary);
-    border: none; background: transparent; cursor: pointer; padding: 0 0.2rem;
+.rv-people { display: inline-flex; gap: 0.3rem; padding: 0.2rem; border-radius: var(--radius-sm); background: var(--background); border: 1px solid var(--border-light); margin: 0 0.3rem; align-self: center; }
+.rv-person-tile {
+    font-family: var(--font); font-size: 0.95rem; font-weight: 600; color: var(--text-secondary);
+    border: none; background: transparent; cursor: pointer; padding: 0.3rem 0.9rem; border-radius: 6px;
 }
-.rv-person:focus { outline: none; }
+.rv-person-tile:hover { color: var(--text-primary); }
+.rv-person-tile.active { background: var(--primary); color: #fff; box-shadow: var(--shadow); }
 .rv-month-label { font-size: 0.85rem; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 0.4rem; }
 .rv-month {
     font-family: var(--font); font-size: 0.85rem; padding: 0.15rem 0.4rem;
