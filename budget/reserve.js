@@ -371,17 +371,12 @@ function compute() {
     if (missing.length) {
         title = 'Fill in ' + missing.join(', ').replace(/, ([^,]*)$/, ' and $1') + '.';
         body = 'The card needs those before it can read the rule. Follow the steps on the left; each one says where the number comes from. The managed accounts figure is everything of mine that is invested, so the draw rate reads like the familiar 4% rule.';
-    } else if (s.baseline == null) {
-        title = 'Set the baseline draw rate.';
-        body = `Today's draw rate is ${pct(rate)}: the yearly gap of ${fmt(gap * 12)} divided by ${fmt(s.managed)} in the managed accounts. The rule compares every month against the rate on the day the plan started, so it needs that number once.`;
-        steps = ['Open settings (bottom right) and press "set to today\'s rate", or type the rate you want as the baseline.',
-                 'Reset it at an annual review whenever the distributions change.'];
     } else if (!above) {
         if (!s.distOn) {
             row = 2; cls = 'restart'; state_ = 'Recovered';
             sell = Math.max(0, target - s.mm);
             title = 'Restart the distributions' + (sell > 0 ? ` and sell ${fmt(sell)} to refill the reserve.` : '.');
-            body = `The draw rate is ${pct(rate)}, back inside the band (under ${pct(upper)}). The managed accounts can carry the monthly amount again, and the reserve${sell > 0 ? ` is at ${fmt1(cover)} months and should go back to ${s.full}` : ' is full'}.`;
+            body = (upper != null ? `The draw rate is ${pct(rate)}, back inside the band (under ${pct(upper)}). ` : '') + `The managed accounts can carry the monthly amount again, and the reserve${sell > 0 ? ` is at ${fmt1(cover)} months and should go back to ${s.full}` : ' is full'}.`;
             steps = [`Call Fidelity or Schwab: restart the monthly distribution of ${fmt(s.dist)} to checking.`];
             if (sell > 0) steps.push(`Same call: sell ${fmt(sell)} from the managed accounts and move it to the money market.`);
             steps.push('Flip the "Distributions are" switch on the left to on, then save the month.');
@@ -397,13 +392,15 @@ function compute() {
             row = 1; cls = 'topup'; state_ = 'Normal, top up';
             sell = Math.max(0, target - s.mm);
             title = `Sell ${fmt(sell)} to top the reserve back up to ${s.full} months.`;
-            body = `The draw rate is ${pct(rate)}, inside the band. The reserve holds ${fmt1(cover)} months against a target of ${s.full} (${fmt(target)}). Markets are fine, so it is refilled now.`;
+            body = (upper != null ? `The draw rate is ${pct(rate)}, inside the band. ` : '') + `The reserve holds ${fmt1(cover)} months against a target of ${s.full} (${fmt(target)}). It is refilled now.`;
             steps = [`Call Fidelity or Schwab, or place it online: sell ${fmt(sell)} from the managed accounts and move it to the money market.`,
                      'Save the month.'];
         } else {
             row = 0; cls = 'ok'; state_ = 'Normal';
             title = 'Nothing to do this month.';
-            body = `The draw rate is ${pct(rate)}, inside the band (under ${pct(upper)}). The reserve holds ${fmt1(cover)} months, at or above the ${s.full}-month target. The distributions keep running.`;
+            body = upper != null
+                ? `The draw rate is ${pct(rate)}, inside the band (under ${pct(upper)}). The reserve holds ${fmt1(cover)} months, at or above the ${s.full}-month target. The distributions keep running.`
+                : `The reserve holds ${fmt1(cover)} months, at or above the ${s.full}-month target. The distributions keep running.`;
             steps = ['Save the month.'];
             if (wellBelow) steps.unshift(`The rate is well under the ${pct(s.baseline)} baseline. Note for the annual review: the distributions could rise.`);
         }
@@ -437,6 +434,10 @@ function compute() {
                          'Flip the "Distributions are" switch on the left to on, then save the month.'];
             }
         }
+    }
+
+    if (!missing.length && s.baseline == null) {
+        steps.unshift('No baseline draw rate yet, so only the reserve rows of the rule apply. Set the baseline in settings once the lump sum and the condo proceeds are invested, around mid-2027.');
     }
 
     return { annual, annualPm, expenses, income, gap, target, cover, hwm, dd, rate, upper, lower, above, wellBelow,
