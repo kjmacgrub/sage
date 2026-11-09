@@ -101,7 +101,7 @@ body { overflow: hidden; }
 
 /* ── Right column: the answer ────────────────────────────── */
 
-.rv-main { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.rv-main { display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
 
 .rv-action {
     flex: 1;
@@ -109,7 +109,7 @@ body { overflow: hidden; }
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     border-left: 6px solid var(--primary);
-    padding: 1.4rem 1.75rem;
+    padding: 1rem 1.5rem 0.9rem;
     display: flex; flex-direction: column;
     overflow: hidden;
 }
@@ -125,23 +125,41 @@ body { overflow: hidden; }
     font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--text-secondary); margin-bottom: 0.4rem;
 }
-.rv-action-title { font-size: 1.7rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; margin-bottom: 0.6rem; }
+.rv-action-title { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; margin-bottom: 0.4rem; }
 .rv-action-body { font-size: 0.98rem; color: var(--text-secondary); line-height: 1.5; max-width: 72ch; }
-.rv-action-steps { margin: 0.9rem 0 0; padding-left: 1.3rem; font-size: 0.95rem; color: var(--text-primary); line-height: 1.5; max-width: 72ch; }
+.rv-action-steps { margin: 0.5rem 0 0; padding-left: 1.3rem; font-size: 0.95rem; color: var(--text-primary); line-height: 1.5; max-width: 72ch; }
 .rv-action-steps li { margin-bottom: 0.35rem; }
 .rv-action-steps:empty { display: none; }
 
-.rv-numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
-.rv-num {
-    background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
-    padding: 0.9rem 1.1rem;
-}
-.rv-num-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
-.rv-num-value { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; margin-top: 0.2rem; }
-.rv-num-value.warn { color: var(--warning); }
-.rv-num-value.bad  { color: var(--danger); }
-.rv-num-value.good { color: var(--income-accent); }
-.rv-num-detail { font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.2rem; line-height: 1.3; }
+.rv-flow { width: 100%; }
+.rv-flow svg { display: block; width: 100%; height: 170px; font-family: var(--font); }
+.rv-flow-box rect { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
+.rv-flow-box.income rect  { stroke: var(--income-accent); }
+.rv-flow-box.managed rect { stroke: #4a6fa5; }
+.rv-flow-box.reserve rect { stroke: var(--primary); }
+.rv-flow-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; fill: var(--text-secondary); }
+.rv-flow-value { font-size: 16px; font-weight: 700; fill: var(--text-primary); }
+.rv-flow-value.big { font-size: 20px; }
+.rv-flow-sub { font-size: 12px; fill: var(--text-secondary); }
+.rv-flow-arrow { fill: none; stroke-width: 2.5; }
+.rv-flow-arrow.income  { stroke: var(--income-accent); }
+.rv-flow-arrow.managed { stroke: #4a6fa5; }
+.rv-flow-arrow.reserve { stroke: var(--primary); }
+.rv-flow-arrow.off { stroke: var(--border); stroke-dasharray: 5 5; }
+#flowHead-income path { fill: var(--income-accent); }
+#flowHead-managed path { fill: #4a6fa5; }
+#flowHead-reserve path { fill: var(--primary); }
+#flowHead-off path { fill: var(--border); }
+.rv-flow-arrow-label { font-size: 12.5px; font-weight: 600; fill: var(--text-primary); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.rv-flow-arrow-label.off { fill: var(--text-secondary); font-weight: 500; }
+.rv-flow-col-bg { fill: var(--background); stroke: var(--border); }
+.rv-flow-seg.income  { fill: var(--income-accent); }
+.rv-flow-seg.managed { fill: #4a6fa5; }
+.rv-flow-seg.reserve { fill: var(--primary); }
+.rv-flow-seg-label { font-size: 13px; font-weight: 600; fill: var(--text-primary); }
+.rv-flow-bracket { fill: none; stroke: var(--text-secondary); stroke-width: 1.2; }
+@media (min-height: 800px) { .rv-flow svg { height: 210px; } }
+@media (min-height: 900px) { .rv-flow svg { height: 240px; } }
 
 .rv-bar { position: relative; height: 6px; border-radius: 3px; background: var(--border-light); margin-top: 0.6rem; overflow: visible; }
 .rv-bar-fill { height: 100%; border-radius: 3px; background: var(--primary); width: 0; }
@@ -229,13 +247,11 @@ body { overflow: hidden; }
 
 @media (max-height: 820px) {
     .rv-action-title { font-size: 1.4rem; }
-    .rv-num-value { font-size: 1.3rem; }
     .rv-steps { gap: 0.4rem; }
 }
 @media (max-width: 1100px) {
     body { overflow: auto; }
     .rv-page { grid-template-columns: 1fr; height: auto; }
-    .rv-numbers { grid-template-columns: 1fr 1fr; }
 }
 
 /* ── Card header: distributions switch ───────────────────── */
@@ -253,7 +269,7 @@ body { overflow: hidden; }
 
 /* ── Gauges ──────────────────────────────────────────────── */
 
-.rv-gauges { margin-top: auto; padding-top: 1.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem 2.5rem; }
+.rv-gauges { margin-top: auto; padding-top: 0.6rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem 2.5rem; }
 .rv-gauge-head { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.3rem; }
 .rv-gauge-head span:last-child { font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; font-size: 0.95rem; }
 .rv-gauge-track { position: relative; height: 14px; border-radius: 7px; background: var(--border-light); }
@@ -278,7 +294,7 @@ body { overflow: hidden; }
 }
 .rv-gauge-pointer.bad { border-top-color: var(--danger); }
 .rv-gauge-pointer.bad::after { background: var(--danger); }
-.rv-gauge-foot { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-secondary); margin-top: 1.2rem; font-variant-numeric: tabular-nums; }
+.rv-gauge-foot { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-secondary); margin-top: 1.25rem; font-variant-numeric: tabular-nums; }
 .rv-gauge-foot span:last-child { text-align: right; }
 
 /* ── Person selector ─────────────────────────────────────── */

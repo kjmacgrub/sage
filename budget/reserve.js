@@ -508,7 +508,7 @@ function compute() {
         steps.unshift(`Move ${fmt(dueTotal)} from my money market to checking for the ${due.map(d => d.name).join(' and ')} due this month. The reserve has been holding it.`);
     }
     if (!missing.length && s.baseline == null) {
-        steps.push('No baseline draw rate yet, so only the reserve rows of the rule apply. Set the baseline in settings once the lump sum and the condo proceeds are invested, around mid-2027.');
+        steps.push('No baseline yet, so only the reserve rows of the rule apply. Set it in settings around mid-2027, once the lump sum and condo proceeds are invested.');
     }
 
     return { annual, annualPm, expenses, income, gap, regularGap, earmarked, due, dueTotal, free, target, cover, hwm, dd, rate, upper, lower, above, wellBelow,
@@ -529,35 +529,9 @@ function render() {
     $('actionBody').textContent = c.body;
     $('actionSteps').innerHTML = c.steps.map(t => `<li>${esc(t)}</li>`).join('');
 
-    // numbers
-    $('nGap').textContent = fmt(c.gap);
-    $('nGapDetail').textContent = `${fmt(c.expenses)} a month I pay, ${fmt(c.income)} guaranteed in`;
-
-    const coverEl = $('nCover');
-    coverEl.textContent = c.gap > 0 && s.mm ? fmt1(c.cover) + ' months' : '—';
-    coverEl.className = 'rv-num-value ' + (c.gap > 0 && s.mm ? (c.cover < s.floor ? 'bad' : c.cover < s.full ? 'warn' : 'good') : '');
-    $('nCoverDetail').textContent = c.gap > 0
-        ? (c.earmarked > 0 ? `${fmt(c.free)} free of the ${fmt(s.mm)} money market, ${fmt(c.earmarked)} held for annual items; target ${fmt(c.target)}` : `${fmt(s.mm)} in the money market; target ${fmt(c.target)}`)
-        : '—';
-
-    const rateEl = $('nRate');
-    rateEl.textContent = c.rate > 0 ? pct(c.rate) : '—';
-    rateEl.className = 'rv-num-value ' + (c.rate > 0 && c.upper != null ? (c.above ? 'bad' : 'good') : '');
-    $('nRateDetail').textContent = c.upper != null
-        ? `baseline ${pct(s.baseline)}, pause above ${pct(c.upper)}`
-        : (c.rate > 0 ? 'no baseline set yet' : 'yearly gap ÷ managed accounts');
-
     renderGauges(c);
     renderDistBox(c);
-
-    $('nTransfer').textContent = fmt(c.transfer);
-    const monthlyWhy = c.regularGap <= 0 ? 'nothing needed for the month'
-        : s.distOn && s.dist > 0 ? (s.dist >= c.regularGap ? `the ${fmt(s.dist)} distribution covers the month` : `${fmt(c.monthly)} for the month, after the ${fmt(s.dist)} distribution`)
-        : s.distOn ? `${fmt(c.monthly)} for the month`
-        : `${fmt(c.monthly)} for the month, distributions paused`;
-    $('nTransferDetail').textContent = c.gap <= 0 ? 'nothing needed'
-        : c.dueTotal > 0 ? `${monthlyWhy}, plus ${fmt(c.dueTotal)} for the ${c.due.map(d => d.name).join(' and ')} due now`
-        : monthlyWhy + (c.annualPm > 0 ? '; the twelfths stay in the reserve' : '');
+    renderFlow(c);
 
     // left column computed bits
     $('rv_annual_pm').textContent = fmt(c.annualPm);
@@ -627,6 +601,112 @@ function renderGauges(c) {
     $('gCoverFoot').innerHTML = c.gap > 0
         ? `<span>${c.earmarked > 0 ? `${fmt(c.free)} free in the money market, ${fmt(c.earmarked)} held for annual items` : `${fmt(s.mm)} in the money market`}</span><span>floor ${s.floor} mo ${fmt(c.gap * s.floor)} · target ${s.full} mo ${fmt(c.target)}</span>`
         : `<span>—</span><span>needs a gap</span>`;
+}
+
+// ── The flow picture ────────────────────────────────────────
+// Three pots on the left feed one column on the right: what I pay each
+// month, stacked from what covers it. Guaranteed income first, then the
+// fixed distribution, then the reserve. The top two of those are the gap.
+function renderFlow(c) {
+    const s = state.settings;
+    const svg = $('flowSvg');
+    const W = 900, H = 210;
+    const expenses = c.expenses;
+    const guar = Math.min(c.income, expenses);
+    const distUse = s.distOn ? Math.min(s.dist, Math.max(0, expenses - guar)) : 0;
+    const resUse = Math.max(0, expenses - guar - distUse);
+    const ok = expenses > 0;
+
+    // boxes
+    const A = { x: 14, y: 12, w: 222, h: 56 };     // guaranteed income
+    const B = { x: 14, y: 138, w: 200, h: 56 };    // managed accounts
+    const C = { x: 372, y: 138, w: 240, h: 56 };   // money market
+    // column
+    const col = { x: 700, w: 46, y: 58, h: 128 };
+    const seg = (amt) => ok ? col.h * amt / expenses : 0;
+    const hG = seg(guar), hD = seg(distUse), hR = seg(resUse);
+    const yG = col.y, yD = yG + hG, yR = yD + hD;
+    const midG = yG + hG / 2, midD = yD + hD / 2, midR = yR + hR / 2;
+    const endX = col.x - 6;
+
+    const box = (b, cls, label, value, sub) =>
+        `<g class="rv-flow-box ${cls}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="8"/>` +
+        `<text class="rv-flow-label" x="${b.x + 12}" y="${b.y + 17}">${esc(label)}</text>` +
+        `<text class="rv-flow-value" x="${b.x + 12}" y="${b.y + 36}">${esc(value)}</text>` +
+        `<text class="rv-flow-sub" x="${b.x + 12}" y="${b.y + 50}">${esc(sub)}</text></g>`;
+    const curve = (x0, y0, x1, y1, cls, label, bend, shift) => {
+        const c1x = x0 + (x1 - x0) * (bend || 0.45), c2x = x1 - (x1 - x0) * (bend || 0.45);
+        const mx = (x0 + 3 * c1x + 3 * c2x + x1) / 8, my = (y0 + 3 * y0 + 3 * y1 + y1) / 8;
+        return `<path class="rv-flow-arrow ${cls}" marker-end="url(#flowHead-${/off/.test(cls) ? 'off' : cls.split(' ')[0]})" d="M ${x0} ${y0} C ${c1x} ${y0}, ${c2x} ${y1}, ${x1} ${y1}"/>` +
+               (label ? `<text class="rv-flow-arrow-label ${cls}" x="${mx + (shift || 0)}" y="${my - 9}" text-anchor="middle">${esc(label)}</text>` : '');
+    };
+
+    let out = '';
+    // defs: arrow head
+    out += '<defs>' + ['income', 'managed', 'reserve', 'off'].map(k =>
+        `<marker id="flowHead-${k}" class="${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"/></marker>`).join('') + '</defs>';
+
+    // guaranteed income box
+    const incomeNames = state.income.filter(r => num(r.amount) > 0).map(r => r.name).filter(Boolean);
+    out += box(A, 'income', 'Guaranteed income', c.income > 0 ? fmt(c.income) + ' a month' : 'none yet',
+               incomeNames.length ? incomeNames.slice(0, 3).join(', ') : 'pension, wages, Social Security');
+    // managed accounts box
+    out += box(B, 'managed', 'Managed accounts', s.managed > 0 ? fmt(s.managed) : 'enter the balance',
+               c.rate > 0 ? `draw rate ${pct(c.rate)}` + (c.upper != null ? ` · pause above ${pct(c.upper)}` : '') : 'everything of mine that is invested');
+    // money market box
+    out += box(C, 'reserve', 'Money market, my reserve', s.mm > 0 ? fmt(s.mm) + (ok && isFinite(c.cover) ? ` · ${fmt1(c.cover)} months` : '') : 'enter the balance',
+               c.earmarked > 0 ? `${fmt(c.free)} free · ${fmt(c.earmarked)} held for bills` : (ok ? `target ${fmt(c.target)}, ${s.full} months` : 'two years of the gap'));
+
+    // arrows
+    if (ok && guar > 0) out += curve(A.x + A.w, A.y + A.h / 2, endX, midG, 'income', `${fmt(guar)} a month`);
+    // managed → column: the distribution
+    if (ok) {
+        if (s.distOn && s.dist > 0 && distUse > 0) out += curve(B.x + B.w, B.y + 12, endX, midD, 'managed', `distribution ${fmt(s.dist)} a month`, 0.55);
+        else if (!s.distOn) out += curve(B.x + B.w, B.y + 12, endX, Math.max(col.y + 8, yD), 'managed off', 'distributions paused', 0.55);
+    }
+    // managed → money market: refills
+    out += `<path class="rv-flow-arrow managed ${c.sell > 0 ? '' : 'off'}" marker-end="url(#flowHead-${c.sell > 0 ? 'managed' : 'off'})" d="M ${B.x + B.w} ${B.y + 40} L ${C.x - 6} ${C.y + 40}"/>` +
+           `<text class="rv-flow-arrow-label managed" x="${(B.x + B.w + C.x) / 2}" y="${B.y + 31}" text-anchor="middle">${esc(c.sell > 0 ? `sell ${fmt(c.sell)} now` : 'sell to refill')}</text>`;
+    // money market → column
+    if (ok) {
+        if (resUse > 0 || c.dueTotal > 0) {
+            const label = (resUse > 0 ? `${fmt(c.monthly)} a month` : 'nothing for the month') + (c.dueTotal > 0 ? ` + ${fmt(c.dueTotal)} bills due` : '');
+            out += curve(C.x + C.w, C.y + C.h / 2, endX, resUse > 0 ? midR : col.y + col.h - 8, 'reserve', label, 0.5, -14);
+        } else {
+            out += curve(C.x + C.w, C.y + C.h / 2, endX, col.y + col.h - 8, 'reserve off', 'nothing needed this month', 0.5, -14);
+        }
+    }
+
+    // the column
+    out += `<text class="rv-flow-label" x="${col.x}" y="22">What I pay each month</text>`;
+    out += `<text class="rv-flow-value big" x="${col.x}" y="44">${esc(ok ? fmt(expenses) : '—')}</text>`;
+    out += `<rect class="rv-flow-col-bg" x="${col.x}" y="${col.y}" width="${col.w}" height="${col.h}" rx="6"/>`;
+    if (ok) {
+        if (hG > 0) out += `<rect class="rv-flow-seg income" x="${col.x}" y="${yG}" width="${col.w}" height="${hG}"/>`;
+        if (hD > 0) out += `<rect class="rv-flow-seg managed" x="${col.x}" y="${yD}" width="${col.w}" height="${hD}"/>`;
+        if (hR > 0) out += `<rect class="rv-flow-seg reserve" x="${col.x}" y="${yR}" width="${col.w}" height="${hR}"/>`;
+        // labels beside the segments, pushed apart so they never overlap
+        const labels = [];
+        if (guar > 0) labels.push({ y: midG, cls: 'income', text: `guaranteed ${fmt(guar)}` });
+        if (distUse > 0) labels.push({ y: midD, cls: 'managed', text: `distribution ${fmt(distUse)}` });
+        if (resUse > 0) labels.push({ y: midR, cls: 'reserve', text: `from the reserve ${fmt(resUse)}` });
+        for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 16);
+        for (let i = labels.length - 1; i >= 0; i--) {
+            const maxY = col.y + col.h - (labels.length - 1 - i) * 16;
+            if (labels[i].y > maxY) labels[i].y = maxY;
+            if (i < labels.length - 1 && labels[i].y > labels[i + 1].y - 16) labels[i].y = labels[i + 1].y - 16;
+        }
+        labels.forEach(l => { out += `<text class="rv-flow-seg-label ${l.cls}" x="${col.x + col.w + 18}" y="${l.y + 4}">${esc(l.text)}</text>`; });
+        // the gap bracket
+        if (c.gap > 0 && yD < col.y + col.h) {
+            const bx = col.x + col.w + 8, y0 = yD, y1 = col.y + col.h;
+            out += `<path class="rv-flow-bracket" d="M ${bx - 3} ${y0} L ${bx} ${y0} L ${bx} ${y1} L ${bx - 3} ${y1}"/>`;
+        }
+        out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 17}">${esc(c.gap > 0 ? `the gap: ${fmt(c.gap)} a month beyond guaranteed income` : 'guaranteed income covers everything')}</text>`;
+    } else {
+        out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 17}">fill in the steps on the left</text>`;
+    }
+    svg.innerHTML = out;
 }
 
 function renderDistBox(c) {

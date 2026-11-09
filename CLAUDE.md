@@ -37,7 +37,7 @@ python3 -m uvicorn cef.api.app:create_app --factory --host 0.0.0.0 --port 8000 -
 - `index.html` + `app.js` + `styles.css` — Budget Planner (localStorage, no server)
 - `dashboard.html` + `dashboard.js` + `dashboard.css` — Cash Flow (Quicken CSV)
 - `tax.html` + `tax.js` + `tax.css` — Tax estimator
-- `reserve.html` + `reserve.js` + `reserve.css` — Reserve: one-screen monthly check-in for the two-year cash bucket (gap, months of cover, draw-rate guardrail that pauses/restarts the fixed distributions, exact instructions on a card; lists, rule, log and explainer in popups); stored as one JSON blob via `/api/reserve`
+- `reserve.html` + `reserve.js` + `reserve.css` — Reserve: one-screen monthly check-in for the two-year cash bucket (gap, months of cover, draw-rate guardrail that pauses/restarts the fixed distributions, exact instructions on a card, live flow picture of the pots below it; lists, rule, log and explainer in popups); stored as one JSON blob via `/api/reserve`
 - `api.py` — Flask API (port 5050)
 - `query.py` — Quicken CSV parsing
 - `db.py` — SQLite helpers
