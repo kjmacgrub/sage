@@ -637,9 +637,9 @@ function renderFlow(c) {
     const ok = expenses > 0;
 
     // tiles, top to bottom in the order their flows arrive at the column
-    const C = { x: 20, y: 8, w: 310, h: 106 };      // Cash bucket, with its gauge
-    const B = { x: 20, y: 150, w: 310, h: 84 };     // Growth bucket
-    const A = { x: 20, y: 254, w: 310, h: 70 };     // guaranteed income
+    const C = { x: 20, y: 8, w: 340, h: 106 };      // Cash bucket, with its gauge
+    const B = { x: 20, y: 150, w: 340, h: 84 };     // Growth bucket
+    const A = { x: 20, y: 254, w: 340, h: 70 };     // guaranteed income
     // the Spending bucket column: income at the bottom, cash at the top
     const col = { x: 1000, w: 64, y: 86, h: 206 };
     // the draw collector: the Cash bucket and the distribution land here,
@@ -674,20 +674,22 @@ function renderFlow(c) {
     out += tile(C, 'reserve', 'Cash bucket', s.mm > 0 ? fmt(s.mm) + (hasCover ? ` · ${fmt1(c.cover)} months` : '') : 'enter the balance',
                 c.earmarked > 0 ? `${fmt(c.free)} free · ${fmt(c.earmarked)} held for bills` : (ok ? `${s.full} months of my draw is ${fmt(c.target)}` : 'two years of my draw'));
     {
-        const gx = C.x + 16, gw = C.w - 32, gy = C.y + 76, gh = 10;
+        // a vertical gauge at the right of the tile: months of cover filling
+        // from the bottom, the floor mark below the target mark
+        const bw = 16, bx = C.x + C.w - 74, by = C.y + 10, bh = C.h - 20;
         const cscale = s.full * 1.3;
-        const px = v => gx + Math.max(0, Math.min(1, v / cscale)) * gw;
-        out += `<rect class="rv-flow-track" x="${gx}" y="${gy}" width="${gw}" height="${gh}" rx="5"/>`;
+        const yAt = v => by + bh - Math.max(0, Math.min(1, v / cscale)) * bh;
+        out += `<rect class="rv-flow-track" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="5"/>`;
         if (hasCover) {
-            const fw = Math.max(0, px(c.cover) - gx);
+            const top = yAt(c.cover);
             const fcls = c.cover < s.floor ? ' bad' : c.cover < s.full ? ' warn' : '';
-            out += `<rect class="rv-flow-fill${fcls}" x="${gx}" y="${gy}" width="${fw}" height="${gh}" rx="5"/>`;
+            out += `<rect class="rv-flow-fill${fcls}" x="${bx}" y="${top}" width="${bw}" height="${by + bh - top}" rx="5"/>`;
         }
-        const fx = px(s.floor), tx = px(s.full);
-        out += `<line class="rv-flow-tick limit" x1="${fx}" y1="${gy - 4}" x2="${fx}" y2="${gy + gh + 4}"/>` +
-               `<text class="rv-flow-tick-label limit" x="${fx}" y="${gy + gh + 17}" text-anchor="middle">floor ${s.floor}</text>` +
-               `<line class="rv-flow-tick" x1="${tx}" y1="${gy - 4}" x2="${tx}" y2="${gy + gh + 4}"/>` +
-               `<text class="rv-flow-tick-label" x="${tx}" y="${gy + gh + 17}" text-anchor="middle">target ${s.full}</text>`;
+        const fy = yAt(s.floor), ty = yAt(s.full);
+        out += `<line class="rv-flow-tick" x1="${bx - 4}" y1="${ty}" x2="${bx + bw + 4}" y2="${ty}"/>` +
+               `<text class="rv-flow-tick-label" x="${bx + bw + 8}" y="${ty + 4}">target ${s.full}</text>` +
+               `<line class="rv-flow-tick limit" x1="${bx - 4}" y1="${fy}" x2="${bx + bw + 4}" y2="${fy}"/>` +
+               `<text class="rv-flow-tick-label limit" x="${bx + bw + 8}" y="${fy + 4}">floor ${s.floor}</text>`;
     }
     // Growth bucket
     out += tile(B, 'managed' + (c.above ? ' bad' : ''), 'Growth bucket', s.managed > 0 ? fmt(s.managed) : 'enter the balance',
@@ -705,7 +707,7 @@ function renderFlow(c) {
         const x0 = B.x + B.w, y0 = B.y + 16, x1 = C.x + C.w + 7, y1 = C.y + C.h - 16, bulge = x0 + 70;
         const on = c.sell > 0;
         out += `<path class="rv-flow-arrow managed refill ${on ? '' : 'off'}" marker-end="url(#flowHead-${on ? 'managed' : 'off'})" d="M ${x0} ${y0} C ${bulge} ${y0}, ${bulge} ${y1}, ${x1} ${y1}"/>` +
-               `<text class="rv-flow-arrow-label managed ${on ? '' : 'off'}" x="${bulge - 10}" y="${(y0 + y1) / 2 + 5}" text-anchor="start">${esc(on ? `sell ${fmt(c.sell)} now` : 'sell to refill')}</text>`;
+               `<text class="rv-flow-arrow-label managed ${on ? '' : 'off'}" x="${bulge + 4}" y="${y1 + 10}" text-anchor="start">${esc(on ? `sell ${fmt(c.sell)} now` : 'sell to refill')}</text>`;
     }
     if (ok) {
         // Cash → Spending: the top of the column
