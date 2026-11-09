@@ -352,7 +352,8 @@ function refreshItemRow(tr, it, ym) {
     const on = itemStatus(it, ym) === 'on';
     tr.classList.toggle('rv-row-off', !on);
     tr.querySelector('.c-pm').textContent = on ? fmt(num(it.amount) / 12) : '—';
-    tr.querySelector('.c-saved').innerHTML = (on ? fmt(sinking(it, ym)) : '—') + `<span class="rv-row-note">${esc(itemNote(it, ym))}</span>`;
+    const due = on ? dueThisMonth(it, ym) : 0;
+    tr.querySelector('.c-saved').innerHTML = (on ? fmt(earmark(it, ym)) : '—') + `<span class="rv-row-note">${esc(due > 0 ? fmt(due) + ' due this month' : itemNote(it, ym))}</span>`;
 }
 function itemChange(i, key, val) {
     const it = state.items[i];
@@ -377,20 +378,42 @@ function sinking(it, ym) {
     const elapsed = ((cur - first) % period + period) % period;
     return num(it.amount) * elapsed / 12;
 }
+// The payment that falls in the check-in month, if any.
+function dueThisMonth(it, ym) {
+    const freq = [1, 2, 4].includes(Number(it.freq)) ? Number(it.freq) : 1;
+    const period = 12 / freq;
+    const first = Number((it.start || '').split('-')[1]) || 1;
+    const cur = Number(ym.split('-')[1]) || 1;
+    return ((cur - first) % period + period) % period === 0 ? num(it.amount) / freq : 0;
+}
+// What the money market is holding for an item right now: the twelfths
+// saved since the last payment, or the whole bill in the month it is due.
+function earmark(it, ym) { return sinking(it, ym) + dueThisMonth(it, ym); }
 
 // ── Calculation ─────────────────────────────────────────────
 
 function compute() {
     const s = state.settings;
 
-    const annual = activeItems(s.month || thisMonth()).reduce((a, it) => a + num(it.amount), 0);
+    const ym = s.month || thisMonth();
+    const active = activeItems(ym);
+    const annual = active.reduce((a, it) => a + num(it.amount), 0);
     const annualPm = annual / 12;
     const expenses = s.deposit + s.own + annualPm;
     const income = state.income.reduce((a, r) => a + num(r.amount), 0);
     const gap = Math.max(0, expenses - income);
+    // the part of the gap that goes to checking every month; the twelfths
+    // of the annual items stay in the money market until each bill is due
+    const regularGap = Math.max(0, s.deposit + s.own - income);
+
+    // what the money market is holding for the annual items, and what falls due now
+    const earmarked = active.reduce((a, it) => a + earmark(it, ym), 0);
+    const due = active.map(it => ({ name: it.name || 'annual item', amount: dueThisMonth(it, ym) })).filter(d => d.amount > 0);
+    const dueTotal = due.reduce((a, d) => a + d.amount, 0);
+    const free = Math.max(0, s.mm - earmarked);
 
     const target = gap * s.full;
-    const cover = gap > 0 ? s.mm / gap : Infinity;
+    const cover = gap > 0 ? free / gap : Infinity;
 
     const hwm = Math.max(s.managed, ...state.log.map(r => num(r.managed)));
     const dd = hwm > 0 ? (1 - s.managed / hwm) * 100 : 0;
@@ -401,8 +424,10 @@ function compute() {
     const above = upper != null && rate > upper;
     const wellBelow = lower != null && rate > 0 && rate < lower;
 
-    // what the reserve sends to checking this month
-    const transfer = gap <= 0 ? 0 : (s.distOn ? Math.max(0, gap - s.dist) : gap);
+    // what the reserve sends to checking this month: the regular part of the
+    // gap (less the distribution while it runs) plus any annual bill due now
+    const monthly = s.distOn ? Math.max(0, regularGap - s.dist) : regularGap;
+    const transfer = monthly + dueTotal;
 
     // ── the rule ──
     let row = -1, cls = 'setup', state_ = 'Set-up', title = '', body = '', steps = [], sell = 0;
@@ -417,7 +442,7 @@ function compute() {
     } else if (!above) {
         if (!s.distOn) {
             row = 2; cls = 'restart'; state_ = 'Recovered';
-            sell = Math.max(0, target - s.mm);
+            sell = Math.max(0, target - free);
             title = 'Restart the distributions' + (sell > 0 ? ` and sell ${fmt(sell)} to refill the reserve.` : '.');
             body = (upper != null ? `The draw rate is ${pct(rate)}, back inside the band (under ${pct(upper)}). ` : '') + `The managed accounts can carry the monthly amount again, and the reserve${sell > 0 ? ` is at ${fmt1(cover)} months and should go back to ${s.full}` : ' is full'}.`;
             steps = [`Call Fidelity or Schwab: restart the monthly distribution of ${fmt(s.dist)} to checking.`];
@@ -425,7 +450,7 @@ function compute() {
             steps.push('Flip the "Distributions are" switch on the left to on, then save the month.');
         } else if (cover < s.floor) {
             row = 6; cls = 'forced'; state_ = 'Reserve low';
-            sell = Math.max(0, gap * s.refill - s.mm);
+            sell = Math.max(0, gap * s.refill - free);
             title = `Sell ${fmt(sell)} to bring the reserve to ${s.refill} months.`;
             body = `The reserve is down to ${fmt1(cover)} months, under the ${s.floor}-month floor, while the distributions are running. Something other than the market is draining it, so it gets refilled now whatever the market is doing.`;
             steps = [`Call Fidelity or Schwab: sell ${fmt(sell)} from the managed accounts and move it to the money market.`,
@@ -433,7 +458,7 @@ function compute() {
                      'Save the month.'];
         } else if (cover < s.full) {
             row = 1; cls = 'topup'; state_ = 'Normal, top up';
-            sell = Math.max(0, target - s.mm);
+            sell = Math.max(0, target - free);
             title = `Sell ${fmt(sell)} to top the reserve back up to ${s.full} months.`;
             body = (upper != null ? `The draw rate is ${pct(rate)}, inside the band. ` : '') + `The reserve holds ${fmt1(cover)} months against a target of ${s.full} (${fmt(target)}). It is refilled now.`;
             steps = [`Call Fidelity or Schwab, or place it online: sell ${fmt(sell)} from the managed accounts and move it to the money market.`,
@@ -454,11 +479,11 @@ function compute() {
                 title = 'Pause the distributions.';
                 body = `The draw rate is ${pct(rate)}, above the band (${pct(upper)}). The managed accounts have fallen enough that each monthly distribution is selling too cheaply. The reserve holds ${fmt1(cover)} months and pays everything from here until the rate is back in the band.`;
                 steps = [`Call Fidelity or Schwab: pause the monthly distribution of ${fmt(s.dist)} until further notice.`,
-                         `Move ${fmt(gap)} a month from my money market from now on; this page shows the figure each month.`,
+                         `Move ${fmt(monthly)} a month from my money market from now on; this page shows the figure each month.`,
                          'Flip the "Distributions are" switch on the left to paused, then save the month.'];
             } else {
                 row = 6; cls = 'forced'; state_ = 'Reserve low';
-                sell = Math.max(0, gap * s.refill - s.mm);
+                sell = Math.max(0, gap * s.refill - free);
                 title = `Sell ${fmt(sell)} to bring the reserve to ${s.refill} months.`;
                 body = `The reserve is under the ${s.floor}-month floor at ${fmt1(cover)} months. Even in a down market it has to be refilled; a thin reserve is the bigger risk.`;
                 steps = [`Call Fidelity or Schwab: sell ${fmt(sell)} from the managed accounts and move it to the money market.`, 'Save the month.'];
@@ -468,7 +493,7 @@ function compute() {
                 row = 4; cls = 'hold'; state_ = 'Market down, holding';
                 title = 'Hold. Keep paying from the reserve.';
                 body = `The draw rate is ${pct(rate)}, still above the band (${pct(upper)}). The distributions stay paused and the reserve carries the month. It holds ${fmt1(cover)} months, about ${fmt1(Math.max(0, cover - s.floor))} above the floor. Nothing is sold.`;
-                steps = [`Move ${fmt(gap)} from my money market to cover the month.`, 'Trim discretionary spending where it is easy.', 'Save the month.'];
+                steps = [`Move ${fmt(monthly)} from my money market to cover the month.`, 'Trim discretionary spending where it is easy.', 'Save the month.'];
             } else {
                 row = 5; cls = 'forced'; state_ = 'Reserve low';
                 title = 'Restart the distributions anyway.';
@@ -479,12 +504,15 @@ function compute() {
         }
     }
 
+    if (!missing.length && dueTotal > 0) {
+        steps.unshift(`Move ${fmt(dueTotal)} from my money market to checking for the ${due.map(d => d.name).join(' and ')} due this month. The reserve has been holding it.`);
+    }
     if (!missing.length && s.baseline == null) {
-        steps.unshift('No baseline draw rate yet, so only the reserve rows of the rule apply. Set the baseline in settings once the lump sum and the condo proceeds are invested, around mid-2027.');
+        steps.push('No baseline draw rate yet, so only the reserve rows of the rule apply. Set the baseline in settings once the lump sum and the condo proceeds are invested, around mid-2027.');
     }
 
-    return { annual, annualPm, expenses, income, gap, target, cover, hwm, dd, rate, upper, lower, above, wellBelow,
-             transfer, row, cls, state: state_, title, body, steps, sell };
+    return { annual, annualPm, expenses, income, gap, regularGap, earmarked, due, dueTotal, free, target, cover, hwm, dd, rate, upper, lower, above, wellBelow,
+             monthly, transfer, row, cls, state: state_, title, body, steps, sell };
 }
 
 // ── Render ──────────────────────────────────────────────────
@@ -508,7 +536,9 @@ function render() {
     const coverEl = $('nCover');
     coverEl.textContent = c.gap > 0 && s.mm ? fmt1(c.cover) + ' months' : '—';
     coverEl.className = 'rv-num-value ' + (c.gap > 0 && s.mm ? (c.cover < s.floor ? 'bad' : c.cover < s.full ? 'warn' : 'good') : '');
-    $('nCoverDetail').textContent = c.gap > 0 ? `${fmt(s.mm)} in the money market; target ${fmt(c.target)}` : '—';
+    $('nCoverDetail').textContent = c.gap > 0
+        ? (c.earmarked > 0 ? `${fmt(c.free)} free of the ${fmt(s.mm)} money market, ${fmt(c.earmarked)} held for annual items; target ${fmt(c.target)}` : `${fmt(s.mm)} in the money market; target ${fmt(c.target)}`)
+        : '—';
 
     const rateEl = $('nRate');
     rateEl.textContent = c.rate > 0 ? pct(c.rate) : '—';
@@ -521,9 +551,13 @@ function render() {
     renderDistBox(c);
 
     $('nTransfer').textContent = fmt(c.transfer);
+    const monthlyWhy = c.regularGap <= 0 ? 'nothing needed for the month'
+        : s.distOn && s.dist > 0 ? (s.dist >= c.regularGap ? `the ${fmt(s.dist)} distribution covers the month` : `${fmt(c.monthly)} for the month, after the ${fmt(s.dist)} distribution`)
+        : s.distOn ? `${fmt(c.monthly)} for the month`
+        : `${fmt(c.monthly)} for the month, distributions paused`;
     $('nTransferDetail').textContent = c.gap <= 0 ? 'nothing needed'
-        : s.distOn ? (s.dist >= c.gap ? `the ${fmt(s.dist)} distribution covers the gap` : `the gap less the ${fmt(s.dist)} distribution`)
-        : 'the whole gap, distributions paused';
+        : c.dueTotal > 0 ? `${monthlyWhy}, plus ${fmt(c.dueTotal)} for the ${c.due.map(d => d.name).join(' and ')} due now`
+        : monthlyWhy + (c.annualPm > 0 ? '; the twelfths stay in the reserve' : '');
 
     // left column computed bits
     $('rv_annual_pm').textContent = fmt(c.annualPm);
@@ -591,7 +625,7 @@ function renderGauges(c) {
     $('gCoverFloor').style.left = px(s.floor / cscale * 100);
     $('gCoverFull').style.left = px(s.full / cscale * 100);
     $('gCoverFoot').innerHTML = c.gap > 0
-        ? `<span>${fmt(s.mm)} in the money market</span><span>floor ${s.floor} mo ${fmt(c.gap * s.floor)} · target ${s.full} mo ${fmt(c.target)}</span>`
+        ? `<span>${c.earmarked > 0 ? `${fmt(c.free)} free in the money market, ${fmt(c.earmarked)} held for annual items` : `${fmt(s.mm)} in the money market`}</span><span>floor ${s.floor} mo ${fmt(c.gap * s.floor)} · target ${s.full} mo ${fmt(c.target)}</span>`
         : `<span>—</span><span>needs a gap</span>`;
 }
 
@@ -640,7 +674,7 @@ function saveToLog() {
         month: s.month, expenses: c.expenses, income: c.income, gap: c.gap,
         mm: s.mm, cover: isFinite(c.cover) ? c.cover : null, managed: s.managed, dd: c.dd,
         rate: c.rate, dist: s.dist, distOn: s.distOn,
-        transfer: c.transfer, sell: c.sell, action: c.title,
+        transfer: c.transfer, due: c.dueTotal, sell: c.sell, action: c.title,
     };
     const existing = state.log.findIndex(r => r.month === s.month);
     if (existing >= 0) state.log[existing] = row; else state.log.push(row);
