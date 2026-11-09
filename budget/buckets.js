@@ -126,7 +126,14 @@ document.addEventListener('click', ev => {
 // on the name shows the month still needs attention (a bucket balance
 // missing, not yet saved, or changed since it was saved).
 
-function openDrawer() { $('drawer').classList.add('open'); $('drawerBackdrop').classList.add('open'); syncPersonTiles(); }
+// The drawer and its backdrop start just below the header, so the names
+// stay clickable while it is open.
+function placeDrawer() {
+    const top = Math.round(document.querySelector('.rv-head').getBoundingClientRect().bottom + 8) + 'px';
+    $('drawer').style.top = top; $('drawerBackdrop').style.top = top;
+}
+window.addEventListener('resize', placeDrawer);
+function openDrawer() { placeDrawer(); $('drawer').classList.add('open'); $('drawerBackdrop').classList.add('open'); syncPersonTiles(); }
 function closeDrawer() { $('drawer').classList.remove('open'); $('drawerBackdrop').classList.remove('open'); syncPersonTiles(); }
 function drawerOpen() { return $('drawer').classList.contains('open'); }
 function personClick(who) {
