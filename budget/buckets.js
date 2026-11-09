@@ -675,12 +675,13 @@ function renderFlow(c) {
                 incomeNames.length ? incomeNames.slice(0, 3).join(', ') : 'pension, wages, Social Security');
 
     // arrows
-    // Growth → Cash: refills, straight up from the Growth bucket into the Cash bucket
+    // Growth → Cash: refills, an arc out of the Growth bucket's right side
+    // and back into the Cash bucket's right side
     {
-        const x0 = B.x + B.w - 36, y0 = B.y, y1 = C.y + C.h + 7;
+        const x0 = B.x + B.w, y0 = B.y + 16, x1 = C.x + C.w + 7, y1 = C.y + C.h - 16, bulge = x0 + 70;
         const on = c.sell > 0;
-        out += `<path class="rv-flow-arrow managed ${on ? '' : 'off'}" marker-end="url(#flowHead-${on ? 'managed' : 'off'})" d="M ${x0} ${y0} L ${x0} ${y1}"/>` +
-               `<text class="rv-flow-arrow-label managed ${on ? '' : 'off'}" x="${x0 + 12}" y="${(y0 + y1) / 2 + 5}" text-anchor="start">${esc(on ? `sell ${fmt(c.sell)} now` : 'sell to refill')}</text>`;
+        out += `<path class="rv-flow-arrow managed refill ${on ? '' : 'off'}" marker-end="url(#flowHead-${on ? 'managed' : 'off'})" d="M ${x0} ${y0} C ${bulge} ${y0}, ${bulge} ${y1}, ${x1} ${y1}"/>` +
+               `<text class="rv-flow-arrow-label managed ${on ? '' : 'off'}" x="${bulge - 10}" y="${(y0 + y1) / 2 + 5}" text-anchor="start">${esc(on ? `sell ${fmt(c.sell)} now` : 'sell to refill')}</text>`;
     }
     if (ok) {
         // Cash → Spending: the top of the column

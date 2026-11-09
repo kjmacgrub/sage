@@ -126,6 +126,7 @@ body { overflow: hidden; }
 .rv-flow-arrow.managed { stroke: #4a6fa5; }
 .rv-flow-arrow.reserve { stroke: var(--primary); }
 .rv-flow-arrow.off { stroke: var(--border); stroke-dasharray: 6 6; }
+.rv-flow-arrow.refill.off { stroke-dasharray: 1 6; stroke-linecap: round; }
 #flowHead-income path { fill: var(--income-accent); }
 #flowHead-managed path { fill: #4a6fa5; }
 #flowHead-reserve path { fill: var(--primary); }
