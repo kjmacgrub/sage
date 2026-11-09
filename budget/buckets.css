@@ -41,7 +41,10 @@ body { overflow: hidden; }
     background: var(--surface); color: var(--text-primary);
 }
 .rv-open-btn { padding: 0.45rem 1rem; font-size: 0.88rem; }
-.rv-open-btn.needed { box-shadow: 0 0 0 3px var(--primary-light); }
+.rv-open-btn { background: var(--surface); color: var(--text-primary); border: 1.5px solid var(--border); }
+.rv-open-btn:hover { background: var(--background); color: var(--text-primary); }
+.rv-open-btn.needed, .rv-open-btn.needed:hover { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-light); }
+.rv-open-btn.needed:hover { background: var(--primary-hover); }
 .rv-icon-btn {
     width: 30px; height: 30px; border-radius: 50%;
     border: 1.5px solid var(--border); background: transparent;

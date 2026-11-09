@@ -121,9 +121,9 @@ document.addEventListener('click', ev => {
 });
 
 // ── The drawer with this month's numbers ────────────────────
-// It opens on its own when the month has not been saved yet or a bucket
-// balance is missing, closes when the month is saved, and can be reopened
-// from the header any time.
+// Hidden by default. The header button is highlighted while the month
+// still needs attention (a bucket balance missing, or not yet saved); the
+// drawer closes when the month is saved.
 
 function openDrawer() { $('drawer').classList.add('open'); $('drawerBackdrop').classList.add('open'); }
 function closeDrawer() { $('drawer').classList.remove('open'); $('drawerBackdrop').classList.remove('open'); }
@@ -179,7 +179,6 @@ async function load() {
     renderIncome();
     renderItems();
     render();
-    if (drawerNeeded()) openDrawer();
 }
 
 function syncPersonTiles() {
@@ -198,7 +197,7 @@ function switchPerson(who) {
     useplanner(false);
     syncPersonTiles();
     fillInputs(); renderIncome(); renderItems(); render(); scheduleSave();
-    if (drawerNeeded()) openDrawer(); else closeDrawer();
+    closeDrawer();
 }
 
 function scheduleSave() {
