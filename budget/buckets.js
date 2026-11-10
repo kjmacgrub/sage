@@ -1,8 +1,8 @@
 // ============================================================
-// Buckets — the three-bucket plan, checked once a month
+// Buckets — the two-bucket plan, checked once a month
 // ============================================================
 //
-// Spending bucket: the shared checking account that pays the bills.
+// Expenses: paid from the shared checking account; each of us deposits a share.
 // Cash bucket: my money market, two years of my draw, where the big yearly
 // bills wait. Growth bucket: everything of mine that is invested.
 //
@@ -11,7 +11,7 @@
 // and in saved data), the Cash bucket's months of cover, the draw rate
 // (yearly draw / Growth bucket) against its guardrail band, and reads the
 // rule table to say exactly what to do. The distributions are the fixed
-// monthly amount the Growth bucket pays into the Spending bucket; the rule
+// monthly amount the Growth bucket pays into shared checking; the rule
 // pauses and restarts them. Everything is saved as one JSON blob through
 // /api/reserve (the route and table keep their original name).
 
@@ -235,7 +235,7 @@ function scheduleSave() {
 
 // ── Planner ─────────────────────────────────────────────────
 // The newest plan on the Planner tab is the household budget for the month.
-// Its expense total times my share is my deposit to the Spending bucket.
+// Its expense total times my share is my deposit toward expenses.
 
 async function loadPlanner() {
     try {
@@ -458,7 +458,7 @@ function compute() {
     const income = state.income.reduce((a, r) => a + num(r.amount), 0);
     // my draw: what my buckets have to supply each month
     const gap = Math.max(0, expenses - income);
-    // the part of the draw that goes to the Spending bucket every month; the
+    // the part of the draw that goes to shared checking every month; the
     // twelfths of the annual items stay in the Cash bucket until each bill is due
     const regularGap = Math.max(0, s.deposit + s.own - income);
 
@@ -480,7 +480,7 @@ function compute() {
     const above = upper != null && rate > upper;
     const wellBelow = lower != null && rate > 0 && rate < lower;
 
-    // what the Cash bucket sends to the Spending bucket this month: the regular
+    // what the Cash bucket sends to shared checking this month: the regular
     // part of the draw (less the distribution while it runs) plus any bill due
     const monthly = s.distOn ? Math.max(0, regularGap - s.dist) : regularGap;
     const transfer = monthly + dueTotal;
@@ -622,7 +622,7 @@ function render() {
 
 // ── The picture ─────────────────────────────────────────────
 // The two buckets of mine and my guaranteed income on the left feed the
-// Spending bucket on the right: a column whose height is what I pay each
+// Expenses on the right: a column whose height is what I pay each
 // month, stacked from what covers it. Guaranteed income is the foundation
 // at the bottom, the fixed distribution sits on it, and the Cash bucket
 // fills whatever is left at the top. Everything above guaranteed income is
@@ -640,7 +640,7 @@ function renderFlow(c) {
     const C = { x: 20, y: 8, w: 340, h: 106 };      // Cash bucket, with its gauge
     const B = { x: 20, y: 134, w: 340, h: 106 };    // Growth bucket, with its gauge
     const A = { x: 20, y: 262, w: 340, h: 70 };     // guaranteed income
-    // the Spending bucket column: income at the bottom, cash at the top
+    // the expenses column: income at the bottom, cash at the top
     const col = { x: 1000, w: 64, y: 86, h: 226 };
     // the draw collector: the Cash bucket and the distribution land here,
     // and together they are the draw, which then goes into the column
@@ -749,8 +749,8 @@ function renderFlow(c) {
         if (guar > 0) out += curve(A.x + A.w, A.y + A.h / 2, endX, midG, 'income', `${fmt(guar)} a month`, 0.4);
     }
 
-    // the Spending bucket
-    out += `<text class="rv-flow-label" x="${col.x}" y="30">Spending bucket</text>`;
+    // the expenses column
+    out += `<text class="rv-flow-label" x="${col.x}" y="30">Expenses</text>`;
     out += `<text class="rv-flow-sub" x="${col.x}" y="46">shared checking · my deposit</text>`;
     out += `<text class="rv-flow-value big" x="${col.x}" y="72">${esc(ok ? fmt(expenses) + ' a month' : '—')}</text>`;
     out += `<rect class="rv-flow-col-bg" x="${col.x}" y="${col.y}" width="${col.w}" height="${col.h}" rx="8"/>`;

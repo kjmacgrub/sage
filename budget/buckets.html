@@ -68,7 +68,7 @@
 
         <!-- ───────────── The picture ───────────── -->
         <main class="rv-flow" id="flow">
-            <svg id="flowSvg" viewBox="0 0 1220 350" preserveAspectRatio="xMidYMid meet" role="img" aria-label="My three buckets and what flows between them each month"></svg>
+            <svg id="flowSvg" viewBox="0 0 1220 350" preserveAspectRatio="xMidYMid meet" role="img" aria-label="My buckets, my expenses, and what flows between them each month"></svg>
         </main>
 
         <footer class="rv-foot">
@@ -113,7 +113,7 @@
             <div class="rv-step-body">
                 <div class="rv-step-title">My share of expenses <span class="rv-step-total" id="spendAllTotal"></span></div>
                 <div class="rv-field">
-                    <label for="rv_deposit">Deposit to the Spending bucket</label>
+                    <label for="rv_deposit">Deposit toward expenses</label>
                     <input type="number" id="rv_deposit" step="100" placeholder="0" oninput="onInput()">
                     <div class="rv-where" id="whereDeposit">Shared checking: Planner household total × my share.</div>
                 </div>
@@ -141,7 +141,7 @@
                 <div class="rv-field">
                     <label for="rv_dist">My monthly distributions</label>
                     <input type="number" id="rv_dist" step="100" placeholder="0" oninput="onInput()">
-                    <div class="rv-where" id="whereDist">The fixed amount the Growth bucket pays into the Spending bucket each month</div>
+                    <div class="rv-where" id="whereDist">The fixed amount the Growth bucket pays into shared checking each month, toward expenses</div>
                 </div>
             </div>
         </section>
@@ -162,7 +162,7 @@
 
     <dialog class="rv-dlg rv-dlg-wide" id="dlgItems">
         <div class="rv-dlg-head"><h3>Annual and irregular expenses</h3><button class="rv-close" onclick="closeDialog('dlgItems')">×</button></div>
-        <p class="rv-dlg-hint">My big irregular costs that the monthly budget does not carry: a long-term care premium, tax estimates, the trip. One twelfth of each is added to what I pay each month, but the twelfths stay in the Cash bucket: in the month a bill is due, the card adds the whole bill to that month's transfer to the Spending bucket. "Starts" is the month of the next payment; "Ends" is the last one, blank if it goes on. An item only counts while it is running. "Saved so far" is what the Cash bucket is holding for the item, and it is left out when the months of cover are counted.</p>
+        <p class="rv-dlg-hint">My big irregular costs that the monthly budget does not carry: a long-term care premium, tax estimates, the trip. One twelfth of each is added to what I pay each month, but the twelfths stay in the Cash bucket: in the month a bill is due, the card adds the whole bill to that month's transfer to shared checking. "Starts" is the month of the next payment; "Ends" is the last one, blank if it goes on. An item only counts while it is running. "Saved so far" is what the Cash bucket is holding for the item, and it is left out when the months of cover are counted.</p>
         <table class="rv-table" id="itemsTable">
             <thead><tr><th>Item</th><th class="num">Per year</th><th>Every</th><th>Starts</th><th>Ends</th><th class="num">Per month</th><th class="num">Saved so far</th><th></th></tr></thead>
             <tbody id="itemsBody"></tbody>
@@ -223,9 +223,9 @@
     <dialog class="rv-dlg rv-dlg-wide" id="dlgExplain">
         <div class="rv-dlg-head"><h3>How my money works in retirement</h3><button class="rv-close" onclick="closeDialog('dlgExplain')">×</button></div>
         <div class="rv-explain">
-            <p><b>Three buckets.</b> The Spending bucket is our shared checking account; it pays the bills. My Cash bucket is a money market account holding two years of what I put in, and it is where the big once-a-year bills wait until they are due. My Growth bucket is everything of mine that is invested, and it is left alone to grow.</p>
-            <p><b>Each of us runs our own side.</b> We each have a Cash bucket, a Growth bucket, our own income, and a page like this one. The one thing we agree on together is how much each of us deposits into the Spending bucket every month: our share of the household budget on the Planner.</p>
-            <p><b>My draw.</b> Whatever my deposit and my own spending come to, beyond my guaranteed income, is my draw: the part my buckets have to supply. The Growth bucket pays a fixed distribution into the Spending bucket each month, set once a year, and the Cash bucket covers the rest.</p>
+            <p><b>Two buckets and the expenses.</b> Our expenses are paid from the shared checking account. My Cash bucket is a money market account holding two years of what I put in, and it is where the big once-a-year bills wait until they are due. My Growth bucket is everything of mine that is invested, and it is left alone to grow.</p>
+            <p><b>Each of us runs our own side.</b> We each have a Cash bucket, a Growth bucket, our own income, and a page like this one. The one thing we agree on together is how much each of us deposits toward expenses every month: our share of the household budget on the Planner.</p>
+            <p><b>My draw.</b> Whatever my deposit and my own spending come to, beyond my guaranteed income, is my draw: the part my buckets have to supply. The Growth bucket pays a fixed distribution into shared checking each month, set once a year, and the Cash bucket covers the rest.</p>
             <p><b>The Cash bucket exists for bad years.</b> If the market falls far enough, I stop the distributions so I am not selling investments while they are cheap, and live from the Cash bucket instead. Two years of cover is long enough for most downturns to pass. When the market recovers, I restart the distributions and refill the Cash bucket from the Growth bucket.</p>
             <p><b>One number tells me when.</b> The draw rate: my draw for a year, as a share of the Growth bucket. The familiar guidance is that about 4% is sustainable. I set a baseline when the plan starts. If the rate climbs more than a fifth above that, the Growth bucket has shrunk or spending has grown too much, and the card says to pause. When it comes back inside the band, the card says to restart.</p>
             <p><b>What the check-in is.</b> Once a month, open the numbers panel, type in the two bucket balances, confirm what I pay and what comes in, and save. Then read the card: it says exactly what to do, including who to call. The log keeps the history.</p>
