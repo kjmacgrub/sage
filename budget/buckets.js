@@ -555,8 +555,8 @@ function compute() {
             row = 0; cls = 'ok'; state_ = 'Normal';
             title = 'Nothing to do this month.';
             body = upper != null
-                ? `The draw rate is ${pct(rate)}, inside the band (under ${pct(upper)}). The Cash bucket holds ${fmt1(cover)} months, at or above the ${s.full}-month target. The distributions keep running.`
-                : `The Cash bucket holds ${fmt1(cover)} months, at or above the ${s.full}-month target. The distributions keep running.`;
+                ? `The draw rate is ${pct(rate)}, inside the band (under ${pct(upper)}). The Cash bucket holds ${fmt1(cover)} months, at or above the ${s.full}-month target. Continue distributions.`
+                : `The Cash bucket holds ${fmt1(cover)} months, at or above the ${s.full}-month target. Continue distributions.`;
             steps = ['Save the month.'];
             if (wellBelow) steps.unshift(`The rate is well under the ${pct(s.baseline)} baseline. Note for the annual review: the distributions could rise.`);
         }
