@@ -191,6 +191,7 @@ async function load() {
     state.settings = Object.assign({}, PERSON_DEFAULTS.settings, state.settings);
     if (!state.settings.month) state.settings.month = thisMonth();
     normalizeItems();
+    normalizeIncome();
     syncPersonTiles();
     await loadPlanner();
     useplanner(false);
@@ -215,6 +216,7 @@ function switchPerson(who) {
     state.settings = Object.assign({}, PERSON_DEFAULTS.settings, state.settings);
     if (!state.settings.month) state.settings.month = thisMonth();
     normalizeItems();
+    normalizeIncome();
     useplanner(false);
     syncPersonTiles();
     fillInputs(); renderIncome(); renderItems(); render(); scheduleSave();
@@ -324,28 +326,48 @@ function setBaseline() {
 }
 
 // income lines
+// Each line has a start and an end month like the annual items; blank means
+// it has always run, or runs on. Only the lines running in the check-in
+// month count.
+function normalizeIncome() {
+    state.income.forEach(r => { if (r.start == null) r.start = ''; if (r.end == null) r.end = ''; });
+}
+function activeIncome(ym) { return state.income.filter(r => itemStatus(r, ym) === 'on'); }
+function incomeTotal(ym) { return activeIncome(ym).reduce((a, r) => a + num(r.amount), 0); }
 function renderIncome() {
-    const box = $('incomeList');
-    box.innerHTML = '';
+    const body = $('incomeBody');
+    body.innerHTML = '';
+    const ym = state.settings.month || thisMonth();
     state.income.forEach((row, i) => {
-        const div = document.createElement('div');
-        div.className = 'rv-income-row';
-        div.innerHTML =
-            `<input type="text" value="${esc(row.name)}" placeholder="Income line" oninput="incomeChange(${i},'name',this.value)">` +
-            `<input type="number" step="10" value="${row.amount || ''}" placeholder="0" oninput="incomeChange(${i},'amount',this.value)">` +
-            `<button class="rv-del" title="Remove" onclick="removeIncome(${i})">×</button>`;
-        box.appendChild(div);
+        const tr = document.createElement('tr');
+        tr.dataset.i = i;
+        tr.innerHTML =
+            `<td><input type="text" value="${esc(row.name)}" placeholder="Source" oninput="incomeChange(${i},'name',this.value)"></td>` +
+            `<td class="num"><input type="number" step="10" value="${row.amount || ''}" placeholder="0" oninput="incomeChange(${i},'amount',this.value)"></td>` +
+            `<td><input type="month" value="${esc(row.start || '')}" onchange="incomeChange(${i},'start',this.value)"></td>` +
+            `<td><input type="month" value="${esc(row.end || '')}" onchange="incomeChange(${i},'end',this.value)"></td>` +
+            `<td class="c-note"></td>` +
+            `<td><button class="rv-del" title="Remove" onclick="removeIncome(${i})">×</button></td>`;
+        body.appendChild(tr);
+        refreshIncomeRow(tr, row, ym);
     });
-    const total = state.income.reduce((a, r) => a + num(r.amount), 0);
-    $('incomeTotalNote').textContent = fmt(total) + ' a month';
+    $('incomeTotalNote').textContent = fmt(incomeTotal(ym)) + ' a month in ' + monthLabel(ym);
+}
+function refreshIncomeRow(tr, row, ym) {
+    const on = itemStatus(row, ym) === 'on';
+    tr.classList.toggle('rv-row-off', !on);
+    tr.querySelector('.c-note').textContent = !row.start && !row.end ? 'always' : itemNote(row, ym);
 }
 function incomeChange(i, key, val) {
-    state.income[i][key] = key === 'amount' ? num(val) : val;
-    const total = state.income.reduce((a, r) => a + num(r.amount), 0);
-    $('incomeTotalNote').textContent = fmt(total) + ' a month';
+    const row = state.income[i];
+    row[key] = key === 'amount' ? num(val) : val;
+    const ym = state.settings.month || thisMonth();
+    const tr = $('incomeBody').querySelector(`tr[data-i="${i}"]`);
+    if (tr) refreshIncomeRow(tr, row, ym);
+    $('incomeTotalNote').textContent = fmt(incomeTotal(ym)) + ' a month in ' + monthLabel(ym);
     render(); scheduleSave();
 }
-function addIncome() { state.income.push({ name: '', amount: 0 }); renderIncome(); scheduleSave(); }
+function addIncome() { state.income.push({ name: '', amount: 0, start: '', end: '' }); renderIncome(); scheduleSave(); }
 function removeIncome(i) { state.income.splice(i, 1); renderIncome(); render(); scheduleSave(); }
 
 // annual items
@@ -455,7 +477,7 @@ function compute() {
     const annual = active.reduce((a, it) => a + num(it.amount), 0);
     const annualPm = annual / 12;
     const expenses = s.deposit + s.own + annualPm;
-    const income = state.income.reduce((a, r) => a + num(r.amount), 0);
+    const income = incomeTotal(ym);
     // my draw: what my buckets have to supply each month
     const gap = Math.max(0, expenses - income);
     // the part of the draw that goes to shared checking every month; the
@@ -478,6 +500,11 @@ function compute() {
     const upper = s.baseline != null ? s.baseline * (1 + s.band / 100) : null;
     const lower = s.baseline != null ? s.baseline * (1 - s.band / 100) : null;
     const above = upper != null && rate > upper;
+    // once paused, the distributions wait for the rate to come all the way
+    // back to the baseline, not just under the pause line, so a choppy market
+    // cannot flip them on and off month after month
+    const backAtBaseline = s.baseline == null || rate <= s.baseline;
+    const stillDown = above || (!s.distOn && !backAtBaseline);
     const wellBelow = lower != null && rate > 0 && rate < lower;
 
     // what the Cash bucket sends to shared checking this month: the regular
@@ -495,12 +522,12 @@ function compute() {
     if (missing.length) {
         title = 'Fill in ' + missing.join(', ').replace(/, ([^,]*)$/, ' and $1') + '.';
         body = 'The card needs those before it can read the rule. Open "Enter this month\'s numbers" at the top right; each step says where the number comes from. The Growth bucket is everything of mine that is invested, so the draw rate reads like the familiar 4% rule.';
-    } else if (!above) {
+    } else if (!stillDown) {
         if (!s.distOn) {
             row = 2; cls = 'restart'; state_ = 'Recovered';
             sell = Math.max(0, target - free);
             title = 'Restart the distributions' + (sell > 0 ? ` and sell ${fmt(sell)} to refill the Cash bucket.` : '.');
-            body = (upper != null ? `The draw rate is ${pct(rate)}, back inside the band (under ${pct(upper)}). ` : '') + `The Growth bucket can carry the monthly amount again, and the Cash bucket${sell > 0 ? ` is at ${fmt1(cover)} months and should go back to ${s.full}` : ' is full'}.`;
+            body = (upper != null ? `The draw rate is ${pct(rate)}, back at the baseline (${pct(s.baseline)}). ` : '') + `The Growth bucket can carry the monthly amount again, and the Cash bucket${sell > 0 ? ` is at ${fmt1(cover)} months and should go back to ${s.full}` : ' is full'}.`;
             steps = [`Call Fidelity or Schwab: restart the monthly distribution of ${fmt(s.dist)} to checking.`];
             if (sell > 0) steps.push(`Same call: sell ${fmt(sell)} from the Growth bucket and move it to the Cash bucket.`);
             steps.push('Flip the distributions switch on the card to on, then save the month.');
@@ -533,7 +560,7 @@ function compute() {
             if (cover >= s.floor) {
                 row = 3; cls = 'pause'; state_ = 'Market down';
                 title = 'Pause the distributions.';
-                body = `The draw rate is ${pct(rate)}, above the band (${pct(upper)}). The Growth bucket has fallen enough that each monthly distribution is selling too cheaply. The Cash bucket holds ${fmt1(cover)} months and pays everything from here until the rate is back in the band.`;
+                body = `The draw rate is ${pct(rate)}, above the band (${pct(upper)}). The Growth bucket has fallen enough that each monthly distribution is selling too cheaply. The Cash bucket holds ${fmt1(cover)} months and pays everything from here until the rate is back down to the baseline (${pct(s.baseline)}).`;
                 steps = [`Call Fidelity or Schwab: pause the monthly distribution of ${fmt(s.dist)} until further notice.`,
                          `Move ${fmt(monthly)} a month from the Cash bucket from now on; this page shows the figure each month.`,
                          'Flip the distributions switch on the card to paused, then save the month.'];
@@ -548,12 +575,12 @@ function compute() {
             if (cover >= s.floor) {
                 row = 4; cls = 'hold'; state_ = 'Market down, holding';
                 title = 'Hold. Keep paying from the Cash bucket.';
-                body = `The draw rate is ${pct(rate)}, still above the band (${pct(upper)}). The distributions stay paused and the Cash bucket carries the month. It holds ${fmt1(cover)} months, about ${fmt1(Math.max(0, cover - s.floor))} above the floor. Nothing is sold.`;
+                body = `The draw rate is ${pct(rate)}, ${above ? `still above the band (${pct(upper)})` : `inside the band but not yet back to the baseline (${pct(s.baseline)})`}. The distributions stay paused and the Cash bucket carries the month. It holds ${fmt1(cover)} months, about ${fmt1(Math.max(0, cover - s.floor))} above the floor. Nothing is sold.`;
                 steps = [`Move ${fmt(monthly)} from the Cash bucket to cover the month.`, 'Trim discretionary spending where it is easy.', 'Save the month.'];
             } else {
                 row = 5; cls = 'forced'; state_ = 'Cash bucket low';
                 title = 'Restart the distributions anyway.';
-                body = `The Cash bucket is down to ${fmt1(cover)} months, under the ${s.floor}-month floor, and the market has not recovered. The distributions come back on so the Cash bucket stops draining. No top-up until the rate is back in the band.`;
+                body = `The Cash bucket is down to ${fmt1(cover)} months, under the ${s.floor}-month floor, and the market has not recovered. The distributions come back on so the Cash bucket stops draining. No top-up until the rate is back at the baseline.`;
                 steps = [`Call Fidelity or Schwab: restart the monthly distribution of ${fmt(s.dist)} to checking.`,
                          'Flip the distributions switch on the card to on, then save the month.'];
             }
@@ -708,9 +735,12 @@ function renderFlow(c) {
             out += `<rect class="rv-flow-band" x="${bx}" y="${uy}" width="${bw}" height="${ly - uy}"/>` +
                    `<line class="rv-flow-tick faint" x1="${bx}" y1="${my}" x2="${bx + bw}" y2="${my}"/>` +
                    `<line class="rv-flow-tick limit" x1="${bx - 4}" y1="${uy}" x2="${bx + bw + 4}" y2="${uy}"/>` +
-                   `<text class="rv-flow-tick-label limit" x="${bx + bw + 8}" y="${uy + 4}">pause ${pct(c.upper)}</text>` +
-                   `<line class="rv-flow-tick soft" x1="${bx - 4}" y1="${ly}" x2="${bx + bw + 4}" y2="${ly}"/>` +
-                   `<text class="rv-flow-tick-label" x="${bx + bw + 8}" y="${ly + 4}">review ${pct(c.lower)}</text>`;
+                   (s.distOn ? `<text class="rv-flow-tick-label limit" x="${bx + bw + 8}" y="${uy + 4}">pause ${pct(c.upper)}</text>` : '') +
+                   (s.distOn
+                       ? `<line class="rv-flow-tick soft" x1="${bx - 4}" y1="${ly}" x2="${bx + bw + 4}" y2="${ly}"/>` +
+                         `<text class="rv-flow-tick-label" x="${bx + bw + 8}" y="${ly + 4}">review ${pct(c.lower)}</text>`
+                       : `<line class="rv-flow-tick" x1="${bx - 4}" y1="${my}" x2="${bx + bw + 4}" y2="${my}"/>` +
+                         `<text class="rv-flow-tick-label" x="${bx + bw + 8}" y="${my + 4}">restart ${pct(s.baseline)}</text>`);
         }
         if (c.rate > 0) {
             // this month's rate is a marker across the track, not a fill: a rate
@@ -721,7 +751,7 @@ function renderFlow(c) {
         }
     }
     // guaranteed income
-    const incomeNames = state.income.filter(r => num(r.amount) > 0).map(r => r.name).filter(Boolean);
+    const incomeNames = activeIncome(state.settings.month || thisMonth()).filter(r => num(r.amount) > 0).map(r => r.name).filter(Boolean);
     out += tile(A, 'income', 'Guaranteed income', c.income > 0 ? fmt(c.income) + ' a month' : 'none yet',
                 incomeNames.length ? incomeNames.slice(0, 3).join(', ') : 'pension, wages, Social Security');
 

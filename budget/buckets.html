@@ -170,10 +170,13 @@
         <div class="rv-dlg-foot"><button class="rv-add" onclick="addItem()">+ item</button><span id="annualTotal"></span></div>
     </dialog>
 
-    <dialog class="rv-dlg" id="dlgIncome">
+    <dialog class="rv-dlg rv-dlg-wide" id="dlgIncome">
         <div class="rv-dlg-head"><h3>Guaranteed income</h3><button class="rv-close" onclick="closeDialog('dlgIncome')">×</button></div>
-        <p class="rv-dlg-hint">Money that arrives to me every month from outside my buckets: wages while they last, a pension or annuity, Social Security when it starts. Distributions from the Growth bucket do not belong here; they are part of my draw.</p>
-        <div id="incomeList"></div>
+        <p class="rv-dlg-hint">Money that arrives to me every month from outside my buckets: wages while they last, a pension or annuity, Social Security when it starts. "Starts" is the first month it arrives and "Ends" the last; leave either blank if it has always run or runs on. A line only counts in the months it is running, so the picture is right for any month I pick. Distributions from the Growth bucket do not belong here; they are part of my draw.</p>
+        <table class="rv-table" id="incomeTable">
+            <thead><tr><th>Source</th><th class="num">Per month</th><th>Starts</th><th>Ends</th><th></th><th></th></tr></thead>
+            <tbody id="incomeBody"></tbody>
+        </table>
         <div class="rv-dlg-foot"><button class="rv-add" onclick="addIncome()">+ income line</button><span id="incomeTotalNote"></span></div>
     </dialog>
 
@@ -196,14 +199,14 @@
             <tbody>
                 <tr data-row="0"><td>inside the band</td><td>on</td><td><span class="r-full">24</span> months or more</td><td>Nothing.</td></tr>
                 <tr data-row="1"><td>inside the band</td><td>on</td><td>under <span class="r-full">24</span></td><td>One-off sale from the Growth bucket to top the Cash bucket back up to <span class="r-full">24</span> months.</td></tr>
-                <tr data-row="2"><td>inside the band</td><td>paused</td><td>any</td><td>Restart the distributions, and top the Cash bucket up to <span class="r-full">24</span> months.</td></tr>
-                <tr data-row="3"><td>above the band</td><td>on</td><td><span class="r-floor">12</span> or more</td><td>Pause the distributions. The Cash bucket pays everything until the rate is back inside the band.</td></tr>
-                <tr data-row="4"><td>above the band</td><td>paused</td><td><span class="r-floor">12</span> or more</td><td>Hold. Keep paying from the Cash bucket.</td></tr>
-                <tr data-row="5"><td>above the band</td><td>paused</td><td>under <span class="r-floor">12</span></td><td>Restart the distributions anyway. No top-up until the rate is back in the band.</td></tr>
+                <tr data-row="2"><td>back at the baseline</td><td>paused</td><td>any</td><td>Restart the distributions, and top the Cash bucket up to <span class="r-full">24</span> months.</td></tr>
+                <tr data-row="3"><td>above the band</td><td>on</td><td><span class="r-floor">12</span> or more</td><td>Pause the distributions. The Cash bucket pays everything until the rate is back down to the baseline.</td></tr>
+                <tr data-row="4"><td>above the baseline</td><td>paused</td><td><span class="r-floor">12</span> or more</td><td>Hold. Keep paying from the Cash bucket.</td></tr>
+                <tr data-row="5"><td>above the baseline</td><td>paused</td><td>under <span class="r-floor">12</span></td><td>Restart the distributions anyway. No top-up until the rate is back at the baseline.</td></tr>
                 <tr data-row="6"><td>any</td><td>on</td><td>under <span class="r-floor">12</span></td><td>One-off sale to bring the Cash bucket to <span class="r-refill">18</span> months, whatever the market is doing.</td></tr>
             </tbody>
         </table>
-        <p class="rv-dlg-hint">The draw rate is my yearly draw divided by the Growth bucket, the same measure as the familiar 4% rule. The band is the rate on the day we set it, plus <span class="r-band">20</span>%. When the rate drops well under the baseline, that is a sign at the annual review that the distributions could rise.</p>
+        <p class="rv-dlg-hint">The draw rate is my yearly draw divided by the Growth bucket, the same measure as the familiar 4% rule. The band is the rate on the day we set it, plus <span class="r-band">20</span>%. Once paused, the distributions wait until the rate is all the way back at the baseline, not just under the pause line, so a choppy market cannot flip them on and off. When the rate drops well under the baseline, that is a sign at the annual review that the distributions could rise.</p>
     </dialog>
 
     <dialog class="rv-dlg" id="dlgSettings">
@@ -227,7 +230,7 @@
             <p><b>Each of us runs our own side.</b> We each have a Cash bucket, a Growth bucket, our own income, and a page like this one. The one thing we agree on together is how much each of us deposits toward expenses every month: our share of the household budget on the Planner.</p>
             <p><b>My draw.</b> Whatever my deposit and my own spending come to, beyond my guaranteed income, is my draw: the part my buckets have to supply. The Growth bucket pays a fixed distribution into shared checking each month, set once a year, and the Cash bucket covers the rest.</p>
             <p><b>The Cash bucket exists for bad years.</b> If the market falls far enough, I stop the distributions so I am not selling investments while they are cheap, and live from the Cash bucket instead. Two years of cover is long enough for most downturns to pass. When the market recovers, I restart the distributions and refill the Cash bucket from the Growth bucket.</p>
-            <p><b>One number tells me when.</b> The draw rate: my draw for a year, as a share of the Growth bucket. The familiar guidance is that about 4% is sustainable. I set a baseline when the plan starts. If the rate climbs more than a fifth above that, the Growth bucket has shrunk or spending has grown too much, and the card says to pause. When it comes back inside the band, the card says to restart.</p>
+            <p><b>One number tells me when.</b> The draw rate: my draw for a year, as a share of the Growth bucket. The familiar guidance is that about 4% is sustainable. I set a baseline when the plan starts. If the rate climbs more than a fifth above that, the Growth bucket has shrunk or spending has grown too much, and the card says to pause. When it comes all the way back to the baseline, the card says to restart.</p>
             <p><b>What the check-in is.</b> Once a month, open the numbers panel, type in the two bucket balances, confirm what I pay and what comes in, and save. Then read the card: it says exactly what to do, including who to call. The log keeps the history.</p>
             <p><b>If I am not here.</b> The steps do not change. The only phone calls this page ever asks for are to the broker: pause the monthly distributions, restart them, or sell a stated amount from the Growth bucket into the Cash bucket. Anything bigger is an annual-review question, not a monthly one.</p>
         </div>
