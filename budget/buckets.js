@@ -303,9 +303,13 @@ function readInputs() {
     s.floor = Math.max(0, num($('rv_floor').value) || 0);
     s.band = Math.max(0, num($('rv_band').value) || 0);
     const b = $('rv_baseline').value;
+    const prevBaseline = s.baseline;
     s.baseline = b === '' ? null : num(b);
+    // remember the draw the baseline was set against, so the card can say
+    // when the draw has moved far enough that the baseline is stale
     const prevMonth = s.month;
     s.month = $('rvMonth').value || thisMonth();
+    if (s.baseline !== prevBaseline) s.baselineGap = s.baseline == null ? null : compute().gap;
     if (s.month !== prevMonth) renderItems();
 }
 
@@ -321,6 +325,7 @@ function setBaseline() {
     const c = compute();
     if (!(c.rate > 0)) { showToast('Enter the Growth bucket balance and a draw first'); return; }
     state.settings.baseline = Math.round(c.rate * 100) / 100;
+    state.settings.baselineGap = c.gap;
     fillInputs(); render(); scheduleSave();
     showToast('Baseline set to ' + pct(state.settings.baseline));
 }
@@ -588,6 +593,16 @@ function compute() {
     }
 
     const saved = !!state.log.find(r => r.month === ym);
+    // notes that go in front of the save step
+    const notes = [];
+    if (sell > 0) notes.push(`The ${fmt(sell)} is a pre-tax figure. Sold from an IRA it is taxable income this year; check the Tax tab.`);
+    if (!missing.length && s.baseline != null && s.baselineGap > 0 && Math.abs(gap - s.baselineGap) / s.baselineGap > 0.1) {
+        notes.push(`The draw is ${fmt(gap)} a month against ${fmt(s.baselineGap)} when the baseline was set, so the band is reading a spending change as well as the market. Re-set the baseline in settings at the review.`);
+    }
+    if (notes.length) {
+        const at = steps.indexOf('Save the month.');
+        steps.splice(at < 0 ? steps.length : at, 0, ...notes);
+    }
     if (saved) steps = steps.filter(t => t !== 'Save the month.');
     if (!missing.length && dueTotal > 0) {
         steps.unshift(`Move ${fmt(dueTotal)} from the Cash bucket to checking for the ${due.map(d => d.name).join(' and ')} due this month. The Cash bucket has been holding it.`);
