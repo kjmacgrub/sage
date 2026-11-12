@@ -13,6 +13,42 @@ class Upload(BaseModel):
     filename: str = ""
 
 
+class FidelityPeriod(BaseModel):
+    start: str
+    end: str
+    pct: float
+    note: str | None = None
+
+
+@router.get("/checklist")
+def checklist():
+    """The review checklist, parsed fresh from docs/review-checklist.md."""
+    from ...services import checklist as ck
+    return ck.load()
+
+
+@router.get("/fidelity")
+def fidelity():
+    with get_db() as conn:
+        return {"periods": compare.fidelity_periods(conn)}
+
+
+@router.post("/fidelity")
+def add_fidelity(p: FidelityPeriod):
+    try:
+        with get_db() as conn:
+            compare.add_fidelity_period(conn, p.start, p.end, p.pct, p.note)
+            return {"periods": compare.fidelity_periods(conn)}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.delete("/fidelity/{period_id}")
+def delete_fidelity(period_id: int):
+    with get_db() as conn:
+        return {"deleted": compare.delete_fidelity_period(conn, period_id)}
+
+
 @router.post("/upload")
 def upload(payload: Upload):
     try:

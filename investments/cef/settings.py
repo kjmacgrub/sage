@@ -52,6 +52,12 @@ DEFAULTS = {
         "your_return": 15,
     },
 
+    # --- Options sleeve compare tab ----------------------------------------
+    # Denominator for the sleeve's percent return when it is set against the
+    # managed Fidelity account's reported return. Schwab's export carries no
+    # balance, so the funding is a setting.
+    "compare.sleeve_funding": 80000,
+
     # --- Display ------------------------------------------------------------
     "display.group_by_type": True,
     "display.disc_alert_threshold": 3.0,   # pp wider than avg triggers alert

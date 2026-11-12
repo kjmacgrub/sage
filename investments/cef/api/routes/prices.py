@@ -14,6 +14,15 @@ class RefreshOne(BaseModel):
     ticker: str
 
 
+# Written only by the full refresh (fund page scrape), never by the quick one.
+_SLOW_FIELDS = (
+    "yield_pct", "distribution", "dist_freq", "avg_discount_1y", "nav_cagr",
+    "has_special_dist", "regular_yield_pct", "last_special_date", "last_special_amount",
+    "earned_yield_1y", "dist_yield_1y", "earned_yield_life", "dist_yield_life",
+    "yield_life_years",
+)
+
+
 @router.get("/latest")
 def latest_prices():
     """Return the most recent price row for each active fund."""
@@ -28,9 +37,23 @@ def latest_prices():
               AND p.date = (SELECT MAX(p2.date) FROM prices p2 WHERE p2.ticker = p.ticker)
             ORDER BY p.premium_discount ASC
         """).fetchall()
+        # The quick refresh writes price-only rows, so the newest row usually
+        # has no distribution data. Carry those fields forward from the last
+        # full refresh rather than reporting them as missing.
+        full = {r["ticker"]: r for r in conn.execute("""
+            SELECT p.* FROM prices p
+            WHERE p.date = (SELECT MAX(p2.date) FROM prices p2
+                            WHERE p2.ticker = p.ticker
+                              AND (p2.distribution IS NOT NULL OR p2.yield_pct IS NOT NULL))
+        """).fetchall()}
         out = []
         for r in rows:
             d = dict(r)
+            src = full.get(d["ticker"])
+            if src is not None and d.get("distribution") is None and d.get("yield_pct") is None:
+                for k in _SLOW_FIELDS:
+                    d[k] = src[k]
+                d["dist_as_of"] = src["date"]
             d["exposure"] = resolve_exposure(
                 d.pop("exposure_set", None), d.pop("category", None), d.get("type"))
             out.append(d)

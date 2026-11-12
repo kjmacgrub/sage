@@ -67,13 +67,47 @@
   Tables `oo_trades`, `oo_equity`, `schwab_options`, `compare_uploads` in `cef.db`.
   Schwab is cash-basis: a 0DTE day reconciles to the day, a multi-day position
   only over its whole life, and the leap only on its close.
+  **Schwab replace range is by the file's STAMPED dates, not the re-dated ones
+  (2026-10-31).** Schwab stamps an expiration the next day "as of" the expiry
+  and the parser files it under the expiry. A file downloaded 10/30 therefore
+  carried rows dated 10/22 while holding none of 10/22's trades; replacing by
+  row date wiped 10/22's cash rows and left only zero-cash Expired rows, so
+  Schwab cash went flat while live moved. Symptom to recognise: a day whose
+  Schwab rows are all `Expired`. Re-dated rows now swap for their twin by
+  (date, symbol, action) instead of widening the delete range.
+  **Sleeve vs Fidelity managed (2026-10-31):** not an upload. Ken types the
+  joint managed account's **rate of return for a period as Fidelity's
+  Performance page reports it** (table `fidelity_periods`, one row per
+  start/end); the sleeve's live P/L over the same dates ÷
+  `compare.sleeve_funding` ($80k) is computed at read time. Fidelity's figure
+  already nets deposits, withdrawals, dividends and the advisory fee. Its 1M
+  window is close-to-close (`Sep-30 → Oct-29` means Oct 1–29), so the row's
+  start is the day after Fidelity's From date. **Do not rebuild this from
+  files**: the activity export cannot give a return (a managed book is never
+  flat, so buys and sells carry no P/L, and its cash-balance column is core
+  cash only) and a value-snapshot export needs flows stripped out and a weekly
+  discipline — both were built and removed the same morning. The table flags
+  a period the live rows only partly cover.
 - `post_oo_week.py` — converts an Option Omega MCP run (get_trade_log +
   get_equity_curve JSON) into OO's CSV shapes and POSTs both to the tab. This is
   the "run the week" path: run the `2027` portfolio for the week sized to the
   contracts live actually traded, save the two responses, run this.
-- `docs/review-checklist.md` — options sleeve: the quarterly and annual review as
-  numbered steps, per strategy. QQQ Leap written (the cap formula, the two vetoes);
-  condor and hedge are stubs carrying their tripwires.
+- `docs/review-checklist.md` — options sleeve: the **weekly / monthly / annual**
+  review as numbered steps (rewritten 2026-11-11; no quarterly). Opens with the
+  account shape (bearable loss → contracts → cash → SGOV → index). Ken finds
+  the word "tripwire" confusing: the sheet says **"warning level"** and defines
+  it; use that, in plain words, when talking to him. `docs/checklist_pdf.py`
+  renders it to a PDF in ~/Downloads; the sheet must fit page 1.
+  **The same file feeds Options › Checklist** (2026-11-12):
+  `cef/services/checklist.py` parses it on every request
+  (`GET /api/compare/checklist`). An `## ` section whose title starts Weekly /
+  Monthly / Annual becomes a tick-box step list (its numbered items are the
+  steps); every other section is a reference card beside it; each `[^note]`
+  becomes a "why" button. Ticks are per browser in `localStorage`
+  (`sage-ck-<kind>-<week|month|year>`), so a new period starts blank. Edit
+  the markdown only; never copy its text into `app.js`. The monthly *bucket*
+  check-in stays on the Buckets page; there is no annual portfolio checklist
+  yet (Ken, 2026-11-12: hold off).
 - `mae_check.py` — audits an Option Omega trade-log export for stop-outs the backtest
   skipped. Run on any new strategy before trusting its P/L.
 - `leap_replay.py` — QQQ Leap replayed on QQQ daily closes from 2000 with Black-Scholes
@@ -213,6 +247,10 @@ is why the concentration stayed invisible with a category column on screen.
   distributions — realized trading is slightly negative. See `docs/decisions.md`.
 - Three-sleeve plan (income / options / managed index) is in `docs/decisions.md`;
   judge this sleeve on income, not capital gains.
+- **The CEF income sleeve is RETIRED as a strategy (2026-11-10).** Positions are
+  still held; what replaces them and when they are sold is open. Do not propose
+  new CEF purchases or tune the selection rule. Trading cash and the Treasury
+  parking lot (2026-10-24) are unchanged. See the 2026-11-10 decisions entry.
 
 ### Options sleeve (backtested in Option Omega, not tracked in `cef.db`)
 
@@ -222,10 +260,17 @@ Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 > **THE BOOK (2026-10-08; sizing 2026-10-24).** CIC-10am · Long Put Hedge ·
 > QQQ Leap, funded at **$80k**: **condor 1 contract** (`maxContractsPerTrade`
 > 1, decided 2026-10-24, live from 2026-10-26; was 2 for the week of
-> 2026-10-19) · hedge **$40k** per contract (2 at $80k, 3 at $120k) · leap
+> 2026-10-19) · hedge **$40k** per contract (2 at $80k, 3 at $120k) — **uncapped
+> and automatic with the account, never a review decision (Ken 2026-11-11); to
+> size today's $80k account, backtest it fixed at 2** · leap
 > **$42k** (1 per trade, **2 open trades**) — i.e. **1 / 2 / 1-per-entry
-> contracts at $80k**, up to two leaps outstanding. **The condor goes to 2 only
-> after a positive live calendar quarter, at a quarterly review.** The figures
+> contracts at $80k**, up to two leaps outstanding. **Leap held at ONE open
+> from 2026-11-11** (Ken's choice, under the cap division, because two open
+> leaps plus a condor drawdown measured ~$24k against the $18k tolerance; back
+> to 2 is a raise, annual review only). **The condor goes to 2 only
+> after a positive live calendar quarter, at a quarterly review** (from
+> 2026-11-11 the reviews are weekly / monthly / annual: read that as the last
+> three full calendar months, checked at the monthly review). The figures
 > below were measured at **one contract each** (2017 → 2026-10-07) — double the
 > hedge column to read it at today's size. Three windows because they are three
 > different books:
@@ -242,7 +287,7 @@ Full writeup in `docs/backtest-autopsy.html`; decisions and evidence in
 > live year.** QQQ Leap's cap is `floor(22% of sleeve equity ÷ price of one
 > contract)` — cap 2 at $80k, 3 past ~$113k, expressed in OO as
 > `maxOpenTrades` 2 × 1 contract per trade (was 3 until 2026-10-23); recomputed
-> quarterly, raised only at the annual review (2026-10-22,
+> monthly (was quarterly), raised only at the annual review (2026-10-22,
 > `docs/review-checklist.md`).
 > Per-trade benchmarks for the live record: condor $70, hedge $97, QQQ ~$2,900.
 > **Reading the live log:** the hedge and the condor have both been exited

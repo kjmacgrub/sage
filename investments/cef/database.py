@@ -317,6 +317,20 @@ def init_db():
                 amount     REAL
             );
             CREATE INDEX IF NOT EXISTS idx_schwab_options_date ON schwab_options(date);
+            -- The managed Fidelity account's return for a period, as Fidelity
+            -- reports it (Performance page, custom range). Typed in, one row
+            -- per period; the sleeve's return over the same dates is computed
+            -- from oo_trades at read time. Fidelity's figure already nets
+            -- flows and dividends, which is why no file is parsed for this.
+            CREATE TABLE IF NOT EXISTS fidelity_periods (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                start      TEXT NOT NULL,
+                end        TEXT NOT NULL,
+                pct        REAL NOT NULL,     -- Fidelity's rate of return, percent
+                note       TEXT,
+                entered_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(start, end)
+            );
 
             CREATE TABLE IF NOT EXISTS bdc_fundamentals (
                 id                 INTEGER PRIMARY KEY AUTOINCREMENT,

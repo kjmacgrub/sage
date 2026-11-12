@@ -9,6 +9,266 @@ live in `../CLAUDE.md`. This file is only for judgment calls.
 
 ---
 
+## 2026-11-11 — DECIDED: the leap is held at one open for now
+
+Ken's answer to the open choice in the entry below (bigger buffer, leap cap of
+1, or a higher tolerance): **leap cap 1 at $80k, "for now"**. The 22% tolerance
+and the $18k buffer stand. With one leap open the 2026 window reads roughly
+$16k at one condor, inside $18k; that figure is an estimate from halving the
+leap marks, not a run.
+
+- The cap division (22% × equity ÷ contract price) still says 2 at $80k. Cap 1
+  is a choice to run under it, because the division budgets the leap's loss
+  alone and the measured window had a leap drawdown and a condor drawdown
+  together.
+- Going back to 2 is a raise: annual review only, both vetoes apply.
+- `maxOpenTrades` set to 1 on live and on the saved `QQQ Leap''` backtest by
+  Ken the same day (saved backtest read back: 1). One leap is open (Dec 2027
+  720 C, 2026-10-16).
+
+**Same day: `review-checklist.md` rewritten, and the reviews are weekly /
+monthly / annual.** Ken: "Quarterly is a little abstract for personal finances
+and monthly is quite concrete." Consequences:
+
+- The condor's "positive live calendar quarter" test and its $35-a-trade level
+  are read over the **last three full calendar months** at each monthly review.
+  Same amount of evidence, rolling. One month (~21 trades) does not qualify.
+- The leap division and the collateral check move from quarterly to monthly.
+  Lowering can happen at any monthly; raises stay annual.
+- The sheet now opens with the account shape (bearable loss → contracts → cash
+  → SGOV → index) and Ken asked for "tripwire" to be dropped: the sheet says
+  "warning level" and defines it.
+- New on the sheet and proposed by Claude, not separately decided: cash refill
+  line **$21k** (collateral $18k + half the $6k slack; replaces the $40k line);
+  "do not sell the index fund to keep trading" (the old never-sell-CEFs rule
+  carried over); condor to 2 needs an account of ~$101k with one leap open
+  (an estimate: $14.2k realized + one leap ~$8k ≈ $22k; the measured $30.5k
+  and ~$139k are with two leaps open).
+
+**Measured the same day, leap at one open** (saved `QQQ Leap''` now carries
+`maxOpenTrades` 1, so the portfolio run can see it). Same setup as the 11-10
+runs: $80k, 2022-05-16 → 2026-11-10, margin ignored, hedge 2.
+
+| | 1 condor (live sizing) | 2 condors |
+|---|---|---|
+| Closed P/L | $166,896 | $230,840 |
+| **Worst dollar drop** | **$16.3k** (256,938 on 06-22 → 240,675 on 11-02) | **$23.7k** (327,308 on 06-23 → 303,635 on 11-02) |
+| Below peak on 2026-11-10 | $14.8k | $21.2k |
+| OO max drawdown % | −6.8% (2022) | −9.74% (2022) |
+
+- One condor with one leap fits the $18k bearable loss, with $1.7k to spare.
+  The $16k estimate held.
+- Two condors with one leap needs an account of about **$108k** ($23.7k ÷
+  0.22), not the $101k estimated. Checklist corrected.
+- Only the 2026 window was read day by day. Earlier years are bounded from
+  OO's per-year drawdown percentages and are smaller in dollars (2 condors:
+  2024 under ~$15k, 2025 under ~$16k).
+- Runs unsaved: `3eyp5PyarRm5UNZftt0s` (1 condor), `bZPBOy1V0JxIKHHJH9ab` (2).
+
+**The hedge is uncapped (Ken, same day):** "the hedge trades one contract for
+every 40k capital. I didn't want to cap it." So the hedge is not a review
+decision; it rises with the account by itself. The saved `Long Put Hedge`
+carries `capitalPerContract` 40000 and no contract cap. Ken's own OO portfolio
+run with that rule live (1 condor, 1 leap open, hedge growing 2 → ~8 as the
+account went $80k → $337k): P/L $256,839, hedge $173,862 of it, worst drop
+**$28,448** (2026-06-22 → 10-13), 8.1% of that account. The fixed-2 runs above
+answer "what can $80k lose today"; Ken's answers "what does the rule do as the
+account grows". Difference ≈ $12k over ~6 extra hedge contracts, about $2k of
+worst drop per contract against $8.8k of bearable loss per $40k. Rough: the
+troughs fall on different dates and the count varied through the window. The
+hedge's own worst realized losing run in Ken's test was $20,881 at up to ~8
+contracts. Checklist corrected (it had the hedge as an annual-review raise).
+
+---
+
+## 2026-11-10 — Measured: the drawdown buffer at current settings is ~$24k at one condor, ~$30k at two; $18k no longer covers either
+
+Re-run of the 2026-10-24 fixed-sizing portfolio test to size the buffer for the
+"start from bearable loss" account shape (entry below). Two Option Omega
+portfolio runs, **$80k, 2022-05-16 → 2026-11-09, `ignoreMarginRequirements` on**,
+hedge 2, leap 1 per entry (2 open), condor at 2 and at 1. Saved `IC` now carries
+the recorded settings (intra-minute stops ON on both shorts, wide-bid-ask filter
+OFF) — checked before running. Dollar drawdowns from the daily equity curve.
+
+| | 2 condors | 1 condor (live sizing) |
+|---|---|---|
+| Closed P/L, 4.5 years | $256,360 | $191,791 |
+| April 2025 tariff week, peak → trough | $14.9k | $12.2k |
+| **2026: June peak → 2026-11-05 trough** | **$30.5k** (354,095 → 323,615) | **$24.0k** (283,840 → 259,852) |
+| ...of which open-leap marks | $16.2k | $16.0k |
+| ...of which realized (condor + hedge) | $14.2k | $8.0k |
+| Still below peak on 2026-11-09 | $26.5k | $20.8k |
+
+**Why it differs from 2026-10-24** ($17.2k worst, April 2025; 2026 read $14.8k).
+That run had no open leaps in 2026 — OO's long-dated QQQ chain was blank after
+2026-02-12. It now fills: both leaps closed at target on 2026-05-06, two more
+opened in June near the QQQ high (740.62 on 06-18), and QQQ closed 647.05 on
+11-05, −12.6%. Two leaps swung $16k on that move, about one contract price per
+slot, which is what the 22% cap rule budgets for. The $18k figure never
+contained a full leap drawdown and a condor drawdown at the same time; this
+window does. The corrected condor settings account for the rest.
+
+**What it means.**
+
+- $18k is not the buffer for the book as sized. One condor needs ~$24k (30% of
+  $80k); two need ~$30k (38%). Against the 22% tolerance the current book is
+  over, and the backtest tripped the $18k tripwire in 2026.
+- The leap is two-thirds of it. With one leap open instead of two the same
+  window is roughly $16k at one condor — an estimate from halving the leap
+  marks, not a run (`run_portfolio` cannot override `maxOpenTrades`).
+- The leap's open trades in OO for mid-2026 are new and should be checked
+  against what live actually holds before anything is resized.
+
+Not decided: whether the answer is a bigger buffer, a leap cap of 1 at $80k, or
+a higher stated tolerance. Runs are unsaved: `gDfn7DnX3Y6VxrmHD3Bb` (2 condors),
+`mrl0EVqD9Bos92v0qrtr` (1 condor).
+
+---
+
+## 2026-11-10 — DECIDED: the CEF income sleeve is retired as a strategy; what replaces it is open
+
+Ken, after working through where non-collateral Roth money should sit: "the CEF
+notion is part of my own financial education and needs to be retired."
+
+**What the sleeve was supposed to do, and why each job fails.**
+
+- *Steady the Roth.* It does not: 0.85 correlated to SPY, 51% drawdown in March
+  2020 (2026-10-08), discounts widening in the same weeks the option sleeve
+  draws down. The 2026-10-24 entry had already stopped it being a cash source
+  for that reason.
+- *Pay income through a downturn.* The MLP funds cut 60-80% in 2020; eight of
+  the holdings have cut within the last year (2026-10-25 inventory).
+- *Supply investable cash for more contracts.* In a Roth a sale is tax-free, so
+  $3,700 of distributions is worth exactly what $3,700 of shares sold is worth.
+  Yield as a form of return buys nothing here. And cash is not what gates the
+  contract count; live evidence at a review is.
+- *Steady household cash flow.* That job now belongs to the Buckets structure
+  (`sage/budget/buckets.html`), which did not exist when the sleeve was framed.
+
+Same lesson as the dividend-growth sleeve (2026-09-19): selecting on how a
+return is paid is not selecting on return. Lifetime CEF/BDC result is +$12.5k
+since Jun 2021 on ~$38k, all of it distributions.
+
+**What stands.** Trading cash and the Treasury parking lot (2026-10-24) are
+unchanged; they are the steadying part of the Roth. Ratcheting contracts to
+absorb idle cash was considered and rejected the same day: it sizes to the
+balance, not to evidence, and spends the drawdown buffer.
+
+**Open, not decided.**
+
+1. What the ~$41k goes into. Proposed by Claude, not yet accepted: a broad
+   index fund, on the grounds that the Roth is the best account for the
+   highest-growth asset. It is as correlated to the leap and the Fidelity book
+   as the CEFs were; it is a growth choice, not a steadying one.
+2. When the positions are sold. No tax cost in the Roth, so timing is only
+   about discounts. Nothing has been sold.
+3. ~~The planning models need re-running.~~ Checked the same day: they do not.
+   `kenalone_model.py` carries the whole Roth as one pot at 12% (`sleeve_r`),
+   with no separate CEF line. Swapping $32k of CEFs at 9% for SGOV plus an
+   index fund moves the Roth's expected return by about $400 a year, against
+   an options sleeve planned at $3k–38k a year on the same account.
+
+Superseded by this entry: the 2026-10-25 selection rule (moot once the
+positions are gone) and item 3 of the 2026-10-24 three-part Roth. The Income
+tabs, audit and screener stay as tools while positions are held.
+
+---
+
+## 2026-11-06 — DECIDED: the taxable pot moves to Schwab; Ken's conversions slow to $50K then $20K a year for ten years, the rest stays in the IRA
+
+Two changes to the Ken Alone plan, both Ken's call on 2026-11-06.
+
+1. **Custodian.** Ken's taxable pot (half of the condo proceeds, the joint
+   managed account and the joint cash) goes to a Schwab 70/30 account rather
+   than a Fidelity managed 70/30. The model keeps the same return assumption
+   (7.4% gross, 6.3% net); only the label changes.
+2. **Conversion pace.** $50K from the lump-sum IRA to the Roth sleeve in 2027,
+   then $20K a year 2028 to 2037, $250K in all. The $20K years sit inside
+   Ken's NY pension exclusion, so the tax is $13,850 then $4,400 a year,
+   $57,850 in all. The remaining ~$150K stays a traditional IRA for life
+   (RMDs from 2037, $7K rising to $9.5K a year). This replaces the
+   $50K-a-year-until-empty schedule of 2026-10-21 ($345K, $95,400 of tax).
+   A $50K-then-$25K-for-five-years version was modelled the same morning and
+   superseded within the hour. Ken: "less urgency about draining the entire
+   IRA."
+
+Same day: the sale is $1.46M and Ken assumes $1.3M clears, so each side's
+taxable pot starts at $792K rather than $816K (the doc and models now use
+$792K; the older figures below the line were on $816K).
+
+What it costs, on the model's 12% sleeve assumption and the $792K pot: Ken's
+2047 total $3.69M instead of $4.29M (Roth $2.7M instead of $3.7M, pot $812K
+instead of $587K, IRA $150K instead of $0); household $9.75M / $5.80M today's
+instead of about $10.3M / $6.2M. The gap is the sleeve's return: at 8% the two schedules are
+$100K apart, at 7% they tie, at 6% the slower one is ahead. The draw on the
+pot runs $40K–$49K through 2037, about what the pot earns, so it holds near
+$800K instead of drifting down. Side effect: Ken's side could carry Hilary's
+conversion tax (household +$170K, Ken's pot ~$170K in 2047); noted in the doc
+as worth a second look, not decided.
+
+Also 2026-11-06: Fidelity's 5 Nov 2026 report (two cases: SS at 67, or SS at
+65 plus one $50K conversion; condo kept, $24K pension annuity, no further
+conversions) summarised to one page at ~/Downloads/Fidelity plan Nov 2026
+summary.pdf. SS at 65 finishes $300K ahead in their model; RMDs with no
+conversions reach $250K a year by 2055. Buying a condo now instead of renting
+a year (2026-10-26) was modelled and rejected: $1.2M does not fit on Hilary's
+side without borrowing or an IRA raid; $1.1M now with a $60K–$100K top-up
+from Ken matches the rent-then-buy plan, but the rental year keeps the
+options open.
+
+**Hilary's conversion tax (same day).** Her taxable money is gone after the
+$1.1M condo, so the model used to pause her conversions from 2029 to 2036
+and resume on RMD surplus (~$310K converted in all, $690K left in the IRA
+in 2047). Ken asked for the tax to be withheld from the conversion itself
+instead. Modelled at $50K / $75K / $100K a year with 31.5% withheld once
+taxable money runs out: her IRA empties by 2042 / 2037 / 2034, no RMDs, and
+2047 investments are $4.08M / $4.17M / $4.23M nominal against $4.07M for
+pausing. Nominally a wash; after the 31.5% still owed on a $690K IRA under
+the pausing case it is +$230K / +$320K / +$380K. The doc now carries $75K a
+year with withholding, sized each December to the IRMAA line (Ken's $20K
+years leave her roughly $75K–$90K of room). Her spending after the IRA is
+empty comes from the Roth (~$270K over the run). Household 2047 $9.85M /
+$5.86M today's. The IRMAA check is not in the model; it is the December
+sizing rule. `household_model.hilary(tax_from_conv=True, conv=75_000)`.
+
+The cash-flow models now live in `docs/models/` (kenalone_model.py,
+household_model.py) after the session scratchpad was cleared; run them from
+that folder. `CONV_SLOW` is the schedule in force.
+
+---
+
+## 2026-10-31 — The managed Fidelity account is compared by its reported return, typed in monthly; the file-based version was built and removed the same morning
+
+**Question.** Ken wanted the joint managed Fidelity account (~$280k) set
+against the options sleeve on the Live vs Backtest tab: "how the active
+management in the Fidelity fund is doing measured against my option sleeve".
+
+**First attempt, removed.** Two uploads: a weekly Positions export summed to
+an account value, and the account History export for the deposits and
+withdrawals the return had to strip out, plus a percent view on the chart.
+It worked, and it was the wrong amount of machinery. The activity file on its
+own can never give a return — a managed book is never flat, so a $20k sell
+and a $20k buy carry no information, and Fidelity's running balance column is
+core cash only (~$3k). October's file was seven dividends ($253) and two
+$1,620 transfers out. The value route fixes that but needs a snapshot every
+Friday, a date read from a filename, flows handled correctly, and dividends
+kept out of the arithmetic (a dividend is already inside the next value — the
+one trap). Six files a week to answer a monthly question.
+
+**Decided.** Fidelity already computes the number. Its Performance page gives
+a rate of return for any custom range with flows and dividends handled.
+That figure is typed into the tab with its dates, once a month; the tab
+computes the sleeve's live P/L over the same dates ÷ its $80k funding and
+shows the gap. One number, no parser, no cadence to keep. Percent, because
+$280k of beta next to an $80k sleeve says nothing in dollars.
+
+**What it will and won't say.** A month is mostly the market; read the table
+quarterly, which is where the sleeve's tripwires already live. Whether
+Fidelity is doing a good job is a separate question, answered against a
+66/34 benchmark (2026-10-05: two broad equity books are too correlated to
+rank against each other). This table answers only the question asked: on the
+same capital, over the same dates, who made more.
+
 ## 2026-10-28 — Candidate strategies checked: put backspreads (two versions) and a mirror of the hedge; none qualify
 
 Ken brought a claude.ai brainstorm proposing DBMF (trend-following ETF) plus
@@ -179,6 +439,9 @@ event. Note the rebalancing-cost arithmetic in that entry was computed on
 | CEFs and BDCs | Income | **Roth, $200k** — receives the annual ratchet from options, so it does drift toward all of it |
 | Options (SPX) | Opportunistic growth + the portfolio's only crash-positive stream | **Roth, $200k** — reversed from taxable 2026-09-19 once nine months of live IRA trading closed the settlement question |
 | Fidelity managed | Conservative growth + tax-loss harvesting | **Everything taxable.** ~46% US / 20% intl / 34% bonds, 0.83%/yr fee |
+
+**Retired: the CEF income sleeve** (2026-11-10). Positions still held; what
+replaces it is open. The CEF row in the table above is history. See the entry.
 
 **Retired: the dividend-growth sleeve** (2026-09-19, never funded). It took full
 single-stock equity risk and returned balanced-portfolio numbers. See the entry.

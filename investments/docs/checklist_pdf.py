@@ -27,7 +27,7 @@ html = f"""<!doctype html><html><head><meta charset="utf-8">
 <title>Options sleeve action sheet</title>
 <style>
 @page {{ size: letter; margin: 0.5in 0.55in; }}
-body {{ font: 9.6pt/1.32 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; color:#222; margin:0; }}
+body {{ font: 9.2pt/1.32 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; color:#222; margin:0; }}
 h1 {{ font-size: 16pt; margin: 0 0 2px; }}
 h1 small {{ font-size: 8pt; font-weight: normal; color:#777; margin-left: 8px; }}
 .sheet > p:first-of-type {{ color:#555; margin: 0 0 6px; font-size: 8pt; }}

@@ -163,7 +163,7 @@ const SLEEVES = {
   options: {
     label: 'Options',
     context: 'SPX condor · hedge · QQQ leap · Roth IRA',
-    tabs: [['opt-compare', 'Live vs Backtest']],
+    tabs: [['opt-compare', 'Live vs Backtest'], ['opt-checklist', 'Checklist']],
   },
 };
 
@@ -217,6 +217,7 @@ function renderApp() {
       ${_tab === 'div-screen' ? renderDividendScreen() : ''}
       ${_tab === 'div-import' ? renderDivImport() : ''}
       ${_tab === 'opt-compare' ? renderCompare() : ''}
+      ${_tab === 'opt-checklist' ? renderChecklist() : ''}
     </div>
 
     <div id="toast"></div>
@@ -349,6 +350,8 @@ function renderPortfolio() {
       </div>
     </div>`}
 
+    ${renderIncomeProjection(positions)}
+
     ${_summaryView === 'lifetime' ? '' : exposureBreakdown(posWithDelta, totalMkt)}
 
     <div class="table-wrap">
@@ -383,8 +386,7 @@ function renderPortfolio() {
           ${portfolioBody(sorted, totalMkt)}
         </tbody>
       </table>
-    </div>
-    ${renderIncomeProjection(positions)}`;
+    </div>`;
 }
 
 /** Rows, optionally grouped by security type with per-group subtotals.
@@ -1397,6 +1399,8 @@ function renderIncomeProjection(positions) {
       months.forEach(m => m.total += amt);
     } else if (freq.includes('quarter')) {
       months.forEach((m, i) => { if (i % 3 === 0) m.total += amt; });
+    } else if (freq.includes('semi')) {
+      months.forEach(m => m.total += amt * 2 / 12);
     } else {
       // Annual or unknown: spread evenly
       months.forEach(m => m.total += amt / 12);
@@ -1406,6 +1410,7 @@ function renderIncomeProjection(positions) {
   const annual = months.reduce((s, m) => s + m.total, 0);
   const maxTotal = Math.max(...months.map(m => m.total), 1);
   const chartH = 80;
+  const topPad = 14;   // room for the total above a full-height bar
   const barW = 36;
   const gap = 8;
   const totalW = months.length * (barW + gap);
@@ -1417,7 +1422,7 @@ function renderIncomeProjection(positions) {
     return `
       <rect x="${x}" y="${y}" width="${barW}" height="${barH}" fill="var(--green)" rx="2" opacity="0.85"/>
       <text x="${x + barW / 2}" y="${chartH + 12}" text-anchor="middle" font-size="9" fill="var(--text-muted)">${m.label}</text>
-      ${m.total > 0 ? `<text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" font-size="9" fill="var(--text-2)">$${Math.round(m.total)}</text>` : ''}`;
+      ${m.total > 0 ? `<text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text)">$${Math.round(m.total).toLocaleString()}</text>` : ''}`;
   }).join('');
 
   return `
@@ -1429,7 +1434,7 @@ function renderIncomeProjection(positions) {
       </div>
       ${_showIncomeProjection ? `
       <div class="proj-chart">
-        <svg viewBox="0 0 ${totalW} ${chartH + 20}" style="width:100%;height:${chartH + 30}px;overflow:visible">
+        <svg viewBox="0 ${-topPad} ${totalW} ${chartH + 20 + topPad}" style="width:100%;height:${chartH + 30 + topPad}px;overflow:visible">
           ${bars}
         </svg>
       </div>` : ''}
@@ -2086,6 +2091,7 @@ function setTab(tab) {
   if (tab === 'div-screen' && !_divScreen.length) loadDividendScreen().then(renderApp);
   if (tab === 'div-holdings' && _divHoldings === null) loadDivHoldings().then(renderApp);
   if (tab === 'opt-compare' && !_cmp.data) loadCompare().then(renderApp);
+  if (tab === 'opt-checklist') loadChecklist().then(renderApp);
   renderApp();
 }
 
@@ -3750,9 +3756,92 @@ async function loadCompare() {
     _cmp.data = await GET('/api/compare/summary?' + q.toString());
     if (!_cmp.data.empty) { _cmp.start = _cmp.data.start; _cmp.end = _cmp.data.end; }
     _cmp.uploads = (await GET('/api/compare/uploads')).uploads;
+    _cmp.fid = (await GET('/api/compare/fidelity')).periods;
   } catch (e) { _cmp.status = e.message; }
   _cmp.loading = false;
 }
+
+// Managed Fidelity account vs the sleeve: Fidelity's own reported rate of
+// return for a period, typed in; the sleeve's return over the same dates is
+// computed server-side. One number a month, no files.
+
+/** The Sleeve vs Fidelity table with its entry row. Lives in a popover off the
+ *  tile (click-anchored), not in the page flow: it is a monthly entry, not a
+ *  weekly read. */
+function renderFidelityTable() {
+  const md = cmpMonthDefaults();
+  const fidRows = (_cmp.fid || []).map(p => {
+    const s = p.sleeve, partial = s.live_rows && (s.live_first > p.start || s.live_last < p.end);
+    return `<tr>
+      <td class="left">${p.start} → ${p.end}</td>
+      <td class="num ${cmpSign(p.pct)}">${fmtPctSigned(p.pct)}</td>
+      <td class="num ${cmpSign(s.live_pct)}">${fmtPctSigned(s.live_pct)}</td>
+      <td class="num ${cmpSign(p.gap)}"><b>${fmtPctSigned(p.gap)}</b></td>
+      ${cmpCell(s.live_pl)}${cmpCell(s.backtest_pl)}
+      <td class="left cmp-muted">${partial ? `<span class="cmp-bad">live rows ${s.live_first.slice(5)} → ${s.live_last.slice(5)} only</span>` : s.live_rows ? `${s.live_rows} live rows` : '<span class="cmp-bad">no live rows</span>'}${p.note ? ` · ${p.note}` : ''}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="cmpDeleteFidelity(${p.id}, '${p.start} → ${p.end}')" title="Remove">×</button></td>
+    </tr>`;
+  }).join('');
+  return `
+      <div class="cmp-h">Sleeve vs Fidelity managed <span class="cmp-muted">Fidelity's 1M return as its Performance page reports it (start = the day after Fidelity's From date, end = its To date) against the sleeve's live P/L ÷ its funding over the same dates · one entry a month, read it quarterly</span></div>
+      <div class="table-wrap cmp-table-wrap">
+        <table class="cmp-table cmp-fid">
+          <thead><tr><th class="left">Period</th><th class="num">Fidelity</th><th class="num">Sleeve</th><th class="num">Sleeve − Fidelity</th><th class="num">Live P/L</th><th class="num">Backtest</th><th class="left">Coverage</th><th></th></tr></thead>
+          <tbody>
+            <tr class="cmp-fid-entry">
+              <td class="left"><input type="date" id="fid-start" value="${md.start}"> <span class="cmp-muted">to</span> <input type="date" id="fid-end" value="${md.end}"></td>
+              <td class="num"><input type="number" id="fid-pct" step="0.01" placeholder="%" style="width:72px"></td>
+              <td colspan="4" class="left"><input type="text" id="fid-note" placeholder="note (optional)" style="width:100%;min-width:160px"></td>
+              <td class="left"><button class="btn btn-sm" onclick="cmpAddFidelity()">Add</button> ${_cmp.fidStatus ? `<span class="cmp-bad">${_cmp.fidStatus}</span>` : ''}</td>
+              <td></td>
+            </tr>
+            ${fidRows || '<tr><td colspan="8" class="left cmp-muted">Nothing entered yet. On the first of the month, open the joint account\'s Performance page at Fidelity, set the custom range to last month, and type the rate of return here.</td></tr>'}
+          </tbody>
+        </table>
+      </div>`;
+}
+
+function openFidelityModal(ev) {
+  if (ev) { _cmp.fidPos = { x: ev.clientX, y: ev.clientY }; ev.stopPropagation(); }
+  const root = document.getElementById('modal-root');
+  if (!root) return;
+  root.innerHTML = `
+    <div class="modal-backdrop cmp-fid-backdrop" onclick="closeModal()">
+      <div class="modal cmp-fid-modal" id="cmp-fid-modal" onclick="event.stopPropagation()">
+        <button class="btn btn-ghost btn-sm cmp-fid-close" onclick="closeModal()">✕</button>
+        <div class="modal-body cmp-root" style="gap:10px">${renderFidelityTable()}</div>
+      </div>
+    </div>`;
+  const m = document.getElementById('cmp-fid-modal'), pos = _cmp.fidPos || { x: 40, y: 120 };
+  // Anchor at the click, clamped to the viewport (CLAUDE.md: click-anchored popups).
+  const r = m.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(pos.x - 20, window.innerWidth - r.width - 8)) + 'px';
+  m.style.top = Math.max(8, Math.min(pos.y + 12, window.innerHeight - r.height - 8)) + 'px';
+  setTimeout(() => document.getElementById('fid-pct')?.focus(), 0);
+}
+async function cmpAddFidelity() {
+  const start = document.getElementById('fid-start').value, end = document.getElementById('fid-end').value;
+  const pct = parseFloat(document.getElementById('fid-pct').value), note = document.getElementById('fid-note').value.trim();
+  if (!start || !end || isNaN(pct)) { _cmp.fidStatus = 'Need a start date, an end date and Fidelity\'s return %.'; openFidelityModal(); return; }
+  try {
+    _cmp.fid = (await POST('/api/compare/fidelity', { start, end, pct, note })).periods;
+    _cmp.fidStatus = '';
+  } catch (e) { _cmp.fidStatus = e.message; }
+  renderApp(); openFidelityModal();
+}
+async function cmpDeleteFidelity(id, label) {
+  if (!confirm(`Remove the Fidelity entry for ${label}?`)) return;
+  await DELETE('/api/compare/fidelity/' + id);
+  _cmp.fid = (await GET('/api/compare/fidelity')).periods;
+  renderApp(); openFidelityModal();
+}
+function cmpMonthDefaults() {
+  // Default the entry to the most recent complete calendar month.
+  const d = new Date(); d.setDate(0);
+  const end = d.toISOString().slice(0, 10), start = end.slice(0, 8) + '01';
+  return { start, end };
+}
+const fmtPctSigned = n => n == null ? '—' : (n < 0 ? '−' : n > 0 ? '+' : '') + Math.abs(n).toFixed(2) + '%';
 
 function cmpSetRange(start, end) { _cmp.start = start; _cmp.end = end; loadCompare().then(renderApp); }
 function cmpToggleManual(on) { _cmp.excludeManual = on; loadCompare().then(renderApp); }
@@ -3780,6 +3869,13 @@ function cmpPreset(which) {
     const p = new Date(a + 'T12:00:00'); p.setDate(p.getDate() - 7);
     const [pa, pb] = cmpWeekOf(p.toISOString().slice(0, 10));
     return cmpSetRange(pa, pb);
+  }
+  // Calendar month of the latest loaded day, first to last: the Fidelity
+  // comparison is monthly, so this is the range to read it against.
+  if (which === 'month') {
+    const first = last.slice(0, 8) + '01';
+    const e = new Date(last.slice(0, 7) + '-01T12:00:00'); e.setMonth(e.getMonth() + 1); e.setDate(0);
+    return cmpSetRange(first, e.toISOString().slice(0, 10));
   }
   if (which === 'all') return cmpSetRange(ds[0], last);
 }
@@ -3866,6 +3962,7 @@ function renderCompare() {
 
   const t = d.totals, cols = d.columns.filter(c => c !== 'Other' || t.live.Other || t.backtest.Other);
   const hasSchwab = d.days.some(x => x.has.schwab);
+  const fidLatest = (_cmp.fid || [])[0] || null;
   const schwabU = Object.keys(t.schwab);
   const diff = t.live_total - t.backtest_total;
   const dg = d.diagnostics;
@@ -3876,6 +3973,7 @@ function renderCompare() {
         <button class="btn btn-ghost btn-sm" onclick="cmpPreset('last5')">Last 5 days</button>
         <button class="btn btn-ghost btn-sm" onclick="cmpPreset('week')">This week</button>
         <button class="btn btn-ghost btn-sm" onclick="cmpPreset('prior')">Prior week</button>
+        <button class="btn btn-ghost btn-sm" onclick="cmpPreset('month')">This month</button>
         <button class="btn btn-ghost btn-sm" onclick="cmpPreset('all')">All</button>
       </div>
       <div class="cmp-range">
@@ -3887,32 +3985,20 @@ function renderCompare() {
         Exclude manual exits <span class="cmp-muted">(${t.manual} this range)</span></label>
     </div>`;
 
-  const cov = `
-    <div class="cmp-cov">
-      ${d.days.map(x => `<div class="cmp-cov-day" title="${x.date}">
-        <div class="cmp-cov-date">${x.date.slice(5)}</div>
-        <div class="cmp-cov-dots">
-          <span class="dot live ${x.has.live ? 'on' : ''}" title="live"></span>
-          <span class="dot bt ${x.has.backtest ? 'on' : ''}" title="backtest"></span>
-          <span class="dot schwab ${x.has.schwab ? 'on' : ''}" title="schwab"></span>
-        </div></div>`).join('')}
-      <div class="cmp-cov-key"><span class="dot live on"></span> live <span class="dot bt on"></span> backtest <span class="dot schwab on"></span> schwab</div>
-    </div>`;
-
   const tile = (label, value, sub, cls = '') => `
     <div class="cmp-tile"><div class="cmp-tile-label">${label}</div>
       <div class="cmp-tile-value ${cls}">${value}</div>${sub ? `<div class="cmp-tile-sub">${sub}</div>` : ''}</div>`;
   const tiles = `
     <div class="cmp-tiles">
-      ${tile('Live', fmtWhole(t.live_total), cols.map(c => `${c} ${fmtWhole(t.live[c])}`).join(' · '), cmpSign(t.live_total))}
-      ${tile('Backtest', fmtWhole(t.backtest_total), cols.map(c => `${c} ${fmtWhole(t.backtest[c])}`).join(' · '), cmpSign(t.backtest_total))}
-      ${tile('Live − backtest', fmtWhole(diff), `${t.pairs} paired trades${t.excluded ? `, ${t.excluded} excluded` : ''}`, cmpSign(diff))}
-      ${hasSchwab ? tile('Schwab option cash', fmtWhole(t.schwab_total), schwabU.map(u => `${u} ${fmtWhole(t.schwab[u])}`).join(' · ') + ` · fees ${fmtWhole(-Math.abs(t.schwab_fees))}`, cmpSign(t.schwab_total))
-                  : tile('Schwab option cash', '—', 'no Schwab rows in this range')}
       ${tile('Stop fill vs 3× trigger', `${dg.live_stop_overshoot.avg == null ? '—' : dg.live_stop_overshoot.avg.toFixed(2)} <span class="cmp-vs">live</span> ${dg.backtest_stop_overshoot.avg == null ? '—' : dg.backtest_stop_overshoot.avg.toFixed(2)} <span class="cmp-vs">test</span>`,
             `${dg.live_stop_overshoot.n} / ${dg.backtest_stop_overshoot.n} stops · per share, lower is better`)}
       ${tile('Entry credit, live − test', dg.credit_diff_matched.avg == null ? '—' : (dg.credit_diff_matched.avg >= 0 ? '+' : '') + dg.credit_diff_matched.avg.toFixed(2),
             `${dg.credit_diff_matched.n} matched-strike trades · per share · tripwire 0.15/leg`)}
+      <div class="cmp-tile-click" onclick="openFidelityModal(event)" title="All periods, and the entry row for this month's Fidelity return">
+      ${fidLatest ? tile('Sleeve vs Fidelity', `${fmtPctSigned(fidLatest.sleeve.live_pct)} <span class="cmp-vs">vs</span> ${fmtPctSigned(fidLatest.pct)}`,
+            `${fidLatest.start} → ${fidLatest.end} · gap ${fmtPctSigned(fidLatest.gap)} · sleeve ${fmtWhole(fidLatest.sleeve.live_pl)} on $${(fidLatest.sleeve.funding / 1000).toFixed(0)}K`, cmpSign(fidLatest.gap))
+          : tile('Sleeve vs Fidelity', '—', 'no period entered yet · click to enter one')}
+      </div>
     </div>`;
 
   const chart = renderCmpChart(d.days, hasSchwab, _cmp.chartW || 860);
@@ -4008,7 +4094,6 @@ function renderCompare() {
   return `
     <div class="cmp-root">
       ${toolbar}
-      ${cov}
       ${tiles}
       ${openPos}
       ${chart}
@@ -4038,7 +4123,13 @@ function renderCmpChart(days, hasSchwab, W = 860) {
   const H = 220, L = 60, R = 16, T = 14, B = 30;
   const series = [['backtest', 'Backtest', 'bt'], ['live', 'Live', 'live']];
   if (hasSchwab) series.push(['schwab', 'Schwab cash', 'schwab']);
-  const vals = [0, ...days.flatMap(x => series.map(([k]) => x.cum[k]))];
+  // $ or % of the sleeve's funding. In % the Fidelity periods that end inside
+  // the range are marked at their end date — only the endpoint is known, so
+  // it is a point, not a line.
+  const pct = _cmp.mode === 'pct';
+  const val = (x, k) => pct ? x.pct[k] : x.cum[k];
+  const fidMarks = pct ? (_cmp.fid || []).map(p => ({ i: days.findIndex(x => x.date === p.end), p })).filter(m => m.i >= 0) : [];
+  const vals = [0, ...days.flatMap(x => series.map(([k]) => val(x, k))), ...fidMarks.map(m => m.p.pct)];
   let lo = Math.min(...vals), hi = Math.max(...vals);
   if (hi - lo < 1) { hi += 1; lo -= 1; }
   const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
@@ -4050,8 +4141,9 @@ function renderCmpChart(days, hasSchwab, W = 860) {
   const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag;
   const ticks = [];
   for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
-  const fmtTick = v => (v < 0 ? '−' : '') + '$' + (Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(Math.abs(v) % 1000 ? 1 : 0) + 'K' : Math.abs(v).toFixed(0));
-  const path = k => days.map((x, i) => `${i ? 'L' : 'M'}${xs(i).toFixed(1)},${ys(x.cum[k]).toFixed(1)}`).join(' ');
+  const fmtTick = v => pct ? (v < 0 ? '−' : '') + Math.abs(v).toFixed(step < 1 ? 1 : 0) + '%'
+    : (v < 0 ? '−' : '') + '$' + (Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(Math.abs(v) % 1000 ? 1 : 0) + 'K' : Math.abs(v).toFixed(0));
+  const path = k => days.map((x, i) => `${i ? 'L' : 'M'}${xs(i).toFixed(1)},${ys(val(x, k)).toFixed(1)}`).join(' ');
   const zeroY = ys(0);
   // Schwab is drawn last and dashed: on an all-0DTE week it equals live to
   // the cent, and a solid line on top would hide the live line entirely.
@@ -4060,7 +4152,11 @@ function renderCmpChart(days, hasSchwab, W = 860) {
     <div class="cmp-chart-wrap" id="cmp-chart-wrap">
       <div class="cmp-legend">
         ${series.map(([k, label, cls]) => `<span class="cmp-legend-item"><span class="swatch ${cls}"></span>${label}</span>`).join('')}
-        <span class="cmp-muted">cumulative over the range</span>
+        <span class="cmp-muted">${pct ? `cumulative, as % of the sleeve's $${((_cmp.data.sleeve_funding || 0) / 1000).toFixed(0)}K funding` : 'cumulative over the range'}</span>
+        <span class="cmp-mode">
+          <button class="btn btn-ghost btn-sm ${pct ? '' : 'on'}" onclick="_cmp.mode='usd';renderApp()">$</button>
+          <button class="btn btn-ghost btn-sm ${pct ? 'on' : ''}" onclick="_cmp.mode='pct';renderApp()">%</button>
+        </span>
       </div>
       <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="cmp-chart" onmousemove="cmpHover(event)" onmouseleave="cmpHoverOff()" data-n="${n}" data-l="${L}" data-r="${R}" data-w="${W}">
         ${ticks.map(v => `<line class="grid" x1="${L}" x2="${W - R}" y1="${ys(v).toFixed(1)}" y2="${ys(v).toFixed(1)}"></line>
@@ -4068,14 +4164,15 @@ function renderCmpChart(days, hasSchwab, W = 860) {
         ${zeroY >= T && zeroY <= H - B ? `<line class="zero" x1="${L}" x2="${W - R}" y1="${zeroY.toFixed(1)}" y2="${zeroY.toFixed(1)}"></line>` : ''}
         ${days.map((x, i) => (n <= 12 || i % Math.ceil(n / 12) === 0 || i === n - 1) ? `<text class="tick" x="${xs(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">${x.date.slice(5)}</text>` : '').join('')}
         ${draw.map(([k, , cls]) => `<path class="line ${cls}" d="${path(k)}"></path>`).join('')}
-        ${draw.map(([k, , cls]) => `<circle class="end ${cls}" cx="${xs(n - 1).toFixed(1)}" cy="${ys(days[n - 1].cum[k]).toFixed(1)}" r="4"></circle>`).join('')}
+        ${draw.map(([k, , cls]) => `<circle class="end ${cls}" cx="${xs(n - 1).toFixed(1)}" cy="${ys(val(days[n - 1], k)).toFixed(1)}" r="4"></circle>`).join('')}
+        ${fidMarks.map(({ i, p }) => { const x = xs(i), y = ys(p.pct); return `<g class="fid-mark"><path d="M${x.toFixed(1)},${(y - 6).toFixed(1)} l6,6 l-6,6 l-6,-6 z"></path><text x="${(x - 10).toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="end">Fidelity ${fmtPctSigned(p.pct)} · ${p.start.slice(5)} → ${p.end.slice(5)}</text></g>`; }).join('')}
         <g id="cmp-hover" style="display:none">
           <line class="cross" x1="0" x2="0" y1="${T}" y2="${H - B}"></line>
           ${series.map(([k, , cls]) => `<circle class="pt ${cls}" data-k="${k}" r="5"></circle>`).join('')}
         </g>
       </svg>
       <div class="cmp-tip" id="cmp-tip" style="display:none"></div>
-      <script type="application/json" id="cmp-chart-data">${JSON.stringify({ xs: days.map((_, i) => xs(i)), ys: days.map(x => Object.fromEntries(series.map(([k]) => [k, ys(x.cum[k])]))), days: days.map(x => ({ date: x.date, cum: x.cum, live: x.live_total, backtest: x.backtest_total, schwab: x.schwab_total })), series })}</script>
+      <script type="application/json" id="cmp-chart-data">${JSON.stringify({ pct, xs: days.map((_, i) => xs(i)), ys: days.map(x => Object.fromEntries(series.map(([k]) => [k, ys(val(x, k))]))), days: days.map(x => ({ date: x.date, cum: x.cum, pct: x.pct, live: x.live_total, backtest: x.backtest_total, schwab: x.schwab_total })), series })}</script>
     </div>`;
 }
 function cmpHover(ev) {
@@ -4091,11 +4188,116 @@ function cmpHover(ev) {
   const d = data.days[best], tip = document.getElementById('cmp-tip');
   tip.style.display = '';
   tip.innerHTML = `<div class="cmp-tip-date">${d.date}</div>` + data.series.map(([k, label, cls]) =>
-    `<div class="cmp-tip-row"><span class="swatch ${cls}"></span>${label} <span class="num">${fmtWhole(d.cum[k])}</span> <span class="cmp-muted">day ${fmtWhole(k === 'live' ? d.live : k === 'backtest' ? d.backtest : d.schwab)}</span></div>`).join('');
+    `<div class="cmp-tip-row"><span class="swatch ${cls}"></span>${label} <span class="num">${data.pct ? fmtPctSigned(d.pct[k]) : fmtWhole(d.cum[k])}</span> <span class="cmp-muted">${data.pct ? fmtWhole(d.cum[k]) + ' · ' : ''}day ${fmtWhole(k === 'live' ? d.live : k === 'backtest' ? d.backtest : d.schwab)}</span></div>`).join('');
   const px = data.xs[best] / W * rect.width;
   tip.style.left = Math.min(px + 12, rect.width - 220) + 'px';
 }
 function cmpHoverOff() {
   const g = document.getElementById('cmp-hover'); if (g) g.style.display = 'none';
   const tip = document.getElementById('cmp-tip'); if (tip) tip.style.display = 'none';
+}
+
+
+// ── Options sleeve: review checklist ────────────────────────────────────────
+// Parsed server-side from docs/review-checklist.md (the same file the PDF is
+// printed from). Weekly / Monthly / Annual are tick-box lists; ticks live in
+// localStorage under a key that carries the week, month or year, so a new
+// period starts blank without anything being cleared.
+let _ck = { data: null, which: null, open: {} };
+
+async function loadChecklist() {
+  try { _ck.data = await (await fetch('/api/compare/checklist')).json(); }
+  catch (e) { _ck.data = { error: String(e) }; }
+}
+
+function ckIso(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function ckPeriod(kind) {
+  const now = new Date();
+  if (kind === 'annual') return { key: String(now.getFullYear()), label: String(now.getFullYear()) };
+  if (kind === 'monthly') return { key: ckIso(now).slice(0, 7),
+    label: now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) };
+  const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  return { key: ckIso(mon), label: 'week of ' + mon.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+}
+/** Monthly on the first weekday of the month, otherwise weekly. Annual is chosen by hand. */
+function ckDue() {
+  const now = new Date(), first = new Date(now.getFullYear(), now.getMonth(), 1);
+  while (first.getDay() === 0 || first.getDay() === 6) first.setDate(first.getDate() + 1);
+  return now.getDate() === first.getDate() ? 'monthly' : 'weekly';
+}
+/** The "due" badge: Monthly on the first weekday of the month, Weekly from Friday through the weekend. */
+function ckBadge(kind) {
+  if (kind === 'monthly') return ckDue() === 'monthly';
+  return kind === 'weekly' && [5, 6, 0].includes(new Date().getDay());
+}
+function ckStore(kind) { return `sage-ck-${kind}-${ckPeriod(kind).key}`; }
+function ckTicks(kind) {
+  try { return JSON.parse(localStorage.getItem(ckStore(kind)) || '[]'); } catch (e) { return []; }
+}
+function ckTick(kind, i, on) {
+  const s = new Set(ckTicks(kind)); on ? s.add(i) : s.delete(i);
+  try { localStorage.setItem(ckStore(kind), JSON.stringify([...s])); } catch (e) {}
+  renderApp();
+}
+function ckReset(kind) { try { localStorage.removeItem(ckStore(kind)); } catch (e) {} renderApp(); }
+function ckPick(kind) { _ck.which = kind; renderApp(); }
+function ckNote(scope, name) { const k = scope + '|' + name; _ck.open[k] = !_ck.open[k]; renderApp(); }
+
+/** Swap the server's %%NOTE:name%% markers for "why" buttons scoped to one step or card. */
+function ckBody(html, scope) {
+  return html.replace(/%%NOTE:([\w-]+)%%/g, (m, name) =>
+    `<button class="ck-why${_ck.open[scope + '|' + name] ? ' on' : ''}" onclick="event.preventDefault();event.stopPropagation();ckNote('${scope}','${name}')" title="Why">why</button>`);
+}
+function ckOpenNotes(html, scope, extra) {
+  const names = [...(extra || []), ...[...html.matchAll(/%%NOTE:([\w-]+)%%/g)].map(m => m[1])];
+  return names.filter(n => _ck.open[scope + '|' + n] && _ck.data.notes[n])
+    .map(n => `<div class="ck-note">${ckBody(_ck.data.notes[n], scope + '>' + n)}</div>`).join('');
+}
+
+function renderChecklist() {
+  const d = _ck.data;
+  if (!d) return `<div class="ck-root"><div class="cmp-muted">Loading…</div></div>`;
+  if (d.error || !d.sections) return `<div class="ck-root"><div class="cmp-muted">Could not load the checklist. ${d.error || ''}</div></div>`;
+  const reviews = d.sections.filter(s => s.kind !== 'reference');
+  const which = reviews.some(s => s.kind === _ck.which) ? _ck.which : ckDue();
+  const sec = reviews.find(s => s.kind === which) || reviews[0];
+  const ticks = new Set(ckTicks(sec.kind)), per = ckPeriod(sec.kind), n = sec.steps.length;
+  const done = sec.steps.filter((_, i) => ticks.has(i)).length;
+
+  const steps = sec.steps.map((h, i) => {
+    const scope = `${sec.kind}-${i}`;
+    return `<li class="ck-step${ticks.has(i) ? ' done' : ''}">
+      <label><input type="checkbox" ${ticks.has(i) ? 'checked' : ''} onchange="ckTick('${sec.kind}', ${i}, this.checked)">
+        <span class="ck-num">${i + 1}</span><span class="ck-text">${ckBody(h, scope)}</span></label>
+      ${ckOpenNotes(h, scope)}</li>`;
+  }).join('');
+
+  const refs = d.sections.filter(s => s.kind === 'reference').map((s, i) => {
+    const scope = `ref-${i}`;
+    const titleWhy = s.title_notes.map(nm => ckBody(`%%NOTE:${nm}%%`, scope)).join('');
+    return `<section class="ck-card">
+      <div class="cmp-h">${s.title} ${s.sub ? `<span class="cmp-muted">${s.sub}</span>` : ''} ${titleWhy}</div>
+      <div class="ck-ref">${ckBody(s.html, scope)}</div>
+      ${ckOpenNotes(s.html, scope, s.title_notes)}</section>`;
+  }).join('');
+
+  return `<div class="ck-root">
+    <div class="ck-main">
+      <div class="ck-pick">
+        ${reviews.map(s => `<button class="ck-pill${s.kind === sec.kind ? ' active' : ''}" onclick="ckPick('${s.kind}')">${s.title}${
+          ckBadge(s.kind) ? ' <span class="ck-due">due</span>' : ''}</button>`).join('')}
+      </div>
+      <section class="ck-card">
+        <div class="ck-head">
+          <div><div class="ck-title">${sec.title} review <span class="cmp-muted">${per.label}</span></div>
+            <div class="cmp-muted">${sec.sub}</div></div>
+          <div class="ck-progress"><span class="${done === n ? 'cmp-ok' : 'cmp-muted'}">${done} of ${n}</span>
+            <button class="btn btn-ghost btn-sm" onclick="ckReset('${sec.kind}')" ${done ? '' : 'disabled'}>Reset</button></div>
+        </div>
+        ${sec.intro ? `<p class="ck-intro">${sec.intro}</p>` : ''}
+        <ol class="ck-steps">${steps}</ol>
+      </section>
+    </div>
+    <aside class="ck-side">${refs}</aside>
+  </div>`;
 }

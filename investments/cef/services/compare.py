@@ -10,6 +10,13 @@ Three sources, one table each, compared by trading day:
   names, so it is compared by underlying and by cash: it is the number that
   actually hit the account.
 
+* **fidelity** — not an upload. The managed Fidelity account's rate of return
+  for a period, as its Performance page reports it, typed in with the dates;
+  the sleeve's return over the same dates is computed here. Fidelity's figure
+  already nets deposits, withdrawals and dividends, which is why no file is
+  parsed for it (a 2026-10-31 attempt at value snapshots + activity exports was
+  replaced by this the same day — see docs/decisions.md).
+
 Uploads replace by date range per source — the newest file for a day wins, and
 re-uploading an overlapping week never duplicates. Strategy names are mapped to
 the book (`Condor` / `Hedge` / `Leap`); anything else is carried as itself and
@@ -20,6 +27,8 @@ import io
 import re
 from collections import defaultdict
 from datetime import date, datetime
+
+from .. import settings as cfg
 
 # The live condor has run under three autotrader names; OO's saved strategy was
 # renamed too. One canonical name per book strategy, everything else kept raw.
@@ -234,9 +243,14 @@ def parse_schwab_options(text):
             d = _iso(raw_date)
         if not d:
             continue
+        # The date Schwab stamped the row with, before any re-dating. The
+        # file's coverage is measured on this, not on `date`: an expiration
+        # stamped 10/23 "as of 10/22" belongs to a file that may hold nothing
+        # else from 10/22, and must not be allowed to replace that day.
+        file_date = _iso(raw_date.split(" as of ")[0]) or d
         underlying = "SPX" if root in ("SPX", "SPXW") else root
         rows.append({
-            "date": d, "action": action, "symbol": sym, "underlying": underlying,
+            "date": d, "file_date": file_date, "action": action, "symbol": sym, "underlying": underlying,
             "expiry": _iso(exp), "strike": float(strike), "right": right,
             "qty": _num(r.get("Quantity")), "price": _num(r.get("Price")),
             "fees": _num(r.get("Fees & Comm")) or 0.0,
@@ -298,12 +312,21 @@ def store_upload(conn, text, filename):
         rows = parse_schwab_options(text)
         if not rows:
             raise ValueError("No option transactions found in that Schwab export.")
-        dates = [r["date"] for r in rows]
-        lo, hi = min(dates), max(dates)
+        # Replace the days the FILE covers (Schwab's stamped dates). Expired
+        # rows re-dated to an earlier day are swapped for their existing twin
+        # by symbol instead, so they never delete that day's cash rows. This
+        # wiped 10/15, 10/22 and 10/23 once (2026-10-31).
+        fdates = [r["file_date"] for r in rows]
+        lo, hi = min(fdates), max(fdates)
         up = _log_upload(conn, kind, filename, len(rows), lo, hi)
         cur = conn.execute(
             "DELETE FROM schwab_options WHERE date BETWEEN ? AND ?", (lo, hi))
         replaced = cur.rowcount
+        for r in rows:
+            if r["date"] < lo or r["date"] > hi:
+                replaced += conn.execute(
+                    "DELETE FROM schwab_options WHERE date=? AND symbol=? AND action=?",
+                    (r["date"], r["symbol"], r["action"])).rowcount
         conn.executemany("""
             INSERT INTO schwab_options (upload_id, date, action, symbol, underlying,
                 expiry, strike, right, qty, price, fees, amount)
@@ -345,6 +368,54 @@ def coverage(conn):
     out["schwab"] = [r[0] for r in conn.execute(
         "SELECT DISTINCT date FROM schwab_options ORDER BY 1")]
     return out
+
+
+# ---------------------------------------------------------------- fidelity periods
+
+def sleeve_return(conn, start, end):
+    """The sleeve over [start, end]: live and backtest closed P/L, Schwab cash,
+    and live as a percent of `compare.sleeve_funding`. Also the first and last
+    live close dates inside the period, so a period the live rows only partly
+    cover is visible as such."""
+    funding = float(cfg.get("compare.sleeve_funding") or 0) or None
+    out = {"funding": funding}
+    for src in ("live", "backtest"):
+        pl, n, lo, hi = conn.execute(
+            f"SELECT COALESCE(SUM(pl),0), COUNT(*), MIN({CLOSE_DATE}), MAX({CLOSE_DATE}) "
+            f"FROM oo_trades WHERE source=? AND {CLOSE_DATE} BETWEEN ? AND ?",
+            (src, start, end)).fetchone()
+        out[src + "_pl"] = round(pl, 2)
+        out[src + "_rows"] = n
+        out[src + "_pct"] = round(pl / funding * 100, 3) if funding and n else None
+        if src == "live":
+            out["live_first"], out["live_last"] = lo, hi
+    out["schwab_cash"] = round(conn.execute(
+        "SELECT COALESCE(SUM(amount),0) FROM schwab_options WHERE date BETWEEN ? AND ?",
+        (start, end)).fetchone()[0], 2)
+    return out
+
+
+def fidelity_periods(conn):
+    rows = [dict(r) for r in conn.execute(
+        "SELECT * FROM fidelity_periods ORDER BY start DESC, end DESC")]
+    for r in rows:
+        r["sleeve"] = sleeve_return(conn, r["start"], r["end"])
+        lp = r["sleeve"]["live_pct"]
+        r["gap"] = round(lp - r["pct"], 3) if lp is not None else None
+    return rows
+
+
+def add_fidelity_period(conn, start, end, pct, note=None):
+    if not (_iso(start) and _iso(end)) or end < start:
+        raise ValueError("Period needs a start and an end date, start first.")
+    conn.execute(
+        "INSERT INTO fidelity_periods (start, end, pct, note) VALUES (?,?,?,?) "
+        "ON CONFLICT(start, end) DO UPDATE SET pct=excluded.pct, note=excluded.note, "
+        "entered_at=datetime('now')", (start, end, float(pct), note or None))
+
+
+def delete_fidelity_period(conn, period_id):
+    return conn.execute("DELETE FROM fidelity_periods WHERE id=?", (period_id,)).rowcount
 
 
 # ---------------------------------------------------------------- comparison
@@ -531,12 +602,15 @@ def summary(conn, start, end, exclude_manual=False):
         dd["net_liq"], dd["bt_day_pl"], dd["dd_pct"] = e["net_liq"], e["day_pl"], e["dd_pct"]
     day_list = [days[d] for d in sorted(days)]
 
+    funding = float(cfg.get("compare.sleeve_funding") or 0) or None
     cum = {"live": 0.0, "backtest": 0.0, "schwab": 0.0}
     for dd in day_list:
         cum["live"] += dd["live_total"]
         cum["backtest"] += dd["backtest_total"]
         cum["schwab"] += dd["schwab_total"]
         dd["cum"] = {k: round(v, 2) for k, v in cum.items()}
+        # Same series as percent of the sleeve's funding, for the chart's % view.
+        dd["pct"] = {k: (round(v / funding * 100, 3) if funding else None) for k, v in cum.items()}
 
     totals = {
         "live": {c: round(sum(dd["live"][c] for dd in day_list), 2) for c in cols},
@@ -576,4 +650,5 @@ def summary(conn, start, end, exclude_manual=False):
     return {"start": start, "end": end, "exclude_manual": bool(exclude_manual),
             "columns": cols, "days": day_list, "totals": totals,
             "pairs": pairs, "diagnostics": diag_out,
-            "schwab_rows": schwab, "open_positions": open_positions}
+            "schwab_rows": schwab, "open_positions": open_positions,
+            "sleeve_funding": funding}

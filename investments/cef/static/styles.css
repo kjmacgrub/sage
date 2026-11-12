@@ -536,14 +536,16 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px 14px;
-  margin-top: 14px;
+  padding: 12px 20px;
+  margin-bottom: 16px;
 }
 .proj-header {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 10px;
+}
+.proj-chart {
+  margin-top: 10px;
 }
 .proj-title {
   font-size: 12px;
@@ -938,6 +940,22 @@ tr.group-header:hover td { background: var(--surface2); }
 .cmp-legend-item { display: flex; gap: 6px; align-items: center; }
 .cmp-root .swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; background: var(--text-muted); }
 .cmp-root .swatch.live { background: var(--s-live); } .cmp-root .swatch.bt { background: var(--s-bt); } .cmp-root .swatch.schwab { background: var(--s-schwab); }
+.cmp-fid-entry td { background: var(--surface2); }
+.cmp-fid-entry input { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px; font-size: 12px; }
+.cmp-tile-click { cursor: pointer; display: contents; }
+.cmp-tile-click .cmp-tile:hover { border-color: var(--text-muted); }
+.cmp-fid-backdrop { background: rgba(0,0,0,0.25); display: block; }
+.cmp-fid-modal { position: fixed; width: min(980px, 95vw); padding: 0; }
+.cmp-fid-modal .modal-body { padding: 14px 16px 16px; display: flex; flex-direction: column; }
+.cmp-fid-modal .cmp-table-wrap { overflow-x: auto; }
+.cmp-fid-modal .cmp-fid { white-space: nowrap; }
+.cmp-fid-modal .cmp-fid td.left.cmp-muted { white-space: normal; min-width: 150px; }
+.cmp-fid-modal .cmp-h { padding-right: 36px; }
+.cmp-fid-close { position: absolute; top: 10px; right: 10px; }
+.cmp-mode { margin-left: auto; display: flex; gap: 2px; }
+.cmp-mode .btn.on { background: var(--surface2); color: var(--text); border-color: var(--border); }
+.cmp-chart .fid-mark path { fill: var(--text-2); stroke: var(--surface); stroke-width: 1.5; }
+.cmp-chart .fid-mark text { fill: var(--text-2); font-size: 11px; }
 .cmp-chart { display: block; max-width: 100%; }
 .cmp-chart .grid { stroke: var(--border); stroke-width: 1; }
 .cmp-chart .zero { stroke: var(--text-muted); stroke-width: 1; }
@@ -980,3 +998,35 @@ tr.group-header:hover td { background: var(--surface2); }
 .cmp-upload-status { margin-top: 8px; font-size: 12px; line-height: 1.6; }
 .cmp-section { display: flex; flex-direction: column; gap: 8px; }
 .cmp-trades td:first-child, .cmp-trades td:nth-child(2), .cmp-trades td.mono { white-space: nowrap; }
+
+
+/* ── Options › Checklist ─────────────────────────────────────────────────── */
+.ck-root { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; padding: 20px 24px 40px; align-items: start; max-width: 1280px; }
+@media (max-width: 900px) { .ck-root { grid-template-columns: 1fr; } }
+.ck-main, .ck-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ck-pick { display: flex; gap: 6px; }
+.ck-pill { background: var(--surface); color: var(--text-2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 16px; font-size: 13px; cursor: pointer; }
+.ck-pill:hover { color: var(--text); }
+.ck-pill.active { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.ck-due { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--green); margin-left: 4px; }
+.ck-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+.ck-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.ck-title { font-size: 17px; font-weight: 600; color: var(--text); }
+.ck-title .cmp-muted { margin-left: 6px; font-size: 13px; }
+.ck-progress { display: flex; gap: 10px; align-items: center; font-size: 13px; white-space: nowrap; }
+.ck-intro { margin: 10px 0 0; font-size: 13px; color: var(--text-2); }
+.ck-steps { list-style: none; margin: 12px 0 0; padding: 0; }
+.ck-step { border-top: 1px solid var(--border); padding: 10px 0; }
+.ck-step label { display: grid; grid-template-columns: 18px 20px 1fr; gap: 8px; align-items: start; cursor: pointer; font-size: 14px; line-height: 1.5; color: var(--text); }
+.ck-step input { margin-top: 4px; accent-color: var(--accent); }
+.ck-num { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.ck-step.done .ck-text { color: var(--text-2); text-decoration: line-through; text-decoration-color: var(--border); }
+.ck-text code, .ck-ref code, .ck-note code { background: var(--surface2); padding: 0 4px; border-radius: 3px; font-size: 12px; }
+.ck-why { background: none; border: 1px solid var(--border); color: var(--text-2); border-radius: 999px; font-size: 10px; line-height: 1; padding: 2px 6px; margin-left: 4px; cursor: pointer; vertical-align: middle; text-decoration: none; }
+.ck-why:hover, .ck-why.on { color: var(--accent); border-color: var(--accent); }
+.ck-note { margin: 8px 0 2px 46px; padding: 8px 12px; border-left: 2px solid var(--accent); background: var(--surface2); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+.ck-card > .ck-note { margin-left: 0; }
+.ck-ref { font-size: 13px; line-height: 1.5; color: var(--text); }
+.ck-ref ol, .ck-ref ul { margin: 8px 0 0; padding-left: 20px; }
+.ck-ref li { margin: 4px 0; }
+.ck-ref p { margin: 8px 0 0; color: var(--text-2); }
