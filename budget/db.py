@@ -1,7 +1,7 @@
 """
 budget/db.py — SQLite backend for Budget Planner + Cash Flow
 """
-import sqlite3, os
+import sqlite3, os, re
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "budget.db")
 
@@ -72,6 +72,7 @@ def init_db(df=None):
     conn.commit()
     _migrate_budget_items(conn)   # may rebuild budget_items, so run before adding columns
     _migrate_scheduled(conn)
+    _migrate_monthly(conn)
     if df is not None:
         _import_df(conn, df)
     conn.close()
@@ -129,6 +130,76 @@ def _migrate_budget_items(conn):
     """)
 
 
+MONTHS = ['January','February','March','April','May','June',
+          'July','August','September','October','November','December']
+
+
+def short_account(name):
+    """Quicken account name → the short label shown in the Planner.
+    'Fidelity® Rewards Visa Signature® Card 1312' → 'Fidelity Visa'."""
+    s = re.sub(r"[®™*]", "", name or "")
+    s = re.sub(r"\b(Rewards|Signature|Card)\b", "", s, flags=re.I)
+    s = re.sub(r"\b\d{3,}\b", "", s)
+    return " ".join(s.split())
+
+
+def _add_cols(conn, table, cols):
+    have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    for name, decl in cols:
+        if name not in have:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+
+
+def _migrate_monthly(conn):
+    """One plan per month (idempotent).
+
+    Plans gain a kind ('dated' = the old per-date plans, 'month' = one per month,
+    plan_date on the 1st) and excl, the comma list of expense groups left out of
+    the column total. Items gain their group, a saved drag order, a tag
+    ('oneoff' = this month only, 'auto' = automatic transfer) and, for credit
+    cards, the Quicken account they are paid to.
+    """
+    _add_cols(conn, "budget_plans", [("kind", "TEXT DEFAULT 'dated'"), ("excl", "TEXT DEFAULT ''")])
+    _add_cols(conn, "budget_items", [("grp", "TEXT"), ("sort_order", "INTEGER"),
+                                     ("tag", "TEXT DEFAULT ''"), ("account", "TEXT")])
+    conn.executescript("""
+    -- The projected month-end balance as it stood at the close of each day it
+    -- was looked at. The first day's figure is "what we expected".
+    CREATE TABLE IF NOT EXISTS plan_projections (
+        plan_id   INTEGER NOT NULL REFERENCES budget_plans(id) ON DELETE CASCADE,
+        day       TEXT NOT NULL,
+        projected REAL NOT NULL,
+        PRIMARY KEY (plan_id, day)
+    );
+    CREATE TABLE IF NOT EXISTS planner_settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT
+    );
+    """)
+    # Old items: Utilities by category, typed-in names were the credit cards.
+    conn.execute("""
+        UPDATE budget_items SET grp = CASE
+            WHEN category LIKE 'Utilities%' THEN 'utilities'
+            WHEN category IS NULL AND scheduled_id IS NULL THEN 'cards'
+            ELSE 'other' END
+        WHERE grp IS NULL AND item_type = 'expense'
+    """)
+    for label, account in card_accounts(conn).items():
+        conn.execute("UPDATE budget_items SET account=? WHERE grp='cards' AND account IS NULL AND label=?",
+                     (account, label))
+    conn.commit()
+
+
+def card_accounts(conn=None):
+    """{short label: Quicken account name} for every account in the transactions."""
+    own = conn is None
+    conn = conn or get_conn()
+    rows = conn.execute("SELECT DISTINCT account FROM transactions WHERE account != '' ORDER BY account").fetchall()
+    if own:
+        conn.close()
+    return {short_account(r["account"]): r["account"] for r in rows}
+
+
 def _import_df(conn, df):
     """Load pandas DataFrame into transactions — skips if already populated."""
     count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
@@ -162,47 +233,90 @@ def reimport_df(df):
 
 # ── Plans ──────────────────────────────────────────────────────────────────
 
+_PLAN_COLS = "id, plan_date, label, starting_balance, COALESCE(kind,'dated') AS kind, COALESCE(excl,'') AS excl"
+_ITEM_COLS = "id, category, label, budget_amount, item_type, scheduled_id, grp, sort_order, COALESCE(tag,'') AS tag, account"
+_ITEM_ORDER = "ORDER BY item_type, sort_order IS NULL, sort_order, COALESCE(category, label)"
+
+
 def list_plans():
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT id, plan_date, label, starting_balance FROM budget_plans ORDER BY plan_date DESC"
-    ).fetchall()
+    rows = conn.execute(f"SELECT {_PLAN_COLS} FROM budget_plans ORDER BY plan_date DESC").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def create_plan(plan_date, label=None, starting_balance=0):
+def create_plan(plan_date, label=None, starting_balance=0, kind="dated", excl=""):
     conn = get_conn()
     conn.execute(
-        "INSERT INTO budget_plans(plan_date, label, starting_balance) VALUES(?,?,?)",
-        (plan_date, label, starting_balance)
+        "INSERT INTO budget_plans(plan_date, label, starting_balance, kind, excl) VALUES(?,?,?,?,?)",
+        (plan_date, label, starting_balance, kind if kind in ("dated", "month") else "dated", excl or "")
     )
     conn.commit()
-    row = conn.execute("SELECT id,plan_date,label,starting_balance FROM budget_plans WHERE plan_date=?",
-                       (plan_date,)).fetchone()
+    row = conn.execute(f"SELECT {_PLAN_COLS} FROM budget_plans WHERE plan_date=?", (plan_date,)).fetchone()
     conn.close()
     return dict(row)
 
 
 def get_plan(plan_id):
     conn = get_conn()
-    plan = conn.execute(
-        "SELECT id,plan_date,label,starting_balance FROM budget_plans WHERE id=?", (plan_id,)
-    ).fetchone()
+    plan = conn.execute(f"SELECT {_PLAN_COLS} FROM budget_plans WHERE id=?", (plan_id,)).fetchone()
     if not plan:
         conn.close()
         return None
     items = conn.execute(
-        "SELECT id,category,label,budget_amount,item_type,scheduled_id FROM budget_items "
-        "WHERE plan_id=? ORDER BY item_type, COALESCE(category, label)",
+        f"SELECT {_ITEM_COLS} FROM budget_items WHERE plan_id=? {_ITEM_ORDER}", (plan_id,)
+    ).fetchall()
+    out = {**dict(plan), "items": [dict(i) for i in items]}
+    out["prev_projected"] = _previous_projection(conn, out) if out["kind"] == "month" else None
+    conn.close()
+    return out
+
+
+def _projected(conn, plan_id, starting_balance):
+    rows = conn.execute(
+        "SELECT item_type, SUM(budget_amount) AS total FROM budget_items WHERE plan_id=? GROUP BY item_type",
         (plan_id,)
     ).fetchall()
-    conn.close()
-    return {**dict(plan), "items": [dict(i) for i in items]}
+    tot = {r["item_type"]: r["total"] or 0 for r in rows}
+    return (starting_balance or 0) + tot.get("income", 0) - tot.get("expense", 0)
+
+
+def _previous_projection(conn, plan):
+    """What last month was projected to end at: {"month": "October", "amount": 4150.0}.
+
+    From last month's plan, the figure as it stood at the close of the first
+    day it was looked at in that month. Before monthly plans existed, from the earliest dated plan of
+    that month. None when there is neither.
+    """
+    y, m = (int(x) for x in plan["plan_date"].split("-")[:2])
+    py, pm = (y, m - 1) if m > 1 else (y - 1, 12)
+    prefix = f"{py}-{pm:02d}"
+    prev = conn.execute(
+        "SELECT id FROM budget_plans WHERE kind='month' AND plan_date=?", (prefix + "-01",)
+    ).fetchone()
+    if prev:
+        # The first figure recorded once that month had begun; a plan set up
+        # ahead of time has only its last figure from before.
+        first = prefix + "-01"
+        snap = conn.execute(
+            "SELECT projected FROM plan_projections WHERE plan_id=? "
+            "ORDER BY (day < ?), CASE WHEN day < ? THEN day END DESC, day LIMIT 1",
+            (prev["id"], first, first)
+        ).fetchone()
+        if snap:
+            return {"month": MONTHS[pm - 1], "amount": snap["projected"]}
+    old = conn.execute(
+        "SELECT id, starting_balance FROM budget_plans "
+        "WHERE COALESCE(kind,'dated')='dated' AND plan_date LIKE ? ORDER BY plan_date LIMIT 1",
+        (prefix + "-%",)
+    ).fetchone()
+    if old:
+        return {"month": MONTHS[pm - 1], "amount": _projected(conn, old["id"], old["starting_balance"])}
+    return None
 
 
 def update_plan(plan_id, **kwargs):
-    allowed = {"label", "starting_balance"}
+    allowed = {"label", "starting_balance", "excl"}
     sets = {k: v for k, v in kwargs.items() if k in allowed}
     if not sets:
         return
@@ -221,25 +335,120 @@ def delete_plan(plan_id):
     conn.close()
 
 
-# ── Budget Items ───────────────────────────────────────────────────────────
+def start_month(month, copy_from=None):
+    """Create the plan for 'YYYY-MM', carried forward from another plan.
 
-def add_item(plan_id, category, budget_amount, item_type, label=None):
+    Everything comes along except lines marked 'oneoff'. The checking balance
+    starts at where the source month was projected to end (or, from an old
+    dated plan, at its balance) — it is typed over at the first check-in.
+    """
+    y, m = (int(x) for x in month.split("-")[:2])
+    source = get_plan(copy_from) if copy_from else None
+    balance, excl = 0, ""
+    if source:
+        excl = source["excl"]
+        conn = get_conn()
+        balance = (_projected(conn, source["id"], source["starting_balance"])
+                   if source["kind"] == "month" else source["starting_balance"])
+        conn.close()
+    plan = create_plan(f"{y}-{m:02d}-01", label=f"{MONTHS[m - 1]} {y}",
+                       starting_balance=balance, kind="month", excl=excl)
+    if source:
+        conn = get_conn()
+        for i in source["items"]:
+            if i["tag"] == "oneoff":
+                continue
+            conn.execute(
+                "INSERT INTO budget_items(plan_id,category,label,budget_amount,item_type,scheduled_id,grp,sort_order,tag,account) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (plan["id"], i["category"], i["label"], i["budget_amount"], i["item_type"],
+                 i["scheduled_id"], i["grp"], i["sort_order"], i["tag"], i["account"])
+            )
+        conn.commit()
+        conn.close()
+    return get_plan(plan["id"])
+
+
+def save_projection(plan_id, day, projected):
     conn = get_conn()
     conn.execute(
-        "INSERT INTO budget_items(plan_id,category,label,budget_amount,item_type) VALUES(?,?,?,?,?)",
-        (plan_id, category or None, label or None, budget_amount, item_type)
+        "INSERT INTO plan_projections(plan_id, day, projected) VALUES(?,?,?) "
+        "ON CONFLICT(plan_id, day) DO UPDATE SET projected=excluded.projected",
+        (plan_id, day, projected)
     )
     conn.commit()
-    row = conn.execute(
-        "SELECT id,category,label,budget_amount,item_type FROM budget_items WHERE rowid=last_insert_rowid()"
-    ).fetchone()
+    conn.close()
+
+
+def get_planner_settings():
+    conn = get_conn()
+    rows = conn.execute("SELECT key, value FROM planner_settings").fetchall()
+    conn.close()
+    out = {"floor": 3000.0}
+    for r in rows:
+        try:
+            out[r["key"]] = float(r["value"])
+        except (TypeError, ValueError):
+            out[r["key"]] = r["value"]
+    return out
+
+
+def set_planner_settings(updates: dict):
+    conn = get_conn()
+    for k, v in updates.items():
+        conn.execute("INSERT OR REPLACE INTO planner_settings(key, value) VALUES(?,?)", (k, str(v)))
+    conn.commit()
+    conn.close()
+
+
+# ── Budget Items ───────────────────────────────────────────────────────────
+
+def add_item(plan_id, category, budget_amount, item_type, label=None, grp=None, tag="", account=None):
+    conn = get_conn()
+    category = category or None
+    if category and conn.execute(
+        "SELECT 1 FROM budget_items WHERE plan_id=? AND category=?", (plan_id, category)
+    ).fetchone():
+        # A second line in the same Quicken category (a one-off beside the usual
+        # line) is kept under its name alone; UNIQUE(plan_id, category) allows one.
+        label = label or category.split(":")[-1]
+        category = None
+    if item_type == "expense" and grp not in ("other", "utilities", "cards"):
+        grp = "other"
+    if item_type != "expense":
+        grp = None
+    nxt = conn.execute(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM budget_items WHERE plan_id=?", (plan_id,)
+    ).fetchone()[0]
+    cur = conn.execute(
+        "INSERT INTO budget_items(plan_id,category,label,budget_amount,item_type,grp,sort_order,tag,account) "
+        "VALUES(?,?,?,?,?,?,?,?,?)",
+        (plan_id, category, label or None, budget_amount, item_type, grp, nxt,
+         tag if tag in ("oneoff", "auto") else "", account or None)
+    )
+    conn.commit()
+    row = conn.execute(f"SELECT {_ITEM_COLS} FROM budget_items WHERE id=?", (cur.lastrowid,)).fetchone()
     conn.close()
     return dict(row)
 
 
-def update_item(item_id, budget_amount):
+def update_item(item_id, **kwargs):
+    allowed = {"budget_amount", "tag"}
+    sets = {k: v for k, v in kwargs.items() if k in allowed}
+    if not sets:
+        return
     conn = get_conn()
-    conn.execute("UPDATE budget_items SET budget_amount=? WHERE id=?", (budget_amount, item_id))
+    placeholders = ", ".join(f"{k}=?" for k in sets)
+    conn.execute(f"UPDATE budget_items SET {placeholders} WHERE id=?", (*sets.values(), item_id))
+    conn.commit()
+    conn.close()
+
+
+def reorder_items(plan_id, ids):
+    """Save the dragged order: ids top to bottom across the whole plan."""
+    conn = get_conn()
+    for n, item_id in enumerate(ids):
+        conn.execute("UPDATE budget_items SET sort_order=? WHERE id=? AND plan_id=?", (n, item_id, plan_id))
     conn.commit()
     conn.close()
 
@@ -394,16 +603,16 @@ def accept_suggestion(plan_id, scheduled_id):
     # Stored as a freeform item (label, no category) so it never collides with a
     # Quicken category row via UNIQUE(plan_id, category).
     conn.execute(
-        "INSERT INTO budget_items(plan_id,category,label,budget_amount,item_type,scheduled_id) "
-        "VALUES(?,NULL,?,?,?,?)",
-        (plan_id, s["source"], s["amount"], s["item_type"] or "income", scheduled_id)
+        "INSERT INTO budget_items(plan_id,category,label,budget_amount,item_type,scheduled_id,grp,sort_order) "
+        "VALUES(?,NULL,?,?,?,?,?,(SELECT COALESCE(MAX(sort_order), -1) + 1 FROM budget_items WHERE plan_id=?))",
+        (plan_id, s["source"], s["amount"], s["item_type"] or "income", scheduled_id,
+         "other" if s["item_type"] == "expense" else None, plan_id)
     )
     conn.execute("DELETE FROM scheduled_dismissals WHERE plan_id=? AND scheduled_id=?",
                  (plan_id, scheduled_id))
     conn.commit()
     row = conn.execute(
-        "SELECT id,category,label,budget_amount,item_type,scheduled_id "
-        "FROM budget_items WHERE rowid=last_insert_rowid()"
+        f"SELECT {_ITEM_COLS} FROM budget_items WHERE rowid=last_insert_rowid()"
     ).fetchone()
     conn.close()
     return dict(row)

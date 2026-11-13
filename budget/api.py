@@ -186,7 +186,9 @@ def create_plan():
         plan = db.create_plan(
             plan_date,
             label=data.get("label"),
-            starting_balance=data.get("starting_balance", 0)
+            starting_balance=data.get("starting_balance", 0),
+            kind=data.get("kind", "dated"),
+            excl=data.get("excl", "")
         )
         return jsonify(plan), 201
     except Exception as e:
@@ -221,14 +223,65 @@ def add_item(plan_id):
     item_type     = data.get("item_type", "expense")
     if not category and not label:
         return jsonify({"error": "category or label required"}), 400
-    item = db.add_item(plan_id, category, budget_amount, item_type, label=label)
+    item = db.add_item(plan_id, category, budget_amount, item_type, label=label,
+                       grp=data.get("grp"), tag=data.get("tag") or "", account=data.get("account"))
     return jsonify(item), 201
 
 @app.route("/api/items/<int:item_id>", methods=["PUT"])
 def update_item(item_id):
     data = request.get_json() or {}
-    db.update_item(item_id, float(data.get("budget_amount", 0)))
+    fields = {}
+    if "budget_amount" in data:
+        fields["budget_amount"] = float(data["budget_amount"] or 0)
+    if data.get("tag") in ("", "oneoff", "auto"):
+        fields["tag"] = data["tag"]
+    db.update_item(item_id, **fields)
     return jsonify({"ok": True})
+
+@app.route("/api/plans/<int:plan_id>/order", methods=["PUT"])
+def reorder_items(plan_id):
+    data = request.get_json() or {}
+    db.reorder_items(plan_id, [int(i) for i in data.get("ids", [])])
+    return jsonify({"ok": True})
+
+@app.route("/api/plans/<int:plan_id>/projection", methods=["PUT"])
+def save_projection(plan_id):
+    """Record today's projected month-end balance (one figure per day, last wins)."""
+    from datetime import date as _date
+    data = request.get_json() or {}
+    db.save_projection(plan_id, _date.today().isoformat(), float(data.get("projected", 0)))
+    return jsonify({"ok": True})
+
+# ── Months, cards, settings ───────────────────────────────────────────────
+
+@app.route("/api/months", methods=["POST"])
+def start_month():
+    """Start the plan for a month ("2026-12"), carried forward from copy_from."""
+    import re
+    data  = request.get_json() or {}
+    month = data.get("month") or ""
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+        return jsonify({"error": "month must be YYYY-MM"}), 400
+    try:
+        return jsonify(db.start_month(month, data.get("copy_from"))), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 409
+
+@app.route("/api/planner/cards")
+def planner_cards():
+    """Quicken accounts as [{label, account}] for the Credit Cards add box."""
+    return jsonify([{"label": k, "account": v} for k, v in db.card_accounts().items()])
+
+@app.route("/api/planner/settings", methods=["GET"])
+def planner_settings_get():
+    return jsonify(db.get_planner_settings())
+
+@app.route("/api/planner/settings", methods=["PUT"])
+def planner_settings_put():
+    data = request.get_json() or {}
+    if "floor" in data:
+        db.set_planner_settings({"floor": float(data["floor"] or 0)})
+    return jsonify(db.get_planner_settings())
 
 @app.route("/api/items/<int:item_id>", methods=["DELETE"])
 def del_item(item_id):
@@ -267,34 +320,6 @@ def csv_upload():
         return jsonify({"count": len(df2)})
     except Exception as e:
         return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
-
-
-# ── Copy plan (B3) ────────────────────────────────────────────────────────
-
-@app.route("/api/plans/<int:source_id>/copy", methods=["POST"])
-def copy_plan(source_id):
-    from datetime import date as _date
-    data      = request.get_json() or {}
-    plan_date = data.get("plan_date")
-    if not plan_date:
-        return jsonify({"error": "plan_date required"}), 400
-    source = db.get_plan(source_id)
-    if not source:
-        return jsonify({"error": "source not found"}), 404
-    try:
-        d      = _date.fromisoformat(plan_date)
-        months = ['January','February','March','April','May','June',
-                  'July','August','September','October','November','December']
-        label    = f"{months[d.month-1]} {d.day}, {d.year}"
-        new_plan = db.create_plan(plan_date, label=label,
-                                  starting_balance=source.get("starting_balance", 0))
-        for item in source.get("items", []):
-            db.add_item(new_plan["id"], item.get("category"),
-                        item["budget_amount"], item["item_type"],
-                        label=item.get("label"))
-        return jsonify(db.get_plan(new_plan["id"])), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 409
 
 
 # ── Annual summary (B4) ───────────────────────────────────────────────────

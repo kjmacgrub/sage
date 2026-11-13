@@ -1,37 +1,52 @@
 // ============================================================
-// Budget Planner — app.js  (API-driven, Quicken categories)
+// Planner — app.js  (one plan per month, API-driven)
 // ============================================================
 
 // ── State ──────────────────────────────────────────────────
-let currentPlanId  = null;
-let currentPlan    = null;   // {id, plan_date, label, starting_balance, items:[]}
-let allPlans       = [];
-let allGroups      = {};     // {group: [{category, type}]}
-let catTypes       = {};     // {category: 'income'|'expense'}
-let currentActuals = {};     // {category: amount}
-let panelsExpanded = false;
-let showZeroIncome = false;
-let showZeroExpense= false;
-let expenseViewMode = 'grouped';  // 'grouped' or 'subpanels'
+let currentPlanId = null;
+let currentPlan   = null;   // {id, plan_date, label, starting_balance, kind, excl, items:[], prev_projected}
+let allPlans      = [];
+let allGroups     = {};     // {group: [{category, type}]}
+let catTypes      = {};     // {category: 'income'|'expense'}
+let cardOptions   = [];     // [{label, account}] — Quicken accounts for the Credit Cards add box
+let settings      = {floor: 3000};
 
 // Scheduled items active for the current plan that are neither accepted nor rejected
 let suggestions = {income: [], expense: [], dismissed: {income: 0, expense: 0}};
-let expenseManualOrder = [];      // [itemId] — drag order in subpanel view, session-only
+
+// Expense groups, top to bottom. An optional group has a "Count in total" box;
+// unticked, it is left out of the column totals but never out of the projection.
+const EXPENSE_GROUPS = [
+    {key: 'other',     title: 'Other'},
+    {key: 'utilities', title: 'Utilities',    optional: true},
+    {key: 'cards',     title: 'Credit Cards', optional: true},
+];
+const GROUP_TITLES = {income: 'Income lines', other: 'Other', utilities: 'Utilities', cards: 'Credit Cards'};
+const TAG_TEXT     = {oneoff: 'one-off', auto: 'automatic'};
+const MONTH_NAMES  = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
 
 // ── Init ───────────────────────────────────────────────────
 
 async function initApp() {
-    await loadCategories();
-    await loadPlans();
-    if (allPlans.length === 0) {
-        const today = new Date();
-        const iso   = today.toISOString().split('T')[0];
-        const label = formatPlanLabel(iso);
-        const plan  = await apiPost('/api/plans', {plan_date: iso, label, starting_balance: 0});
-        allPlans = [plan];
+    const nav = document.querySelector('.tab-nav');
+    if (nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+
+    await Promise.all([loadCategories(), loadCards(), loadSettings(), loadPlans()]);
+    if (!allPlans.some(p => p.kind === 'month')) {
+        // First run of the monthly Planner: this month starts from the newest dated plan.
+        await apiPost('/api/months', {month: thisMonth(), copy_from: allPlans[0]?.id || null});
+        await loadPlans();
     }
+    const months = allPlans.filter(p => p.kind === 'month');
+    const open   = months.find(p => p.plan_date.startsWith(thisMonth())) || months[0];
     renderPlanDropdown();
-    await loadPlan(allPlans[0].id);
+    await loadPlan(open.id);
+}
+
+function thisMonth() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 async function loadCategories() {
@@ -43,35 +58,18 @@ async function loadCategories() {
     }
 }
 
-async function loadPlans() {
-    allPlans = await apiFetch('/api/plans');
-}
+async function loadCards()    { try { cardOptions = await apiFetch('/api/planner/cards'); } catch (e) { cardOptions = []; } }
+async function loadSettings() { try { settings = await apiFetch('/api/planner/settings'); } catch (e) {} }
+async function loadPlans()    { allPlans = await apiFetch('/api/plans'); }
 
 // ── Plan CRUD ──────────────────────────────────────────────
 
 async function loadPlan(id) {
     currentPlan   = await apiFetch(`/api/plans/${id}`);
     currentPlanId = id;
-
-    // Derive month/year from plan_date e.g. "2026-01-08"
-    const [year, month] = currentPlan.plan_date.split('-').map(Number);
-    currentActuals = await apiFetch(`/api/actuals?month=${month}&year=${year}`);
     await loadSuggestions();
-
     renderDropdownSelection();
     renderBudget();
-}
-
-async function createNewPlan(isoDate) {
-    const label = formatPlanLabel(isoDate);
-    try {
-        const plan = await apiPost('/api/plans', {plan_date: isoDate, label, starting_balance: 0});
-        allPlans.unshift(plan);
-        renderPlanDropdown();
-        await loadPlan(plan.id);
-    } catch(e) {
-        showToast('A plan with that date already exists');
-    }
 }
 
 async function deletePlan(id) {
@@ -79,36 +77,26 @@ async function deletePlan(id) {
     await apiDelete(`/api/plans/${id}`);
     allPlans = allPlans.filter(p => p.id !== id);
     renderPlanDropdown();
-    await loadPlan(allPlans[0].id);
+    if (id === currentPlanId) await loadPlan(allPlans[0].id);
 }
 
 async function saveStartingBalance() {
     const input = document.getElementById('startingBalanceInput');
-    const val   = parseFloat(input.value.replace(/[^0-9.]/g, '')) || 0;
+    const val   = parseFloat(input.value.replace(/[^0-9.\-]/g, '')) || 0;
     input.value = formatCurrencyWhole(val);
     currentPlan.starting_balance = val;
     await apiPut(`/api/plans/${currentPlanId}`, {starting_balance: val});
     calculateTotals();
 }
 
-// ── Item CRUD ──────────────────────────────────────────────
+// ── Items ──────────────────────────────────────────────────
 
-async function addBudgetItem(category, budgetAmount) {
-    const type = catTypes[category] || 'expense';
-    const item = await apiPost(`/api/plans/${currentPlanId}/items`,
-        {category, budget_amount: budgetAmount, item_type: type});
-    currentPlan.items.push(item);
-    renderBudget();
-    showToast(`Added ${category}`);
-}
-
-async function addFreeformItem(label, budgetAmount) {
-    const item = await apiPost(`/api/plans/${currentPlanId}/items`,
-        {label, budget_amount: budgetAmount, item_type: 'expense'});
-    currentPlan.items.push(item);
-    renderBudget();
-    showToast(`Added ${label}`);
-}
+const groupOf  = i => i.item_type === 'income' ? 'income' : (i.grp || 'other');
+const shortCat = c => c.includes(':') ? c.split(':').slice(1).join(':') : c;
+const nameOf   = i => i.label || shortCat(i.category || '');
+const amountOf = i => parseFloat(i.budget_amount) || 0;
+const exclSet  = () => new Set((currentPlan.excl || '').split(',').filter(Boolean));
+const esc      = s => escHtmlBP(s).replace(/"/g, '&quot;');
 
 async function removeItem(itemId) {
     await apiDelete(`/api/items/${itemId}`);
@@ -116,9 +104,8 @@ async function removeItem(itemId) {
     renderBudget();
 }
 
-// Keep the in-memory plan in sync with edited inputs so any re-render
-// (view toggle, add/remove item, suggestions) repaints the real value
-// instead of the stale pre-edit one (which would show — and re-save — 0).
+// Keep the in-memory plan in sync with edited inputs so a re-render repaints
+// the real value instead of the stale pre-edit one.
 function updateLocalItemAmount(itemId, amount) {
     const item = (currentPlan.items || []).find(i => i.id === itemId);
     if (item) item.budget_amount = amount;
@@ -133,283 +120,163 @@ function debounceSaveItem(itemId, amount) {
     }, 600);
 }
 
+// Click a line's name to change how often it applies. A one-off stays in this
+// month only; everything else is carried into the next month's plan.
+async function cycleTag(itemId) {
+    const item = currentPlan.items.find(i => i.id === itemId);
+    if (!item) return;
+    const order = item.item_type === 'income' ? ['', 'oneoff', 'auto'] : ['', 'oneoff'];
+    item.tag = order[(order.indexOf(item.tag || '') + 1) % order.length];
+    renderBudget();
+    showToast(`${nameOf(item)}: ${{'': 'every month', oneoff: 'just this month', auto: 'automatic transfer'}[item.tag]}`);
+    await apiPut(`/api/items/${itemId}`, {tag: item.tag}).catch(() => showToast('Could not save — check connection'));
+}
+
+async function toggleGroup(grp, counted) {
+    const excl = exclSet();
+    counted ? excl.delete(grp) : excl.add(grp);
+    currentPlan.excl = [...excl].join(',');
+    document.querySelector(`.pl-card[data-grp="${grp}"]`)?.classList.toggle('pl-off', !counted);
+    calculateTotals();
+    await apiPut(`/api/plans/${currentPlanId}`, {excl: currentPlan.excl})
+        .catch(() => showToast('Could not save — check connection'));
+}
+
 // ── Rendering ──────────────────────────────────────────────
 
 function renderBudget() {
-    const incomeItems  = (currentPlan.items || []).filter(i => i.item_type === 'income');
-    const expenseItems = (currentPlan.items || []).filter(i => i.item_type === 'expense');
-
-    const content = `
-        <div class="two-column-wrapper">
-            <div class="budget-panel income-panel">
-                <div class="budget-panel-header">
-                    <span class="budget-panel-title income-title">Income</span>
-                    <span class="budget-panel-total-stack">
-                        <span class="budget-panel-total" id="totalIncome">$0</span>
-                        <span class="budget-panel-subtotal" id="totalAvailable"
-                              title="Future income plus current balance — all money available this period"></span>
-                    </span>
-                    <button class="add-category-plus" onclick="openAddItem('income')" title="Add income category">+</button>
-                </div>
-                ${renderTable(incomeItems, 'income')}
+    const items = currentPlan.items || [];
+    const by    = g => items.filter(i => groupOf(i) === g);
+    const excl  = exclSet();
+    const el    = document.getElementById('budgetContent');
+    el.className = '';
+    el.innerHTML = `
+        <div class="pl-cols">
+            <div class="pl-col">
+                <div class="pl-colhead"><span>Income</span><b id="totalIncome"></b></div>
+                ${renderCard('income', by('income'))}
             </div>
-            <div class="budget-panel expense-panel">
-                <div class="budget-panel-header">
-                    <span class="budget-panel-title expense-title">Expenses</span>
-                    <span class="budget-panel-total-stack">
-                        <span class="budget-panel-total" id="totalExpenses">$0</span>
-                        <span class="budget-panel-subtotal" aria-hidden="true">&nbsp;</span>
-                    </span>
-                    <button class="view-toggle-btn" onclick="toggleExpenseView()" title="Toggle subpanel view">${expenseViewMode === 'grouped' ? '▦' : '▤'}</button>
-                    <button class="add-category-plus" onclick="openAddItem('expense')" title="Add expense category">+</button>
+            <div class="pl-col">
+                <div class="pl-colhead"><span>Expenses</span><b id="totalExpenses"></b></div>
+                ${EXPENSE_GROUPS.map(g => renderCard(g.key, by(g.key), g.optional, excl.has(g.key))).join('')}
+                <div class="pl-card pl-grand">
+                    <div><span>Total expenses</span><small id="grandNote"></small></div>
+                    <b id="grandExpenses"></b>
                 </div>
-                ${expenseViewMode === 'grouped' ? renderTable(expenseItems, 'expense') : renderExpenseSubpanels(expenseItems)}
             </div>
         </div>`;
-
-    document.getElementById('budgetContent').innerHTML = content;
-    if (expenseViewMode === 'subpanels') enableExpenseDragReorder();
-
-    const balInput = document.getElementById('startingBalanceInput');
-    if (balInput) balInput.value = formatCurrencyWhole(currentPlan.starting_balance || 0);
-
+    enableDragReorder();
+    renderHeader();
     calculateTotals();
 }
 
-function renderTable(items, type) {
-    const suggRows = renderSuggestionRows(type);
-    if (!items.length && !suggRows) {
-        return `<p class="empty-section">No ${type} items — click + to add.</p>`;
+function renderHeader() {
+    const balInput = document.getElementById('startingBalanceInput');
+    if (balInput) balInput.value = formatCurrencyWhole(currentPlan.starting_balance || 0);
+
+    const prev = currentPlan.prev_projected;
+    document.getElementById('prevProjected').textContent =
+        prev ? `${prev.month} projected ${money(prev.amount)}` : '';
+
+    let label = 'Projected balance';
+    if (currentPlan.kind === 'month') {
+        const [y, m] = currentPlan.plan_date.split('-').map(Number);
+        label = `Projected ${MONTH_NAMES[m - 1].slice(0, 3)} ${new Date(y, m, 0).getDate()}`;
     }
-
-    // Group by Quicken top-level category; freeform items go under '__freeform__'
-    const grouped = {};
-    items.forEach(item => {
-        const group = !item.category ? '__freeform__'
-            : item.category.includes(':') ? item.category.split(':')[0]
-            : item.category;
-        (grouped[group] = grouped[group] || []).push(item);
-    });
-
-    const rows = Object.entries(grouped).sort(([a],[b]) => {
-        if (a === '__freeform__') return 1;
-        if (b === '__freeform__') return -1;
-        return a.localeCompare(b);
-    }).map(([group, groupItems]) => {
-        const groupLabel = group === '__freeform__' ? 'Custom' : group;
-        const itemRows = groupItems
-            .sort((a,b) => (a.label || a.category).localeCompare(b.label || b.category))
-            .map(item => renderItem(item, type, group))
-            .join('');
-        return `
-            <tr class="budget-group-row">
-                <td class="group-name">${groupLabel}</td>
-                <td></td><td></td>
-                <td class="group-subtotal" id="stot_${CSS.escape(group)}_${type}"></td>
-            </tr>
-            ${itemRows}`;
-    }).join('');
-
-    return `
-        <table class="budget-table">
-            <thead>
-                <tr class="budget-col-heads">
-                    <th class="bh-cat">Category</th>
-                    <th class="bh-num">Budget</th>
-                    <th class="bh-num">Actual</th>
-                    <th class="bh-del"></th>
-                </tr>
-            </thead>
-            <tbody>${rows}${suggRows}</tbody>
-        </table>`;
+    document.getElementById('projectedLabel').textContent = label;
 }
 
-function renderItem(item, type, group) {
-    const isFreeform  = !item.category;
-    const displayName = isFreeform
-        ? item.label
-        : (item.category.includes(':') ? item.category.split(':').slice(1).join(':') : item.category);
-
-    const actualRaw = isFreeform ? 0 : (currentActuals[item.category] || 0);
-    const actualAbs = Math.abs(actualRaw);
-    const actualStr = isFreeform ? '—' : (actualAbs > 0.01 ? formatCurrencyWhole(actualAbs) : '—');
-
+function renderCard(grp, items, optional, off) {
+    const sugg  = grp === 'income' ? renderSuggestionRows('income')
+                : grp === 'other'  ? renderSuggestionRows('expense') : '';
+    const check = optional ? `
+        <label class="pl-count" title="Unticked, this group is left out of the Expenses total. The projected balance always counts it.">
+            <input type="checkbox" ${off ? '' : 'checked'} onchange="toggleGroup('${grp}', this.checked)"> Count in total
+        </label>` : '';
     return `
-    <tr class="budget-item-row" data-item-id="${item.id}">
-        <td class="item-name${isFreeform ? ' freeform-item' : ''}" title="${isFreeform ? item.label : item.category}">${displayName}</td>
-        <td class="item-budget">
+        <div class="pl-card${off ? ' pl-off' : ''}" data-grp="${grp}">
+            <div class="pl-card-head">
+                <span class="pl-card-title">${GROUP_TITLES[grp]}</span>
+                ${check}
+                <button class="pl-add" onclick="openAdd('${grp}')">+ add</button>
+            </div>
+            <div class="pl-addrow" id="add_${grp}" hidden>${addRowHtml(grp)}</div>
+            <div class="pl-rows" data-grp="${grp}">${items.map(renderRow).join('') || '<p class="pl-empty">No lines yet.</p>'}</div>
+            ${sugg}
+            <div class="pl-row pl-total"><span>${grp === 'income' ? 'Total' : 'Subtotal'}</span><b id="sub_${grp}"></b></div>
+        </div>`;
+}
+
+function renderRow(item) {
+    const tag  = item.tag ? `<span class="pl-tag pl-tag-${item.tag}">${TAG_TEXT[item.tag]}</span>` : '';
+    const full = item.account || item.category || item.label || '';
+    return `
+        <div class="pl-row${item.tag === 'oneoff' ? ' pl-oneoff' : ''}" data-item-id="${item.id}">
+            <span class="pl-grip" draggable="true" title="Drag to reorder">⋮⋮</span>
+            <span class="pl-name" title="${esc(full)}. Click to change between every month and just this month."
+                  onclick="cycleTag(${item.id})">${esc(nameOf(item))}${tag}</span>
             <input type="text" class="expense-input"
                    value="${formatNumberWithCommas(item.budget_amount)}"
                    data-item-id="${item.id}"
-                   data-group-type="${type}"
-                   data-group="${group}"
                    onfocus="removeCommasOnFocus(this)"
                    onblur="formatAndSaveAmount(this)"
                    oninput="onAmountInput(this)"
                    onkeypress="if(event.key==='Enter') this.blur()">
-        </td>
-        <td class="item-actual">${actualStr}</td>
-        <td class="item-del"><button class="delete-item-btn" onclick="removeItem(${item.id})">×</button></td>
-    </tr>`;
-}
-
-// ── Expense subpanel view ─────────────────────────────────
-
-function toggleExpenseView() {
-    expenseViewMode = expenseViewMode === 'grouped' ? 'subpanels' : 'grouped';
-    renderBudget();
-}
-
-function renderExpenseSubpanels(items) {
-    const utilities = [];
-    const custom    = [];
-    const other     = [];
-
-    items.forEach(item => {
-        if (!item.category) {
-            custom.push(item);
-        } else {
-            const group = item.category.includes(':') ? item.category.split(':')[0] : item.category;
-            if (group.toLowerCase() === 'utilities') {
-                utilities.push(item);
-            } else {
-                other.push(item);
-            }
-        }
-    });
-
-    const displayName = item => item.label || (item.category.includes(':') ? item.category.split(':').slice(1).join(':') : item.category);
-    // Dragged items keep their manual position; everything else stays alphabetical below them.
-    const orderIdx = item => {
-        const i = expenseManualOrder.indexOf(item.id);
-        return i === -1 ? Number.MAX_SAFE_INTEGER : i;
-    };
-    const sortItems = (a, b) => (orderIdx(a) - orderIdx(b)) || displayName(a).localeCompare(displayName(b));
-    utilities.sort(sortItems);
-    custom.sort(sortItems);
-    other.sort(sortItems);
-
-    // Utilities also appear inside Other as a single derived roll-up row, so
-    // Other's subtotal reads as "everything but Custom". The row carries no
-    // input, so the Expenses grand total still counts each utility only once.
-    const utilitiesRollup = utilities.length ? {
-        label:  'Utilities',
-        amount: utilities.reduce((s, i) => s + (parseFloat(i.budget_amount) || 0), 0),
-        actual: utilities.reduce((s, i) => s + Math.abs(currentActuals[i.category] || 0), 0),
-    } : null;
-
-    return renderSubpanel('Utilities', utilities, 'expense')
-         + renderSubpanel('Custom', custom, 'expense')
-         + renderSubpanel('Other', other, 'expense', utilitiesRollup)
-         + renderSuggestionSubpanel();
-}
-
-// Scheduled expenses get their own block in subpanel view — they belong to no
-// subpanel until accepted, and this keeps them clear of the drag-reorder rows.
-function renderSuggestionSubpanel() {
-    const suggRows = renderSuggestionRows('expense', false);
-    if (!suggRows) return '';
-    return `
-        <div class="expense-subpanel sched-subpanel">
-            <div class="subpanel-header">
-                <span class="subpanel-title">Scheduled &middot; not added</span>
-                <span class="subpanel-total">${fmtS((suggestions.expense || []).reduce((s, x) => s + x.amount, 0))}</span>
-            </div>
-            <table class="budget-table">
-                <colgroup><col><col style="width:88px"><col style="width:88px"><col style="width:28px"></colgroup>
-                <tbody>${suggRows}</tbody>
-            </table>
+            <button class="delete-item-btn" onclick="removeItem(${item.id})" title="Remove">×</button>
         </div>`;
 }
 
-// Drag a row by its category name to reorder within its own subpanel.
-// The result lives in expenseManualOrder (memory only) so it survives
-// re-renders — add/remove item, view toggle — but resets on reload.
-function enableExpenseDragReorder() {
+// ── Drag to reorder ────────────────────────────────────────
+// Drag a row by its grip, within its own card. The order is saved with the
+// plan and carried into each new month.
+
+function enableDragReorder() {
     let dragRow = null;
-
-    document.querySelectorAll('.expense-subpanel tbody').forEach(tbody => {
-        tbody.querySelectorAll('tr.budget-item-row').forEach(row => {
-            const handle = row.querySelector('td.item-name');
-            if (!handle) return;
-            handle.draggable = true;
-            handle.classList.add('drag-handle');
-
-            handle.addEventListener('dragstart', e => {
+    document.querySelectorAll('.pl-rows').forEach(box => {
+        box.querySelectorAll('.pl-grip').forEach(grip => {
+            const row = grip.closest('.pl-row');
+            grip.addEventListener('dragstart', e => {
                 dragRow = row;
                 row.classList.add('dragging');
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', row.dataset.itemId);
+                e.dataTransfer.setDragImage(row, 12, row.offsetHeight / 2);
             });
-            handle.addEventListener('dragend', () => {
+            grip.addEventListener('dragend', () => {
                 row.classList.remove('dragging');
                 dragRow = null;
-                // Rebuild from the DOM so every panel's order is captured at once.
-                expenseManualOrder = [...document.querySelectorAll('.expense-subpanel tr.budget-item-row')]
-                    .map(r => parseInt(r.dataset.itemId));
+                saveOrder();
             });
         });
-
-        tbody.addEventListener('dragover', e => {
-            if (!dragRow || dragRow.parentElement !== tbody) return;  // same subpanel only
+        box.addEventListener('dragover', e => {
+            if (!dragRow || dragRow.parentElement !== box) return;   // same card only
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            const target = e.target.closest('tr.budget-item-row');
-            if (!target || target === dragRow || target.parentElement !== tbody) return;
-            const rect  = target.getBoundingClientRect();
-            const after = e.clientY > rect.top + rect.height / 2;
-            tbody.insertBefore(dragRow, after ? target.nextSibling : target);
+            const target = e.target.closest('.pl-row');
+            if (!target || target === dragRow || target.parentElement !== box) return;
+            const rect = target.getBoundingClientRect();
+            box.insertBefore(dragRow, e.clientY > rect.top + rect.height / 2 ? target.nextSibling : target);
         });
-        tbody.addEventListener('drop', e => e.preventDefault());
+        box.addEventListener('drop', e => e.preventDefault());
     });
 }
 
-function renderSubpanel(title, items, type, rollup) {
-    const rows = items.map(item => {
-        const group = !item.category ? '__freeform__'
-            : item.category.includes(':') ? item.category.split(':')[0]
-            : item.category;
-        return renderItem(item, type, group);
-    }).join('');
-
-    const rollupRow = rollup ? `
-        <tr class="budget-rollup-row" title="Total of the ${rollup.label} panel above — edit those items to change it">
-            <td class="item-name">${rollup.label}</td>
-            <td class="item-budget"><span class="rollup-amount" id="rollup_${rollup.label.toLowerCase()}">${formatNumberWithCommas(rollup.amount)}</span></td>
-            <td class="item-actual">${rollup.actual > 0.01 ? formatCurrencyWhole(rollup.actual) : '—'}</td>
-            <td class="item-del"></td>
-        </tr>` : '';
-
-    return `
-        <div class="expense-subpanel">
-            <div class="subpanel-header">
-                <span class="subpanel-title">${title}</span>
-                <span class="subpanel-total" id="subpanel_${title.toLowerCase()}"></span>
-            </div>
-            ${!items.length && !rollup ? `<p class="empty-section">No ${title.toLowerCase()} items.</p>` : `
-            <table class="budget-table">
-                <thead>
-                    <tr class="budget-col-heads">
-                        <th class="bh-cat">Category</th>
-                        <th class="bh-num">Budget</th>
-                        <th class="bh-num">Actual</th>
-                        <th class="bh-del"></th>
-                    </tr>
-                </thead>
-                <tbody>${rollupRow}${rows}</tbody>
-            </table>`}
-        </div>`;
+function saveOrder() {
+    const ids = [...document.querySelectorAll('.pl-rows .pl-row')].map(r => parseInt(r.dataset.itemId));
+    const pos = new Map(ids.map((id, n) => [id, n]));
+    currentPlan.items.sort((a, b) => pos.get(a.id) - pos.get(b.id));
+    apiPut(`/api/plans/${currentPlanId}/order`, {ids})
+        .catch(() => showToast('Could not save the order — check connection'));
 }
 
 // ── Plan dropdown ──────────────────────────────────────────
 
 function renderPlanDropdown() {
-    const menu    = document.getElementById('monthDropdownMenu');
-    const display = document.getElementById('selectedMonthDisplay');
-    if (!menu || !display) return;
-
+    const menu = document.getElementById('monthDropdownMenu');
+    if (!menu) return;
     menu.innerHTML = '';
-    allPlans.forEach(plan => {
+
+    const addOption = plan => {
         const opt = document.createElement('div');
         opt.className = `month-option ${plan.id === currentPlanId ? 'selected' : ''}`;
 
@@ -427,14 +294,24 @@ function renderPlanDropdown() {
         opt.appendChild(del);
         opt.onclick = e => { if (e.target !== del) selectPlan(plan.id); };
         menu.appendChild(opt);
-    });
+    };
+
+    allPlans.filter(p => p.kind === 'month').forEach(addOption);
 
     const newBtn = document.createElement('div');
     newBtn.className = 'month-option new-month-option';
-    newBtn.textContent = '+ New Date';
+    newBtn.textContent = '+ New month';
     newBtn.onclick = () => { toggleMonthDropdown(); createNewMonth(); };
     menu.appendChild(newBtn);
 
+    const dated = allPlans.filter(p => p.kind !== 'month');
+    if (dated.length) {
+        const head = document.createElement('div');
+        head.className = 'pl-menu-head';
+        head.textContent = 'Earlier dated plans';
+        menu.appendChild(head);
+        dated.forEach(addOption);
+    }
     renderDropdownSelection();
 }
 
@@ -456,154 +333,156 @@ async function selectPlanById(id) {
     renderPlanDropdown();
 }
 
-// ── Add item modal ─────────────────────────────────────────
+function toggleMonthDropdown() {
+    document.getElementById('monthDropdownMenu')?.classList.toggle('active');
+}
 
-let _addItemType = 'expense';
+// ── Add a line ─────────────────────────────────────────────
+// One name box per card. Pick a Quicken category (or, for Credit Cards, a
+// Quicken account) from the suggestions and the line is linked to it; type
+// anything else and it is a plain line with that name.
 
-function openAddItem(type) {
-    _addItemType = type;
-    const modal = document.getElementById('addItemModal');
-    const sel   = document.getElementById('addItemSelect');
-    if (!modal || !sel) return;
+function addRowHtml(grp) {
+    const oneoffFirst = grp === 'income' || grp === 'other';   // surprises land here
+    const opts = [
+        ['', 'Every month'],
+        ['oneoff', 'Just this month'],
+        ...(grp === 'income' ? [['auto', 'Automatic transfer']] : []),
+    ];
+    if (oneoffFirst) opts.unshift(opts.splice(1, 1)[0]);
+    return `
+        <input class="pl-add-name" list="dl_${grp}" placeholder="${grp === 'cards' ? 'Card' : 'Name or Quicken category'}"
+               onkeydown="addKey(event, '${grp}')">
+        <datalist id="dl_${grp}"></datalist>
+        <input class="pl-add-amt" type="number" step="0.01" min="0" placeholder="0" onkeydown="addKey(event, '${grp}')">
+        <select class="pl-add-tag">${opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>
+        <button class="pl-add-ok" onclick="confirmAdd('${grp}')">Add</button>`;
+}
 
-    // Get categories already in plan for this type (only category-based items)
+function candidates(grp) {
+    if (grp === 'cards') return cardOptions.map(c => c.label);
+    const type = grp === 'income' ? 'income' : 'expense';
     const used = new Set((currentPlan.items || []).filter(i => i.category).map(i => i.category));
-
-    // Build options from allGroups
-    sel.innerHTML = '<option value="">— select a category —</option>';
-    if (type === 'expense') {
-        sel.innerHTML += '<option value="__custom__">— Custom name… —</option>';
+    const out  = [];
+    for (const [group, cats] of Object.entries(allGroups)) {
+        const isUtil = group.toLowerCase() === 'utilities';
+        if (grp === 'utilities' && !isUtil) continue;
+        if (grp === 'other' && isUtil) continue;
+        cats.forEach(c => { if (c.type === type && !used.has(c.category)) out.push(c.category); });
     }
-    Object.entries(allGroups).sort(([a],[b]) => a.localeCompare(b)).forEach(([group, cats]) => {
-        const matching = cats.filter(c => c.type === type && !used.has(c.category));
-        if (!matching.length) return;
-        const og = document.createElement('optgroup');
-        og.label = group;
-        matching.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c.category;
-            opt.textContent = c.category.includes(':') ? c.category.split(':').slice(1).join(':') : c.category;
-            og.appendChild(opt);
-        });
-        sel.appendChild(og);
-    });
+    return out.sort((a, b) => a.localeCompare(b));
+}
 
-    sel.onchange = () => {
-        const customRow = document.getElementById('customNameRow');
-        if (customRow) customRow.style.display = sel.value === '__custom__' ? 'block' : 'none';
+function resolveName(grp, text) {
+    const name = text.trim(), t = name.toLowerCase();
+    if (grp === 'cards') {
+        const card = cardOptions.find(c => c.label.toLowerCase() === t);
+        return card ? {label: card.label, account: card.account} : {label: name};
+    }
+    const list = candidates(grp);
+    const full = list.find(c => c.toLowerCase() === t);
+    if (full) return {category: full};
+    const short = list.filter(c => shortCat(c).toLowerCase() === t);
+    return short.length === 1 ? {category: short[0]} : {label: name};
+}
+
+function openAdd(grp) {
+    const row = document.getElementById(`add_${grp}`);
+    if (!row) return;
+    row.hidden = !row.hidden;
+    if (row.hidden) return;
+    document.getElementById(`dl_${grp}`).innerHTML =
+        candidates(grp).map(c => `<option value="${esc(c)}">`).join('');
+    row.querySelector('.pl-add-name').focus();
+}
+
+function addKey(e, grp) {
+    if (e.key === 'Enter')  confirmAdd(grp);
+    if (e.key === 'Escape') document.getElementById(`add_${grp}`).hidden = true;
+}
+
+async function confirmAdd(grp) {
+    const row  = document.getElementById(`add_${grp}`);
+    const name = row.querySelector('.pl-add-name').value;
+    if (!name.trim()) { showToast('Please enter a name'); return; }
+    const body = {
+        ...resolveName(grp, name),
+        budget_amount: parseFloat(row.querySelector('.pl-add-amt').value) || 0,
+        item_type:     grp === 'income' ? 'income' : 'expense',
+        grp:           grp === 'income' ? null : grp,
+        tag:           row.querySelector('.pl-add-tag').value,
     };
-
-    document.getElementById('addItemAmount').value = '';
-    const labelInput = document.getElementById('addItemLabel');
-    if (labelInput) labelInput.value = '';
-    const customRow = document.getElementById('customNameRow');
-    if (customRow) customRow.style.display = 'none';
-
-    modal.style.display = 'flex';
-    sel.focus();
-}
-
-function hideAddItemModal() {
-    document.getElementById('addItemModal').style.display = 'none';
-}
-
-async function confirmAddItem() {
-    const cat    = document.getElementById('addItemSelect').value;
-    const amount = parseFloat(document.getElementById('addItemAmount').value) || 0;
-    if (cat === '__custom__') {
-        const label = (document.getElementById('addItemLabel')?.value || '').trim();
-        if (!label) { showToast('Please enter a name'); return; }
-        hideAddItemModal();
-        await addFreeformItem(label, amount);
-    } else {
-        if (!cat) { showToast('Please select a category'); return; }
-        hideAddItemModal();
-        await addBudgetItem(cat, amount);
+    try {
+        const item = await apiPost(`/api/plans/${currentPlanId}/items`, body);
+        currentPlan.items.push(item);
+        renderBudget();
+        showToast(`Added ${nameOf(item)}`);
+    } catch (e) {
+        showToast('Could not add — check connection');
     }
 }
 
 // ── Totals ─────────────────────────────────────────────────
 
+function money(v) {
+    return new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD',
+        minimumFractionDigits: 0, maximumFractionDigits: 0}).format(Math.round(v));
+}
+
 function calculateTotals() {
-    const bal = parseFloat(
-        (document.getElementById('startingBalanceInput')?.value || '0').replace(/[^0-9.]/g, '')
-    ) || 0;
+    const items = currentPlan.items || [];
+    const sum   = g => items.filter(i => groupOf(i) === g).reduce((s, i) => s + amountOf(i), 0);
+    const set   = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    const excl  = exclSet();
 
-    let totalIncome   = 0;
-    let totalExpenses = 0;
-    const groupTotals = {};
+    const income = sum('income');
+    set('sub_income', money(income));
+    set('totalIncome', money(income));
 
-    document.querySelectorAll('.expense-input').forEach(inp => {
-        const val   = parseFloat(inp.value.replace(/,/g, '')) || 0;
-        const type  = inp.getAttribute('data-group-type');
-        const group = inp.getAttribute('data-group');
-        const key   = `${group}_${type}`;
-        groupTotals[key] = (groupTotals[key] || 0) + val;
-        if (type === 'income') totalIncome   += val;
-        else                   totalExpenses += val;
+    // "all" drives the projection; "counted" is what the column totals show.
+    let all = 0, counted = 0;
+    const leftOut = [];
+    EXPENSE_GROUPS.forEach(g => {
+        const t = sum(g.key);
+        all += t;
+        if (excl.has(g.key)) { if (t) leftOut.push(g.title); }
+        else counted += t;
+        set(`sub_${g.key}`, money(t));
     });
+    set('totalExpenses', money(counted));
+    set('grandExpenses', money(counted));
+    set('grandNote', leftOut.length ? `${leftOut.join(' and ')} not counted here.` : '');
 
-    // Update group subtotals
-    for (const [key, total] of Object.entries(groupTotals)) {
-        const el = document.getElementById(`stot_${CSS.escape(key.replace('_income','').replace('_expense',''))}_${key.endsWith('income')?'income':'expense'}`);
-        if (el) el.innerHTML = formatCurrencyWithSuperscriptCents(total);
-    }
-
-    // Update subpanel totals when in subpanel view
-    if (expenseViewMode === 'subpanels') {
-        const subTotals = {utilities: 0, custom: 0, other: 0};
-        (currentPlan.items || []).filter(i => i.item_type === 'expense').forEach(item => {
-            const val = parseFloat(item.budget_amount) || 0;
-            // Re-read from DOM for live values
-            const inp = document.querySelector(`.expense-input[data-item-id="${item.id}"]`);
-            const live = inp ? (parseFloat(inp.value.replace(/,/g, '')) || 0) : val;
-            if (!item.category) {
-                subTotals.custom += live;
-            } else {
-                const group = item.category.includes(':') ? item.category.split(':')[0] : item.category;
-                if (group.toLowerCase() === 'utilities') subTotals.utilities += live;
-                else subTotals.other += live;
-            }
-        });
-        // Utilities roll up into Other: the derived row and Other's subtotal both
-        // pick up the live utilities figure. The grand total above is unaffected —
-        // it sums .expense-input only, and the roll-up row has none.
-        subTotals.other += subTotals.utilities;
-        const rollupEl = document.getElementById('rollup_utilities');
-        if (rollupEl) rollupEl.textContent = formatNumberWithCommas(subTotals.utilities);
-
-        for (const [key, total] of Object.entries(subTotals)) {
-            const el = document.getElementById(`subpanel_${key}`);
-            if (el) el.innerHTML = formatCurrencyWithSuperscriptCents(total);
-        }
-    }
-
-    const ending = bal + totalIncome - totalExpenses;
-    const inc = document.getElementById('totalIncome');
-    const exp = document.getElementById('totalExpenses');
+    const projected = (currentPlan.starting_balance || 0) + income - all;
     const end = document.getElementById('endingBalanceDisplay');
-    if (inc) inc.innerHTML = formatCurrencyWithSuperscriptCents(totalIncome);
-    if (exp) exp.innerHTML = formatCurrencyWithSuperscriptCents(totalExpenses);
-
-    const avail = document.getElementById('totalAvailable');
-    if (avail) avail.innerHTML =
-        `<span class="subtotal-label">Available</span> ${formatCurrencyWithSuperscriptCents(bal + totalIncome)}`;
     if (end) {
-        end.innerHTML = formatCurrencyWithSuperscriptCents(ending);
-        end.classList.toggle('negative', ending < 0);
+        end.textContent = money(projected);
+        end.classList.toggle('negative', projected < 0);
     }
 
-    const wcEl = document.getElementById('worstCaseLow');
-    if (wcEl) {
-        const worstCase = bal - totalExpenses;
-        if (worstCase < 0) {
-            wcEl.innerHTML = `Worst-case low: <span class="negative">${formatCurrencyWithSuperscriptCents(worstCase)}</span>`;
-            wcEl.style.display = '';
-        } else {
-            wcEl.innerHTML = `Worst-case low: ${formatCurrencyWithSuperscriptCents(worstCase)}`;
-            wcEl.style.display = '';
-        }
+    // Adjustment: the one extra transfer that brings the projection back up to
+    // the floor. Dips that stay above the floor ask for nothing.
+    const need = (settings.floor || 0) - projected;
+    const box  = document.getElementById('adjustBox');
+    if (box) {
+        box.classList.toggle('pl-need', need > 0.5);
+        box.title = `Shows only when the projection falls below ${money(settings.floor || 0)}. Click to change that amount.`;
+        set('adjustValue', need > 0.5 ? money(need) : 'None');
+        set('adjustNote',  need > 0.5 ? 'from the Cash bucket' : '');
     }
+    queueProjection(projected);
+}
+
+// The projection is recorded once a day (last value wins) so next month can
+// show what this month was expected to end at.
+let _projTimer = null;
+function queueProjection(projected) {
+    clearTimeout(_projTimer);
+    if (currentPlan.kind !== 'month') return;
+    const id = currentPlanId;
+    _projTimer = setTimeout(() => {
+        apiPut(`/api/plans/${id}/projection`, {projected}).catch(() => {});
+    }, 1200);
 }
 
 function onAmountInput(input) {
@@ -614,28 +493,58 @@ function onAmountInput(input) {
     calculateTotals();
 }
 
-// ── New plan date modal ────────────────────────────────────
+// ── The floor (Adjustment popup) ───────────────────────────
+
+function positionNear(el, event) {
+    el.style.left = el.style.top = '0px';
+    const w = el.offsetWidth, h = el.offsetHeight, pad = 12;
+    el.style.left = Math.max(pad, Math.min(event.clientX - w / 2, window.innerWidth  - w - pad)) + 'px';
+    el.style.top  = Math.max(pad, Math.min(event.clientY + 14,    window.innerHeight - h - pad)) + 'px';
+}
+
+function openFloor(event) {
+    const pop = document.getElementById('floorPop');
+    document.getElementById('floorInput').value = settings.floor || 0;
+    pop.hidden = false;
+    positionNear(pop, event);
+    document.getElementById('floorInput').select();
+    event.stopPropagation();
+}
+
+async function saveFloor() {
+    const val = parseFloat(document.getElementById('floorInput').value) || 0;
+    if (val === settings.floor) return;
+    settings.floor = val;
+    calculateTotals();
+    await apiPut('/api/planner/settings', {floor: val}).catch(() => showToast('Could not save — check connection'));
+}
+
+function closeFloor() {
+    const pop = document.getElementById('floorPop');
+    if (pop && !pop.hidden) { saveFloor(); pop.hidden = true; }
+}
+
+// ── New month ──────────────────────────────────────────────
 
 function createNewMonth() {
-    const modal  = document.getElementById('newDateModal');
-    const dp     = document.getElementById('newDatePicker');
-    const copyEl = document.getElementById('copyFromSelect');
-    dp.value = new Date().toISOString().split('T')[0];
-
-    // Populate copy-from dropdown (B3)
-    if (copyEl) {
-        copyEl.innerHTML = '<option value="">— start fresh —</option>';
-        allPlans.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value       = p.id;
-            opt.textContent = p.label || formatPlanLabel(p.plan_date);
-            // Pre-select the current plan as the default copy source
-            if (p.id === currentPlanId) opt.selected = true;
-            copyEl.appendChild(opt);
-        });
+    const newest = allPlans.find(p => p.kind === 'month');
+    let month = thisMonth();
+    if (newest) {
+        const [y, m] = newest.plan_date.split('-').map(Number);
+        month = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
     }
+    document.getElementById('newMonthPicker').value = month;
 
-    modal.style.display = 'flex';
+    const copyEl = document.getElementById('copyFromSelect');
+    copyEl.innerHTML = '<option value="">— start empty —</option>';
+    allPlans.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value       = p.id;
+        opt.textContent = p.label || formatPlanLabel(p.plan_date);
+        if (newest ? p.id === newest.id : p.id === currentPlanId) opt.selected = true;
+        copyEl.appendChild(opt);
+    });
+    document.getElementById('newDateModal').style.display = 'flex';
 }
 
 function hideNewDateModal() {
@@ -643,41 +552,25 @@ function hideNewDateModal() {
 }
 
 async function createNewMonthFromPicker() {
-    const isoDate   = document.getElementById('newDatePicker').value;
-    const copyFromId = parseInt(document.getElementById('copyFromSelect')?.value || '0') || null;
-    if (!isoDate) { showToast('Please select a date'); return; }
+    const month    = document.getElementById('newMonthPicker').value;
+    const copyFrom = parseInt(document.getElementById('copyFromSelect').value || '0') || null;
+    if (!month) { showToast('Please choose a month'); return; }
     hideNewDateModal();
-
-    if (copyFromId) {
-        // B3: copy items from source plan
-        try {
-            const plan = await apiPost(`/api/plans/${copyFromId}/copy`, {plan_date: isoDate});
-            allPlans.unshift(plan);
-            renderPlanDropdown();
-            await loadPlan(plan.id);
-        } catch(e) {
-            showToast('A plan with that date already exists');
-        }
-    } else {
-        await createNewPlan(isoDate);
+    try {
+        const plan = await apiPost('/api/months', {month, copy_from: copyFrom});
+        await loadPlans();
+        await loadPlan(plan.id);
+        renderPlanDropdown();
+    } catch (e) {
+        showToast('That month already has a plan');
     }
 }
-
-// ── Section / panel toggles ────────────────────────────────
-
-function toggleMonthDropdown() {
-    document.getElementById('monthDropdownMenu')?.classList.toggle('active');
-}
-
-function toggleBudgetPanels() {}   // kept for HTML onclick compatibility
-function showIncomeOnly()    {}
-function showExpensesOnly()  {}
 
 // ── Starting balance ───────────────────────────────────────
 
 function selectStartingBalance() {
     const input = document.getElementById('startingBalanceInput');
-    if (input) { input.value = input.value.replace(/[^0-9.]/g, ''); input.select(); }
+    if (input) { input.value = input.value.replace(/[^0-9.\-]/g, ''); input.select(); }
 }
 
 function formatAndSaveStartingBalance() { saveStartingBalance(); }
@@ -903,41 +796,24 @@ async function loadSuggestions() {
     }
 }
 
-// Rows appended inside the real panel, styled as not-yet-committed.
-function renderSuggestionRows(type, showHeader = true) {
+// Rows shown under the real lines, styled as not-yet-committed.
+function renderSuggestionRows(type) {
     const list      = suggestions[type] || [];
     const dismissed = (suggestions.dismissed || {})[type] || 0;
     if (!list.length && !dismissed) return '';
 
     const rows = list.map(s => `
-        <tr class="sched-sugg-row" data-sched-id="${s.id}">
-            <td class="item-name" title="Scheduled ${type}, starts ${s.start_date}${s.end_date ? ' — ends ' + s.end_date : ''}">${escHtmlBP(s.source)}</td>
-            <td class="item-budget"><span class="sched-amount">${formatNumberWithCommas(s.amount)}</span></td>
-            <td class="item-actual sched-actions" colspan="2">
-                <button class="sched-btn sched-accept" title="Add to this period"
-                        onclick="acceptSuggestion(${s.id})">&#10003;</button>
-                <button class="sched-btn sched-reject" title="Skip for this period only"
-                        onclick="rejectSuggestion(${s.id})">&#10005;</button>
-            </td>
-        </tr>`).join('');
+        <div class="pl-row pl-sugg" title="Scheduled ${type}, starts ${s.start_date}${s.end_date ? ', ends ' + s.end_date : ''}">
+            <span class="pl-name">${escHtmlBP(s.source)}</span>
+            <span class="pl-sugg-amt">${formatNumberWithCommas(s.amount)}</span>
+            <button class="sched-btn sched-accept" title="Add to this month" onclick="acceptSuggestion(${s.id})">&#10003;</button>
+            <button class="sched-btn sched-reject" title="Skip for this month only" onclick="rejectSuggestion(${s.id})">&#10005;</button>
+        </div>`).join('');
 
-    const restoreRow = dismissed ? `
-        <tr class="sched-restore-row">
-            <td colspan="4">
-                <button class="sched-restore" onclick="restoreSuggestions('${type}')">
-                    ${dismissed} skipped this period — restore
-                </button>
-            </td>
-        </tr>` : '';
+    const restore = dismissed ? `
+        <button class="sched-restore" onclick="restoreSuggestions('${type}')">${dismissed} skipped this month — restore</button>` : '';
 
-    const header = (list.length && showHeader) ? `
-        <tr class="budget-group-row sched-group-row">
-            <td class="group-name">Scheduled &middot; not added</td>
-            <td></td><td></td>
-            <td class="group-subtotal">${fmtS(list.reduce((s, x) => s + x.amount, 0))}</td>
-        </tr>` : '';
-
-    return header + rows + restoreRow;
+    return `<div class="pl-suggs">${list.length ? '<div class="pl-sugg-head">Scheduled, not added</div>' : ''}${rows}${restore}</div>`;
 }
 
 async function acceptSuggestion(schedId) {
@@ -952,7 +828,7 @@ async function rejectSuggestion(schedId) {
     await apiPost(`/api/plans/${currentPlanId}/suggestions/${schedId}/dismiss`, {});
     await loadSuggestions();
     renderBudget();
-    showToast('Skipped for this period');
+    showToast('Skipped for this month');
 }
 
 async function restoreSuggestions(type) {
@@ -988,10 +864,12 @@ function importData(event) {
             for (const p of plans) {
                 try {
                     const created = await apiPost('/api/plans',
-                        {plan_date: p.plan_date, label: p.label, starting_balance: p.starting_balance});
+                        {plan_date: p.plan_date, label: p.label, starting_balance: p.starting_balance,
+                         kind: p.kind, excl: p.excl});
                     for (const item of (p.items || [])) {
                         await apiPost(`/api/plans/${created.id}/items`,
-                            {category: item.category, label: item.label, budget_amount: item.budget_amount, item_type: item.item_type});
+                            {category: item.category, label: item.label, budget_amount: item.budget_amount,
+                             item_type: item.item_type, grp: item.grp, tag: item.tag, account: item.account});
                     }
                 } catch(e) { /* skip duplicate plan dates */ }
             }
@@ -1020,12 +898,6 @@ function showToast(msg) {
     setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-// ── Modal helpers ──────────────────────────────────────────
-
-function hideInfoModal() {
-    document.getElementById('infoModal')?.classList.remove('active');
-}
-
 // ── API helpers ────────────────────────────────────────────
 
 async function apiFetch(url) {
@@ -1052,7 +924,7 @@ async function apiDelete(url) {
     return r.json();
 }
 
-// ── Click-outside dropdown close ───────────────────────────
+// ── Click-outside and Escape ───────────────────────────────
 
 document.addEventListener('click', e => {
     const menu    = document.getElementById('monthDropdownMenu');
@@ -1060,15 +932,18 @@ document.addEventListener('click', e => {
     if (menu?.classList.contains('active') && !menu.contains(e.target) && !trigger?.contains(e.target)) {
         menu.classList.remove('active');
     }
+    const pop = document.getElementById('floorPop');
+    if (pop && !pop.hidden && !pop.contains(e.target)) closeFloor();
+
     const newModal  = document.getElementById('newDateModal');
     if (newModal && e.target === newModal) hideNewDateModal();
-    const addModal  = document.getElementById('addItemModal');
-    if (addModal && e.target === addModal) hideAddItemModal();
     const annModal  = document.getElementById('annualModal');
     if (annModal && e.target === annModal) hideAnnualModal();
     const schedModal = document.getElementById('scheduledModal');
     if (schedModal && e.target === schedModal) hideScheduledModal();
 });
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFloor(); });
 
 // ── Start ──────────────────────────────────────────────────
 
