@@ -14,7 +14,7 @@ let settings      = {floor: 3000};
 // Scheduled items active for the current plan that are neither accepted nor rejected
 let suggestions = {income: [], expense: [], dismissed: {income: 0, expense: 0}};
 
-// Expense groups, top to bottom. An optional group has a "Count in total" box;
+// Expense groups, top to bottom. An optional group has a "Include in total" box;
 // unticked, it is left out of the column totals but never out of the projection.
 const EXPENSE_GROUPS = [
     {key: 'other',     title: 'Other'},
@@ -191,7 +191,7 @@ function renderCard(grp, items, optional, off) {
                 : grp === 'other'  ? renderSuggestionRows('expense') : '';
     const check = optional ? `
         <label class="pl-count" title="Unticked, this group is left out of the Expenses total. The projected balance always counts it.">
-            <input type="checkbox" ${off ? '' : 'checked'} onchange="toggleGroup('${grp}', this.checked)"> Count in total
+            <input type="checkbox" ${off ? '' : 'checked'} onchange="toggleGroup('${grp}', this.checked)"> Include in total
         </label>` : '';
     return `
         <div class="pl-card${off ? ' pl-off' : ''}" data-grp="${grp}">
