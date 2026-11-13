@@ -31,6 +31,11 @@ const MONTH_NAMES  = ['January','February','March','April','May','June',
 async function initApp() {
     const nav = document.querySelector('.tab-nav');
     if (nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+    // The column totals stick just under the header, whose height changes
+    // when the Adjustment box appears.
+    const hero = document.querySelector('.pl-hero-wrap');
+    if (hero) new ResizeObserver(() =>
+        document.documentElement.style.setProperty('--hero-h', hero.offsetHeight + 'px')).observe(hero);
 
     await Promise.all([loadCategories(), loadCards(), loadSettings(), loadPlans()]);
     if (!allPlans.some(p => p.kind === 'month')) {

@@ -1890,10 +1890,14 @@ input.pl-big:focus {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
-    align-items: start;
+    align-items: stretch;   /* equal-height columns, so both totals stay stuck */
 }
 
 .pl-colhead {
+    position: sticky;
+    top: calc(var(--nav-h, 49px) + var(--hero-h, 160px));
+    z-index: 40;
+    background: var(--background);
     display: flex;
     justify-content: space-between;
     align-items: baseline;
