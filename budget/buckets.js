@@ -11,8 +11,9 @@
 // and in saved data), the Cash bucket's months of cover, the draw rate
 // (yearly draw / Growth bucket) against its guardrail band, and reads the
 // rule table to say exactly what to do. The distributions are the fixed
-// monthly amount the Growth bucket pays into shared checking; the rule
-// pauses and restarts them. Everything is saved as one JSON blob through
+// monthly amount the Growth bucket pays into the Cash bucket; the rule
+// pauses and restarts them. The Cash bucket sends one transfer to shared
+// checking each month, larger in a month when an annual bill is due. Everything is saved as one JSON blob through
 // /api/reserve (the route and table keep their original name).
 
 const API = 'http://localhost:5050';
@@ -249,7 +250,7 @@ async function loadPlanner() {
         }
         const items = plan ? (plan.items || []) : [];
         planner = plan ? {
-            date: plan.plan_date, label: plan.label,
+            date: plan.plan_date, label: plan.label, checking: num(plan.starting_balance),
             expenses: items.filter(i => i.item_type !== 'income').reduce((a, i) => a + num(i.budget_amount), 0),
         } : null;
     } catch (e) { planner = null; }
@@ -435,7 +436,7 @@ function refreshItemRow(tr, it, ym) {
     tr.classList.toggle('rv-row-off', !on);
     tr.querySelector('.c-pm').textContent = on ? fmt(num(it.amount) / 12) : '—';
     const due = on ? dueThisMonth(it, ym) : 0;
-    tr.querySelector('.c-saved').innerHTML = (on ? fmt(earmark(it, ym)) : '—') + `<span class="rv-row-note">${esc(due > 0 ? fmt(due) + ' due this month' : itemNote(it, ym))}</span>`;
+    tr.querySelector('.c-saved').innerHTML = `<span class="rv-row-note">${esc(due > 0 ? fmt(due) + ' due this month' : itemNote(it, ym))}</span>`;
 }
 function itemChange(i, key, val) {
     const it = state.items[i];
@@ -448,18 +449,6 @@ function itemChange(i, key, val) {
 function addItem() { state.items.push({ name: '', amount: 0, freq: 1, start: state.settings.month || thisMonth(), end: '' }); renderItems(); scheduleSave(); }
 function removeItem(i) { state.items.splice(i, 1); renderItems(); render(); scheduleSave(); }
 
-// How much should have been saved toward an item by the check-in month. The
-// amount is per year, paid `freq` times a year, with the payment months set
-// by `start`. Twelfths accumulate from the month after each payment; in a
-// payment month the float has just been spent.
-function sinking(it, ym) {
-    const freq = [1, 2, 4].includes(Number(it.freq)) ? Number(it.freq) : 1;
-    const period = 12 / freq;
-    const first = Number((it.start || '').split('-')[1]) || 1;
-    const cur = Number(ym.split('-')[1]) || 1;
-    const elapsed = ((cur - first) % period + period) % period;
-    return num(it.amount) * elapsed / 12;
-}
 // The payment that falls in the check-in month, if any.
 function dueThisMonth(it, ym) {
     const freq = [1, 2, 4].includes(Number(it.freq)) ? Number(it.freq) : 1;
@@ -468,9 +457,6 @@ function dueThisMonth(it, ym) {
     const cur = Number(ym.split('-')[1]) || 1;
     return ((cur - first) % period + period) % period === 0 ? num(it.amount) / freq : 0;
 }
-// What the Cash bucket is holding for an item right now: the twelfths saved
-// since the last payment, or the whole bill in the month it is due.
-function earmark(it, ym) { return sinking(it, ym) + dueThisMonth(it, ym); }
 
 // ── Calculation ─────────────────────────────────────────────
 
@@ -485,15 +471,15 @@ function compute() {
     const income = incomeTotal(ym);
     // my draw: what my buckets have to supply each month
     const gap = Math.max(0, expenses - income);
-    // the part of the draw that goes to shared checking every month; the
-    // twelfths of the annual items stay in the Cash bucket until each bill is due
+    // the part of the draw that goes to shared checking every month; an
+    // annual bill goes over only in the month it is due
     const regularGap = Math.max(0, s.deposit + s.own - income);
 
-    // what the Cash bucket is holding for the annual items, and what falls due now
-    const earmarked = active.reduce((a, it) => a + earmark(it, ym), 0);
+    // annual bills that fall due now. Nothing is set aside for them: the draw
+    // carries a twelfth of each, so the target and the floor already hold them
     const due = active.map(it => ({ name: it.name || 'annual item', amount: dueThisMonth(it, ym) })).filter(d => d.amount > 0);
     const dueTotal = due.reduce((a, d) => a + d.amount, 0);
-    const free = Math.max(0, s.mm - earmarked);
+    const free = Math.max(0, s.mm);
 
     const target = gap * s.full;
     const cover = gap > 0 ? free / gap : Infinity;
@@ -512,9 +498,10 @@ function compute() {
     const stillDown = above || (!s.distOn && !backAtBaseline);
     const wellBelow = lower != null && rate > 0 && rate < lower;
 
-    // what the Cash bucket sends to shared checking this month: the regular
-    // part of the draw (less the distribution while it runs) plus any bill due
-    const monthly = s.distOn ? Math.max(0, regularGap - s.dist) : regularGap;
+    // what the Cash bucket sends to shared checking this month, in one
+    // transfer: the regular part of the draw plus any bill due. The
+    // distributions land in the Cash bucket, so pausing them does not change it
+    const monthly = regularGap;
     const transfer = monthly + dueTotal;
 
     // ── the rule ──
@@ -533,7 +520,7 @@ function compute() {
             sell = Math.max(0, target - free);
             title = 'Restart the distributions' + (sell > 0 ? ` and sell ${fmt(sell)} to refill the Cash bucket.` : '.');
             body = (upper != null ? `The draw rate is ${pct(rate)}, back at the baseline (${pct(s.baseline)}). ` : '') + `The Growth bucket can carry the monthly amount again, and the Cash bucket${sell > 0 ? ` is at ${fmt1(cover)} months and should go back to ${s.full}` : ' is full'}.`;
-            steps = [`Call Fidelity or Schwab: restart the monthly distribution of ${fmt(s.dist)} to checking.`];
+            steps = [`Call Fidelity or Schwab: restart the monthly distribution of ${fmt(s.dist)} into the Cash bucket.`];
             if (sell > 0) steps.push(`Same call: sell ${fmt(sell)} from the Growth bucket and move it to the Cash bucket.`);
             steps.push('Flip the distributions switch on the card to on, then save the month.');
         } else if (cover < s.floor) {
@@ -567,7 +554,7 @@ function compute() {
                 title = 'Pause the distributions.';
                 body = `The draw rate is ${pct(rate)}, above the band (${pct(upper)}). The Growth bucket has fallen enough that each monthly distribution is selling too cheaply. The Cash bucket holds ${fmt1(cover)} months and pays everything from here until the rate is back down to the baseline (${pct(s.baseline)}).`;
                 steps = [`Call Fidelity or Schwab: pause the monthly distribution of ${fmt(s.dist)} until further notice.`,
-                         `Move ${fmt(monthly)} a month from the Cash bucket from now on; this page shows the figure each month.`,
+                         `Leave the monthly transfer of ${fmt(monthly)} from the Cash bucket to checking as it is; the Cash bucket now carries it alone.`,
                          'Flip the distributions switch on the card to paused, then save the month.'];
             } else {
                 row = 6; cls = 'forced'; state_ = 'Cash bucket low';
@@ -581,12 +568,12 @@ function compute() {
                 row = 4; cls = 'hold'; state_ = 'Market down, holding';
                 title = 'Hold. Keep paying from the Cash bucket.';
                 body = `The draw rate is ${pct(rate)}, ${above ? `still above the band (${pct(upper)})` : `inside the band but not yet back to the baseline (${pct(s.baseline)})`}. The distributions stay paused and the Cash bucket carries the month. It holds ${fmt1(cover)} months, about ${fmt1(Math.max(0, cover - s.floor))} above the floor. Nothing is sold.`;
-                steps = [`Move ${fmt(monthly)} from the Cash bucket to cover the month.`, 'Trim discretionary spending where it is easy.', 'Save the month.'];
+                steps = [`The transfer of ${fmt(monthly)} from the Cash bucket to checking carries on.`, 'Trim discretionary spending where it is easy.', 'Save the month.'];
             } else {
                 row = 5; cls = 'forced'; state_ = 'Cash bucket low';
                 title = 'Restart the distributions anyway.';
                 body = `The Cash bucket is down to ${fmt1(cover)} months, under the ${s.floor}-month floor, and the market has not recovered. The distributions come back on so the Cash bucket stops draining. No top-up until the rate is back at the baseline.`;
-                steps = [`Call Fidelity or Schwab: restart the monthly distribution of ${fmt(s.dist)} to checking.`,
+                steps = [`Call Fidelity or Schwab: restart the monthly distribution of ${fmt(s.dist)} into the Cash bucket.`,
                          'Flip the distributions switch on the card to on, then save the month.'];
             }
         }
@@ -605,13 +592,13 @@ function compute() {
     }
     if (saved) steps = steps.filter(t => t !== 'Save the month.');
     if (!missing.length && dueTotal > 0) {
-        steps.unshift(`Move ${fmt(dueTotal)} from the Cash bucket to checking for the ${due.map(d => d.name).join(' and ')} due this month. The Cash bucket has been holding it.`);
+        steps.unshift(`Move ${fmt(dueTotal)} more from the Cash bucket to checking for the ${due.map(d => d.name).join(' and ')} due this month. That makes this month's transfer ${fmt(transfer)}.`);
     }
     if (!missing.length && s.baseline == null) {
         steps.push('No baseline yet, so only the Cash bucket rows of the rule apply. Set it in settings around mid-2027, once the lump sum and condo proceeds are invested.');
     }
 
-    return { annual, annualPm, expenses, income, gap, regularGap, earmarked, due, dueTotal, free, target, cover, hwm, dd, rate, upper, lower, above, wellBelow,
+    return { annual, annualPm, expenses, income, gap, regularGap, due, dueTotal, free, target, cover, hwm, dd, rate, upper, lower, above, wellBelow,
              monthly, transfer, row, cls, state: state_, title, body, steps, sell };
 }
 
@@ -639,7 +626,7 @@ function render() {
     $('rv_income').textContent = fmt(c.income);
     $('spendAllTotal').textContent = '(' + fmt(c.expenses) + ')';
     $('whereDeposit').textContent = planner ? `Shared checking: Planner ${fmt(planner.expenses)} × ${s.share}% = ${fmt(plannerDeposit())}` : 'Shared checking: my share of the household budget.';
-    $('incomeAllTotal').textContent = '(' + fmt(c.income + (s.distOn ? s.dist : 0)) + (s.distOn ? '' : ', distributions paused') + ')';
+    $('incomeAllTotal').textContent = '(' + fmt(c.income) + ')';
     $('annualTotal').textContent = c.annual > 0 ? fmt(c.annual) + ' a year' : '';
 
     // footer: planner and the share
@@ -663,179 +650,158 @@ function render() {
 }
 
 // ── The picture ─────────────────────────────────────────────
-// The two buckets of mine and my guaranteed income on the left feed the
-// Expenses on the right: a column whose height is what I pay each
-// month, stacked from what covers it. Guaranteed income is the foundation
-// at the bottom, the fixed distribution sits on it, and the Cash bucket
-// fills whatever is left at the top. Everything above guaranteed income is
-// my draw. The Cash bucket tile carries its months-of-cover gauge.
+// Everything shown is this month. On the left the Growth bucket sits above
+// the Cash bucket: the distributions and any top-up run down into Cash. One
+// transfer leaves the Cash bucket for shared checking on the right, a column
+// with the balance at the top and this month's arrivals stacked under it in
+// proportion: the Cash transfer on top of guaranteed income, which arrives
+// straight from outside and is the floor of the column.
 function renderFlow(c) {
     const s = state.settings;
     const svg = $('flowSvg');
-    const expenses = c.expenses;
-    const guar = Math.min(c.income, expenses);
-    const distUse = s.distOn ? Math.min(s.dist, Math.max(0, expenses - guar)) : 0;
-    const resUse = Math.max(0, expenses - guar - distUse);
-    const ok = expenses > 0;
+    const W = 1100, H = 460;
+    const G = { x: 20, y: 14, w: 300, h: 130 };      // Growth bucket
+    const C = { x: 20, y: 250, w: 300, h: 150 };     // Cash bucket
+    const K = { x: 800, y: 14, w: 280, h: 432 };     // checking column
+    const ready = s.mm > 0 && s.managed > 0;
+    const income = c.income, transfer = c.transfer;
+    const checking = planner ? planner.checking : 0;
 
-    // tiles, top to bottom in the order their flows arrive at the column
-    const C = { x: 20, y: 8, w: 340, h: 106 };      // Cash bucket, with its gauge
-    const B = { x: 20, y: 134, w: 340, h: 106 };    // Growth bucket, with its gauge
-    const A = { x: 20, y: 262, w: 340, h: 70 };     // guaranteed income
-    // the expenses column: income at the bottom, cash at the top
-    const col = { x: 1000, w: 64, y: 86, h: 226 };
-    // the draw collector: the Cash bucket and the distribution land here,
-    // and together they are the draw, which then goes into the column
-    const D = { x: 800, w: col.x - 26 - 800 };
-    const seg = (amt) => ok ? col.h * amt / expenses : 0;
-    const hG = seg(guar), hD = seg(distUse), hR = seg(resUse);
-    const yG = col.y + col.h - hG, yD = yG - hD, yR = yD - hR;
-    const midG = yG + hG / 2, midD = yD + hD / 2, midR = yR + hR / 2;
-    const endX = col.x - 7;          // where the income arrow lands
-    const drawX = D.x - 7;           // where the draw arrows land
-
+    const widthOf = amt => Math.max(4, Math.min(22, amt / 150));
+    // an arrowhead pointing right or down, sized to its line
+    const headR = (x, y, w, cls) => `<path class="rv-flow-head ${cls}" d="M ${x - 18} ${y - w / 2 - 7} L ${x} ${y} L ${x - 18} ${y + w / 2 + 7} z"/>`;
+    const headD = (x, y, w, cls) => `<path class="rv-flow-head ${cls}" d="M ${x - w / 2 - 6} ${y - 15} L ${x} ${y} L ${x + w / 2 + 6} ${y - 15} z"/>`;
     const tile = (b, cls, label, value, sub) =>
-        `<g class="rv-flow-box ${cls}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="10"/>` +
-        `<text class="rv-flow-label ${cls.split(' ')[0]}" x="${b.x + 16}" y="${b.y + 22}">${esc(label)}</text>` +
-        `<text class="rv-flow-value" x="${b.x + 16}" y="${b.y + 47}">${esc(value)}</text>` +
-        (sub ? `<text class="rv-flow-sub" x="${b.x + 16}" y="${b.y + 65}">${esc(sub)}</text>` : '') + `</g>`;
-    const head = cls => `url(#flowHead-${/off/.test(cls) ? 'off' : cls.split(' ')[0]})`;
-    const curve = (x0, y0, x1, y1, cls, label, bend, shift) => {
-        const c1x = x0 + (x1 - x0) * (bend || 0.45), c2x = x1 - (x1 - x0) * (bend || 0.45);
-        const mx = (x0 + 3 * c1x + 3 * c2x + x1) / 8, my = (y0 + y1) / 2;
-        return `<path class="rv-flow-arrow ${cls}" marker-end="${head(cls)}" d="M ${x0} ${y0} C ${c1x} ${y0}, ${c2x} ${y1}, ${x1} ${y1}"/>` +
-               (label ? `<text class="rv-flow-arrow-label ${cls}" x="${mx + (shift || 0)}" y="${my - 10}" text-anchor="middle">${esc(label)}</text>` : '');
-    };
+        `<g class="rv-flow-box ${cls}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="12"/></g>` +
+        `<text class="rv-flow-label ${cls.split(' ')[0]}" x="${b.x + 16}" y="${b.y + 24}">${esc(label)}</text>` +
+        `<text class="rv-flow-value big" x="${b.x + 16}" y="${b.y + 53}">${esc(value)}</text>` +
+        (sub ? `<text class="rv-flow-sub" x="${b.x + 16}" y="${b.y + 73}">${esc(sub)}</text>` : '');
 
-    let out = '';
-    out += '<defs>' + ['income', 'managed', 'reserve', 'draw', 'off'].map(k =>
-        `<marker id="flowHead-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"/></marker>`).join('') + '</defs>';
+    let out = '<defs><clipPath id="flowClipK"><rect x="' + K.x + '" y="' + K.y + '" width="' + K.w + '" height="' + K.h + '" rx="12"/></clipPath></defs>';
 
-    // Cash bucket, with the months-of-cover gauge inside
-    const hasCover = ok && s.mm > 0 && isFinite(c.cover);
-    out += tile(C, 'reserve', 'Cash bucket', s.mm > 0 ? fmt(s.mm) + (hasCover ? ` · ${fmt1(c.cover)} months` : '') : 'enter the balance',
-                c.earmarked > 0 ? `${fmt(c.free)} free · ${fmt(c.earmarked)} held for bills` : (ok ? `${s.full} months of my draw is ${fmt(c.target)}` : 'two years of my draw'));
+    // ── Growth bucket: balance, draw rate, and the rate against its band
+    out += tile(G, 'managed' + (c.above ? ' bad' : ''), 'Growth bucket', s.managed > 0 ? fmt(s.managed) : 'enter the balance',
+                c.rate > 0 ? `draw rate ${pct(c.rate)} a year` : 'everything of mine that is invested');
     {
-        // a vertical gauge at the right of the tile: months of cover filling
-        // from the bottom, the floor mark below the target mark
-        const bw = 16, bx = C.x + C.w - 90, by = C.y + 10, bh = C.h - 20;
-        const cscale = s.full * 1.3;
-        const yAt = v => by + bh - Math.max(0, Math.min(1, v / cscale)) * bh;
-        out += `<rect class="rv-flow-track" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="5"/>`;
-        if (hasCover) {
-            const top = yAt(c.cover);
-            const fcls = c.cover < s.floor ? ' bad' : c.cover < s.full ? ' warn' : '';
-            out += `<rect class="rv-flow-fill${fcls}" x="${bx}" y="${top}" width="${bw}" height="${by + bh - top}" rx="5"/>`;
-        }
-        const fy = yAt(s.floor), ty = yAt(s.full);
-        out += `<line class="rv-flow-tick" x1="${bx - 4}" y1="${ty}" x2="${bx + bw + 4}" y2="${ty}"/>` +
-               `<text class="rv-flow-tick-label" x="${bx + bw + 8}" y="${ty + 4}">target ${s.full}</text>` +
-               `<line class="rv-flow-tick limit" x1="${bx - 4}" y1="${fy}" x2="${bx + bw + 4}" y2="${fy}"/>` +
-               `<text class="rv-flow-tick-label limit" x="${bx + bw + 8}" y="${fy + 4}">floor ${s.floor}</text>`;
-    }
-    // Growth bucket, with the draw-rate gauge inside
-    out += tile(B, 'managed' + (c.above ? ' bad' : ''), 'Growth bucket', s.managed > 0 ? fmt(s.managed) : 'enter the balance',
-                c.rate > 0 ? `draw rate ${pct(c.rate)}` + (c.upper != null ? ` · baseline ${pct(s.baseline)}` : ' · no baseline yet') : 'everything of mine that is invested');
-    if (c.rate > 0) out += `<text class="rv-flow-sub" x="${B.x + 16}" y="${B.y + 78}">${esc(c.hwm > 0 && c.dd > 0.5 ? `${pct(c.dd)} below its high of ${fmt(c.hwm)}` : 'my yearly draw ÷ this balance')}</text>`;
-    {
-        // a vertical gauge at the right of the tile: the draw rate filling from
-        // the bottom, the guardrail band shaded over it. The top edge is the
-        // pause line and acts; the bottom edge only flags the annual review.
-        const bw = 16, bx = B.x + B.w - 90, by = B.y + 10, bh = B.h - 20;
-        const rscale = Math.max(c.upper != null ? c.upper * 1.35 : 0, c.rate * 1.15, 0.1);
-        const yAt = v => by + bh - Math.max(0, Math.min(1, v / rscale)) * bh;
-        out += `<rect class="rv-flow-track" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="5"/>`;
+        const tx = G.x + 16, tw = G.w - 32, ty = G.y + 86, th = 8;
+        const scale = Math.max(c.upper != null ? c.upper * 1.3 : 0, c.rate * 1.5, 0.1);
+        const xAt = v => tx + Math.max(0, Math.min(1, v / scale)) * tw;
+        out += `<rect class="rv-flow-track" x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="4"/>`;
         if (c.upper != null) {
-            const uy = yAt(c.upper), ly = yAt(c.lower), my = yAt(s.baseline);
-            out += `<rect class="rv-flow-band" x="${bx}" y="${uy}" width="${bw}" height="${ly - uy}"/>` +
-                   `<line class="rv-flow-tick faint" x1="${bx}" y1="${my}" x2="${bx + bw}" y2="${my}"/>` +
-                   `<line class="rv-flow-tick limit" x1="${bx - 4}" y1="${uy}" x2="${bx + bw + 4}" y2="${uy}"/>` +
-                   (s.distOn ? `<text class="rv-flow-tick-label limit" x="${bx + bw + 8}" y="${uy + 4}">pause ${pct(c.upper)}</text>` : '') +
-                   (s.distOn
-                       ? `<line class="rv-flow-tick soft" x1="${bx - 4}" y1="${ly}" x2="${bx + bw + 4}" y2="${ly}"/>` +
-                         `<text class="rv-flow-tick-label" x="${bx + bw + 8}" y="${ly + 4}">review ${pct(c.lower)}</text>`
-                       : `<line class="rv-flow-tick" x1="${bx - 4}" y1="${my}" x2="${bx + bw + 4}" y2="${my}"/>` +
-                         `<text class="rv-flow-tick-label" x="${bx + bw + 8}" y="${my + 4}">restart ${pct(s.baseline)}</text>`);
-        }
-        if (c.rate > 0) {
-            // this month's rate is a marker across the track, not a fill: a rate
-            // is a reading, and the question is where it sits against the band
-            const ry = yAt(c.rate);
-            out += `<rect class="rv-flow-mark${c.above ? ' bad' : ''}" x="${bx - 6}" y="${ry - 3.5}" width="${bw + 12}" height="7" rx="3.5"/>`;
-            if (c.upper == null) out += `<text class="rv-flow-tick-label" x="${bx + bw + 8}" y="${ry + 4}">${pct(c.rate)}</text>`;
-        }
-    }
-    // guaranteed income
-    const incomeNames = activeIncome(state.settings.month || thisMonth()).filter(r => num(r.amount) > 0).map(r => r.name).filter(Boolean);
-    out += tile(A, 'income', 'Guaranteed income', c.income > 0 ? fmt(c.income) + ' a month' : 'none yet',
-                incomeNames.length ? incomeNames.slice(0, 3).join(', ') : 'pension, wages, Social Security');
-
-    // arrows
-    // Growth → Cash: refills, an arc out of the Growth bucket's right side
-    // and back into the Cash bucket's right side
-    {
-        const x0 = B.x + B.w, y0 = B.y + 16, x1 = C.x + C.w + 7, y1 = C.y + C.h - 16, bulge = x0 + 70;
-        const on = c.sell > 0;
-        out += `<path class="rv-flow-arrow managed refill ${on ? '' : 'off'}" marker-end="url(#flowHead-${on ? 'managed' : 'off'})" d="M ${x0} ${y0} C ${bulge} ${y0}, ${bulge} ${y1}, ${x1} ${y1}"/>` +
-               `<text class="rv-flow-arrow-label managed ${on ? '' : 'off'}" x="${bulge + 4}" y="${y1 + 10}" text-anchor="start">${esc(on ? `sell ${fmt(c.sell)} now` : 'sell to refill')}</text>`;
-    }
-    if (ok) {
-        // Cash → Spending: the top of the column
-        if (resUse > 0 || c.dueTotal > 0) {
-            const label = c.dueTotal > 0 ? `${fmt(c.transfer)} with bills due` : `${fmt(c.monthly)} a month`;
-            out += curve(C.x + C.w, C.y + 58, c.gap > 0 ? drawX : endX, resUse > 0 ? midR : col.y + 8, 'reserve', label, 0.5);
-        } else {
-            out += curve(C.x + C.w, C.y + 58, c.gap > 0 ? drawX : endX, col.y + 8, 'reserve off', 'nothing needed', 0.5);
-        }
-        // Growth → Spending: the distribution, into the middle
-        if (s.distOn && s.dist > 0 && distUse > 0) out += curve(B.x + B.w, B.y + B.h / 2, drawX, midD, 'managed', `distribution ${fmt(s.dist)} a month`, 0.4);
-        else if (!s.distOn) out += curve(B.x + B.w, B.y + B.h / 2, c.gap > 0 ? drawX : endX, Math.min(col.y + col.h - 8, yD), 'managed off', 'distributions paused', 0.4);
-        // income → Spending: the foundation
-        if (guar > 0) out += curve(A.x + A.w, A.y + A.h / 2, endX, midG, 'income', `${fmt(guar)} a month`, 0.4);
-    }
-
-    // the expenses column
-    out += `<text class="rv-flow-label" x="${col.x}" y="30">Expenses</text>`;
-    out += `<text class="rv-flow-sub" x="${col.x}" y="46">shared checking · my deposit</text>`;
-    out += `<text class="rv-flow-value big" x="${col.x}" y="72">${esc(ok ? fmt(expenses) + ' a month' : '—')}</text>`;
-    out += `<rect class="rv-flow-col-bg" x="${col.x}" y="${col.y}" width="${col.w}" height="${col.h}" rx="8"/>`;
-    if (ok) {
-        if (hG > 0) out += `<rect class="rv-flow-seg income" x="${col.x}" y="${yG}" width="${col.w}" height="${hG}"/>`;
-        if (hD > 0) out += `<rect class="rv-flow-seg managed" x="${col.x}" y="${yD}" width="${col.w}" height="${hD}"/>`;
-        if (hR > 0) out += `<rect class="rv-flow-seg reserve" x="${col.x}" y="${yR}" width="${col.w}" height="${hR}"/>`;
-        // labels beside the segments, top to bottom, pushed apart so they never overlap
-        const labels = [];
-        if (resUse > 0) labels.push({ y: midR, cls: 'reserve', text: `Cash bucket ${fmt(resUse)}` });
-        if (distUse > 0) labels.push({ y: midD, cls: 'managed', text: `distribution ${fmt(distUse)}` });
-        if (guar > 0) labels.push({ y: midG, cls: 'income', text: `guaranteed ${fmt(guar)}` });
-        for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 18);
-        for (let i = labels.length - 1; i >= 0; i--) {
-            const maxY = col.y + col.h - (labels.length - 1 - i) * 18;
-            if (labels[i].y > maxY) labels[i].y = maxY;
-            if (i < labels.length - 1 && labels[i].y > labels[i + 1].y - 18) labels[i].y = labels[i + 1].y - 18;
-        }
-        labels.forEach(l => { out += `<text class="rv-flow-seg-label ${l.cls}" x="${col.x + col.w + 20}" y="${l.y + 4}">${esc(l.text)}</text>`; });
-        // the draw collector: spans the top two layers, left of the column
-        if (c.gap > 0 && yG > col.y) {
-            const y0 = col.y, y1 = yG, hh = y1 - y0, cy = (y0 + y1) / 2;
-            out += `<rect class="rv-flow-draw" x="${D.x}" y="${y0}" width="${D.w}" height="${hh}" rx="8"/>`;
-            // a bracket between the draw total and the two layers it is made of
-            const bx = col.x - 11;
-            out += `<path class="rv-flow-bracket" d="M ${bx + 5} ${y0} L ${bx} ${y0} L ${bx} ${y1} L ${bx + 5} ${y1}"/>`;
-            const cx = D.x + D.w / 2;
-            if (hh >= 44) {
-                out += `<text class="rv-flow-label draw" x="${cx}" y="${cy - 4}" text-anchor="middle">My draw</text>` +
-                       `<text class="rv-flow-value" x="${cx}" y="${cy + 16}" text-anchor="middle">${esc(fmt(c.gap) + ' a month')}</text>`;
-            } else if (hh >= 20) {
-                out += `<text class="rv-flow-seg-label" x="${cx}" y="${cy + 5}" text-anchor="middle">${esc('my draw ' + fmt(c.gap))}</text>`;
+            const lx = xAt(c.lower), ux = xAt(c.upper), bx = xAt(s.baseline);
+            out += `<rect class="rv-flow-band" x="${lx}" y="${ty}" width="${ux - lx}" height="${th}"/>`;
+            if (s.distOn) {
+                out += `<line class="rv-flow-tick limit" x1="${ux}" y1="${ty - 5}" x2="${ux}" y2="${ty + th + 5}"/>` +
+                       `<text class="rv-flow-tick-label limit" x="${Math.min(ux, G.x + G.w - 60)}" y="${ty + 30}" text-anchor="middle">pause above ${pct(c.upper)}</text>`;
             } else {
-                out += `<text class="rv-flow-seg-label" x="${cx}" y="${y0 - 6}" text-anchor="middle">${esc('my draw ' + fmt(c.gap))}</text>`;
+                out += `<line class="rv-flow-tick" x1="${bx}" y1="${ty - 5}" x2="${bx}" y2="${ty + th + 5}"/>` +
+                       `<text class="rv-flow-tick-label" x="${Math.min(bx, G.x + G.w - 60)}" y="${ty + 30}" text-anchor="middle">restart at ${pct(s.baseline)}</text>`;
             }
-        } else {
-            out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 20}">no draw: income covers it</text>`;
+        } else if (c.rate > 0) {
+            out += `<text class="rv-flow-tick-label" x="${tx}" y="${ty + 30}">no baseline yet, so no pause line</text>`;
         }
-    } else {
-        out += `<text class="rv-flow-sub" x="${col.x}" y="${col.y + col.h + 20}">enter this month's numbers</text>`;
+        if (c.rate > 0) out += `<circle class="rv-flow-mark${c.above ? ' bad' : ''}" cx="${xAt(c.rate)}" cy="${ty + th / 2}" r="7"/>`;
+    }
+
+    // ── Growth → Cash: the distributions, and the top-up when one is due
+    {
+        const y0 = G.y + G.h, y1 = C.y, x = G.x + 60;
+        const on = s.distOn && s.dist > 0;
+        const w = on ? widthOf(s.dist) : 3;
+        out += `<path class="rv-flow-arrow ${on ? 'managed' : 'off'}" style="stroke-width:${w}" d="M ${x} ${y0} V ${y1 - 14}"/>` + headD(x, y1 - 1, w, on ? 'managed' : 'off');
+        out += on
+            ? `<text class="rv-flow-arrow-label" x="${x + 22}" y="${y0 + 48}">${esc(fmt(s.dist))} this month</text><text class="rv-flow-sub" x="${x + 22}" y="${y0 + 66}">distributions</text>`
+            : `<text class="rv-flow-arrow-label off" x="${x + 22}" y="${y0 + 48}">distributions</text><text class="rv-flow-sub" x="${x + 22}" y="${y0 + 66}">${s.distOn ? 'none set' : 'paused'}</text>`;
+        const tx = G.x + 230, top = c.sell > 0;
+        out += `<path class="rv-flow-arrow refill ${top ? 'managed' : 'off'}" style="stroke-width:3" d="M ${tx} ${y0} V ${y1 - 12}"/>` + headD(tx, y1 - 1, 3, top ? 'managed' : 'off');
+        out += top
+            ? `<text class="rv-flow-arrow-label" x="${tx + 14}" y="${y0 + 48}">top-up due</text><text class="rv-flow-sub" x="${tx + 14}" y="${y0 + 66}">sell ${esc(fmt(c.sell))}</text>`
+            : `<text class="rv-flow-arrow-label off" x="${tx + 14}" y="${y0 + 48}">top-up</text><text class="rv-flow-sub" x="${tx + 14}" y="${y0 + 66}">none this month</text>`;
+    }
+
+    // ── Cash bucket: balance and months of cover against the floor and target
+    const hasCover = s.mm > 0 && c.gap > 0 && isFinite(c.cover);
+    out += tile(C, 'reserve', 'Cash bucket', s.mm > 0 ? fmt(s.mm) : 'enter the balance',
+                hasCover ? `${fmt1(c.cover)} months of cover` : 'two years of what I draw');
+    {
+        const tx = C.x + 16, tw = C.w - 32, ty = C.y + 86, th = 14;
+        const scale = s.full * 1.5;
+        const xAt = v => tx + Math.max(0, Math.min(1, v / scale)) * tw;
+        out += `<rect class="rv-flow-track" x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="4"/>`;
+        if (hasCover) {
+            const fcls = c.cover < s.floor ? ' bad' : c.cover < s.full ? ' warn' : '';
+            out += `<rect class="rv-flow-fill${fcls}" x="${tx}" y="${ty}" width="${xAt(c.cover) - tx}" height="${th}" rx="4"/>`;
+        }
+        const fx = xAt(s.floor), gx = xAt(s.full);
+        out += `<line class="rv-flow-tick limit" x1="${fx}" y1="${ty - 4}" x2="${fx}" y2="${ty + th + 4}"/>` +
+               `<line class="rv-flow-tick" x1="${gx}" y1="${ty - 4}" x2="${gx}" y2="${ty + th + 4}"/>` +
+               `<text class="rv-flow-tick-label limit" x="${fx}" y="${ty + 32}" text-anchor="middle">floor ${s.floor} mo</text>` +
+               `<text class="rv-flow-tick-label" x="${gx}" y="${ty + 32}" text-anchor="middle">target ${s.full} mo</text>`;
+        if (c.gap > 0) {
+            out += `<text class="rv-flow-tick-label limit" x="${fx}" y="${ty + 46}" text-anchor="middle">${esc(fmt(c.gap * s.floor))}</text>` +
+                   `<text class="rv-flow-tick-label" x="${gx}" y="${ty + 46}" text-anchor="middle">${esc(fmt(c.target))}</text>`;
+        }
+    }
+
+    // ── Checking: balance at the top, this month's arrivals stacked under it
+    const bottom = K.y + K.h;
+    const total = checking + income + transfer;
+    let hI = 0, hC = 0;
+    if (total > 0) {
+        const px = K.h / total;
+        hI = income > 0 ? Math.max(24, income * px) : 0;
+        hC = transfer > 0 ? Math.max(24, transfer * px) : 0;
+        const room = K.h - 96;                       // the balance keeps room for its text
+        if (hI + hC > room) { const k = room / (hI + hC); hI *= k; hC *= k; }
+    }
+    const yI = bottom - hI, yC = yI - hC;
+    out += `<g clip-path="url(#flowClipK)">` +
+           `<rect class="rv-flow-seg checking" x="${K.x}" y="${K.y}" width="${K.w}" height="${K.h}"/>` +
+           (hC > 0 ? `<rect class="rv-flow-seg reserve" x="${K.x}" y="${yC}" width="${K.w}" height="${hC}"/>` : '') +
+           (hI > 0 ? `<rect class="rv-flow-seg income" x="${K.x}" y="${yI}" width="${K.w}" height="${hI}"/>` : '') +
+           `</g><rect class="rv-flow-col-edge" x="${K.x}" y="${K.y}" width="${K.w}" height="${K.h}" rx="12"/>`;
+    const kx = K.x + K.w / 2;
+    out += `<text class="rv-flow-label checking" x="${kx}" y="${K.y + 36}" text-anchor="middle">Checking · shared</text>` +
+           `<text class="rv-flow-value big" x="${kx}" y="${K.y + 68}" text-anchor="middle">${esc(planner ? fmt(checking) : '—')}</text>` +
+           `<text class="rv-flow-sub" x="${kx}" y="${K.y + 90}" text-anchor="middle">${esc(planner ? 'balance now, from the Planner' : 'balance is on the Planner')}</text>`;
+    if (hC > 0) out += `<text class="rv-flow-on" x="${kx}" y="${yC + hC / 2 + 5}" text-anchor="middle">${esc(fmt(transfer))} · from Cash</text>`;
+    if (hI > 0) out += `<text class="rv-flow-on" x="${kx}" y="${yI + hI / 2 + 5}" text-anchor="middle">${esc(fmt(income))} · guaranteed income</text>`;
+
+    // ── Cash → checking: one transfer, landing on its block
+    let cashY0 = C.y + C.h - 40;
+    {
+        const x0 = C.x + C.w, x1 = K.x - 4;
+        const yEnd = hC > 0 ? yC + hC / 2 : yI - 12;
+        const y0 = Math.max(C.y + 24, Math.min(C.y + C.h - 40, yEnd));
+        cashY0 = y0;
+        const on = transfer > 0;
+        const w = on ? widthOf(transfer) : 3;
+        const mid = (x0 + x1 - 16) / 2;
+        const d = Math.abs(y0 - yEnd) < 1
+            ? `M ${x0} ${y0} H ${x1 - 16}`
+            : `M ${x0} ${y0} C ${mid} ${y0}, ${mid} ${yEnd}, ${x1 - 16} ${yEnd}`;
+        out += `<path class="rv-flow-arrow ${on ? 'reserve' : 'off'}" style="stroke-width:${w}" d="${d}"/>` + headR(x1, yEnd, w, on ? 'reserve' : 'off');
+        const label = !ready ? '' : !on ? 'nothing needed this month'
+            : `${fmt(transfer)} this month · ${c.dueTotal > 0 ? 'covers bills due' : 'one transfer'}`;
+        if (label) out += `<text class="rv-flow-arrow-label${on ? '' : ' off'}" x="${x0 + 16}" y="${y0 - w / 2 - 10}">${esc(label)}</text>`;
+    }
+
+    // ── Guaranteed income: a flow from outside, with no balance of its own
+    {
+        const names = activeIncome(s.month || thisMonth()).filter(r => num(r.amount) > 0).map(r => r.name).filter(Boolean);
+        // level with its block where there is room under the Cash transfer
+        const tx = 400, ty = Math.max(cashY0 + 46, Math.min(H - 52, yI + hI / 2 - 18));
+        out += `<text class="rv-flow-label income" x="${tx}" y="${ty}">Guaranteed income</text>` +
+               `<text class="rv-flow-value" x="${tx}" y="${ty + 24}">${esc(income > 0 ? fmt(income) + ' this month' : 'none yet')}</text>` +
+               `<text class="rv-flow-sub" x="${tx}" y="${ty + 43}">${esc(names.length ? names.slice(0, 3).join(', ') : 'pension, wages, Social Security')}</text>`;
+        if (income > 0 && hI > 0) {
+            const w = widthOf(income), x0 = 610, x1 = K.x - 4, y0 = ty + 18, yEnd = yI + hI / 2;
+            const mid = (x0 + x1 - 16) / 2;
+            const d = Math.abs(y0 - yEnd) < 1
+                ? `M ${x0} ${y0} H ${x1 - 16}`
+                : `M ${x0} ${y0} C ${mid} ${y0}, ${mid} ${yEnd}, ${x1 - 16} ${yEnd}`;
+            out += `<path class="rv-flow-arrow income" style="stroke-width:${w}" d="${d}"/>` + headR(x1, yEnd, w, 'income');
+        }
     }
     svg.innerHTML = out;
 }
