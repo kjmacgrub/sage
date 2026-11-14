@@ -267,7 +267,6 @@ def get_plan(plan_id):
         f"SELECT {_ITEM_COLS} FROM budget_items WHERE plan_id=? {_ITEM_ORDER}", (plan_id,)
     ).fetchall()
     out = {**dict(plan), "items": [dict(i) for i in items]}
-    out["prev_projected"] = _previous_projection(conn, out) if out["kind"] == "month" else None
     conn.close()
     return out
 
@@ -279,40 +278,6 @@ def _projected(conn, plan_id, starting_balance):
     ).fetchall()
     tot = {r["item_type"]: r["total"] or 0 for r in rows}
     return (starting_balance or 0) + tot.get("income", 0) - tot.get("expense", 0)
-
-
-def _previous_projection(conn, plan):
-    """What last month was projected to end at: {"month": "October", "amount": 4150.0}.
-
-    From last month's plan, the figure as it stood at the close of the first
-    day it was looked at in that month. Before monthly plans existed, from the earliest dated plan of
-    that month. None when there is neither.
-    """
-    y, m = (int(x) for x in plan["plan_date"].split("-")[:2])
-    py, pm = (y, m - 1) if m > 1 else (y - 1, 12)
-    prefix = f"{py}-{pm:02d}"
-    prev = conn.execute(
-        "SELECT id FROM budget_plans WHERE kind='month' AND plan_date=?", (prefix + "-01",)
-    ).fetchone()
-    if prev:
-        # The first figure recorded once that month had begun; a plan set up
-        # ahead of time has only its last figure from before.
-        first = prefix + "-01"
-        snap = conn.execute(
-            "SELECT projected FROM plan_projections WHERE plan_id=? "
-            "ORDER BY (day < ?), CASE WHEN day < ? THEN day END DESC, day LIMIT 1",
-            (prev["id"], first, first)
-        ).fetchone()
-        if snap:
-            return {"month": MONTHS[pm - 1], "amount": snap["projected"]}
-    old = conn.execute(
-        "SELECT id, starting_balance FROM budget_plans "
-        "WHERE COALESCE(kind,'dated')='dated' AND plan_date LIKE ? ORDER BY plan_date LIMIT 1",
-        (prefix + "-%",)
-    ).fetchone()
-    if old:
-        return {"month": MONTHS[pm - 1], "amount": _projected(conn, old["id"], old["starting_balance"])}
-    return None
 
 
 def update_plan(plan_id, **kwargs):

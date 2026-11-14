@@ -4,7 +4,7 @@
 
 // ── State ──────────────────────────────────────────────────
 let currentPlanId = null;
-let currentPlan   = null;   // {id, plan_date, label, starting_balance, kind, excl, items:[], prev_projected}
+let currentPlan   = null;   // {id, plan_date, label, starting_balance, kind, excl, items:[]}
 let allPlans      = [];
 let allGroups     = {};     // {group: [{category, type}]}
 let catTypes      = {};     // {category: 'income'|'expense'}
@@ -178,10 +178,6 @@ function renderBudget() {
 function renderHeader() {
     const balInput = document.getElementById('startingBalanceInput');
     if (balInput) balInput.value = formatCurrencyWhole(currentPlan.starting_balance || 0);
-
-    const prev = currentPlan.prev_projected;
-    document.getElementById('prevProjected').textContent =
-        prev ? `${prev.month} projected ${money(prev.amount)}` : '';
 
     let label = 'Projected balance';
     if (currentPlan.kind === 'month') {
