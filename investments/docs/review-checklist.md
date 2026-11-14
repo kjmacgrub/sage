@@ -36,8 +36,8 @@ is not a signal to trade; it is a signal to stop and look.[^warning]
 
 1. **Before 4pm:** read the cash balance at Schwab. Under **$21k** → sell
    SGOV to bring it back to $24k. $21k or more → nothing to do.[^line]
-2. **After the close:** export four files: OO trade log + portfolio CSV
-   (`2027` portfolio, Monday → Friday, sized to what live traded);
+2. **After the close:** export four files, each for Monday → Friday: OO
+   trade log + portfolio CSV (`2027` portfolio, sized to what live traded);
    autotrader strategy log; Schwab transactions.[^weekly-files]
 3. Drop all four on **Sage › Investments › Options › Live vs Backtest**.
 4. Read in order: live − backtest tile → flagged rows → stop fill vs 3×
@@ -173,7 +173,9 @@ The only review where the leap can go up.
     is why its checks are the fill gap and the account high instead.
 
 [^weekly-files]: Each upload is recognised by its header and replaces the
-    same dates from last time, so re-dropping a week is safe. The `2027` OO
+    same dates from last time, so re-dropping a week is safe. The week alone
+    is enough for every file, Schwab included: earlier weeks stay stored, and
+    the open leap is read from them. A wider range does no harm. The `2027` OO
     portfolio must be sized to the contracts live actually traded, or the
     comparison is against a different book.
 
