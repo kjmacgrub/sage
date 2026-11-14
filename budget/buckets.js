@@ -782,8 +782,8 @@ function renderFlow(c) {
             : `M ${x0} ${y0} C ${mid} ${y0}, ${mid} ${yEnd}, ${x1 - 16} ${yEnd}`;
         out += `<path class="rv-flow-arrow ${on ? 'reserve' : 'off'}" style="stroke-width:${w}" d="${d}"/>` + headR(x1, yEnd, w, on ? 'reserve' : 'off');
         const label = !ready ? '' : !on ? 'nothing needed this month'
-            : `${fmt(transfer)} this month · ${c.dueTotal > 0 ? 'covers bills due' : 'one transfer'}`;
-        if (label) out += `<text class="rv-flow-arrow-label${on ? '' : ' off'}" x="${x0 + 16}" y="${y0 - w / 2 - 10}">${esc(label)}</text>`;
+            : `${fmt(transfer)} this month${c.dueTotal > 0 ? ' · covers bills due' : ''}`;
+        if (label) out += `<text class="rv-flow-arrow-label${on ? '' : ' off'}" x="${(x0 + x1) / 2}" y="${(y0 + yEnd) / 2 - w / 2 - 10}" text-anchor="middle">${esc(label)}</text>`;
     }
 
     // ── Guaranteed income: a flow from outside, with no balance of its own
